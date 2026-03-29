@@ -1,0 +1,13 @@
+Projektkontext:
+[project_overview.md]
+
+Aktueller Stand:
+[optional]
+
+Aufgabe:
+[konkrete Aufgabe]
+
+Anforderungen:
+- sauberer Code
+- .NET 8
+- EF Core

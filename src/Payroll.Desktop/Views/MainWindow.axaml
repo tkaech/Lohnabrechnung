@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        x:Class="Payroll.Desktop.Views.MainWindow"
+        Width="960"
+        Height="640"
+        Title="{Binding Title}">
+  <Grid RowDefinitions="Auto,Auto,*" Margin="24">
+    <StackPanel Spacing="8">
+      <TextBlock FontSize="28" FontWeight="Bold" Text="{Binding Title}" />
+      <TextBlock Opacity="0.75" Text="{Binding StatusText}" />
+    </StackPanel>
+
+    <Border Grid.Row="1"
+            Margin="0,24,0,24"
+            Padding="16"
+            CornerRadius="12"
+            Background="#EEF6F1">
+      <TextBlock Text="Nächste Ausbaustufen: CSV-Import, Monatslauf, PDF-Erstellung, Spesen-Workflow" />
+    </Border>
+
+    <DataGrid Grid.Row="2"
+              ItemsSource="{Binding Employees}"
+              AutoGenerateColumns="False"
+              GridLinesVisibility="All"
+              CanUserSortColumns="True">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Nr." Binding="{Binding EmployeeNumber}" Width="120" />
+        <DataGridTextColumn Header="Mitarbeiter" Binding="{Binding FullName}" Width="220" />
+        <DataGridTextColumn Header="Anstellung" Binding="{Binding EmploymentType}" Width="150" />
+        <DataGridTextColumn Header="Monatslohn" Binding="{Binding MonthlySalary}" Width="140" />
+        <DataGridTextColumn Header="Stundenansatz" Binding="{Binding HourlyRate}" Width="140" />
+      </DataGrid.Columns>
+    </DataGrid>
+  </Grid>
+</Window>
