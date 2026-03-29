@@ -1,55 +1,59 @@
-# Lohnabrechnung Schweiz
+# Swiss Payroll Management
 
-Desktop-Anwendung fuer die Lohnverwaltung in der Schweiz auf Basis von C#, .NET 8, Avalonia, SQLite und Entity Framework Core.
+Desktop application for payroll management in Switzerland built with C#, .NET 8, Avalonia, SQLite, and Entity Framework Core.
 
-## Ziel
+The project follows a layered architecture with a clear separation between domain model, business logic, infrastructure, and UI. It is designed as a local, maintainable foundation for small to medium-sized teams with around 40 employees and can later be extended for PostgreSQL and additional payroll rules.
 
-Die Anwendung soll kleinere bis mittlere Teams mit rund 40 Mitarbeitenden bei der monatlichen Lohnverarbeitung unterstuetzen.
+## Goals
 
-Geplante Kernfunktionen:
+The application is intended to support monthly payroll processing in a Swiss business context and provide a solid technical base for future functional growth.
 
-- Mitarbeiter-Stammdaten verwalten
-- Arbeitsstunden per CSV importieren
-- Lohnberechnung inklusive Schweizer Abzuegen wie AHV und ALV
-- Spesen und manuelle Anpassungen erfassen
-- Monatliche Lohnabrechnungen als PDF erzeugen
+Planned core features:
 
-## Projektstruktur
+- Employee master data management
+- CSV import for working hours
+- Payroll calculation including Swiss deductions such as AHV and ALV
+- Expense management with manual adjustments
+- Monthly payslip generation as PDF
 
-- `src/Payroll.Domain`: Fachliche Kernobjekte
-- `src/Payroll.Application`: Anwendungslogik und Abfragen
-- `src/Payroll.Infrastructure`: EF Core, SQLite und technische Implementierungen
-- `src/Payroll.Desktop`: Avalonia-UI mit ViewModels
-- `docs`: Architektur- und Projektnotizen
+## Project Structure
 
-## Technik
+- `src/Payroll.Domain`: Core business entities and rules
+- `src/Payroll.Application`: Use cases, queries, and business orchestration
+- `src/Payroll.Infrastructure`: EF Core, SQLite, and technical implementations
+- `src/Payroll.Desktop`: Avalonia desktop UI and view models
+- `docs`: Architecture notes and project planning
 
-- Sprache: C#
+## Tech Stack
+
+- Language: C#
 - Framework: .NET 8
 - UI: Avalonia
-- Datenbank: SQLite
+- Database: SQLite
 - ORM: Entity Framework Core
-- Entwicklungsumgebung: VS Code
+- IDE: VS Code
 
-## Starten
+## Getting Started
 
 ```powershell
 dotnet build Lohnabrechnung.slnx
 dotnet run --project src/Payroll.Desktop/Payroll.Desktop.csproj
 ```
 
-## Status
+## Current Status
 
-Das Repository enthaelt aktuell ein minimales Startprojekt mit:
+The repository currently contains a minimal starter project with:
 
-- sauber getrennten Schichten
-- vorbereiteten Domain-Klassen fuer Mitarbeiter, Stunden, Spesen und Lohnlauf
-- EF-Core-Kontext fuer SQLite
-- minimaler Avalonia-Oberflaeche mit Beispielmitarbeitern
+- a clean layered architecture
+- initial domain models for employees, work time, expenses, and payroll runs
+- an EF Core SQLite data context
+- a minimal Avalonia desktop UI with seeded sample employees
 
-## Naechste Schritte
+The current state is intended as a technical foundation for the next functional milestones.
 
-- CSV-Import fuer Arbeitsstunden
-- konfigurierbare Abzugssaetze
-- PDF-Erstellung fuer Lohnabrechnungen
-- spaetere Vorbereitung fuer PostgreSQL
+## Roadmap
+
+- CSV import for working hours
+- configurable payroll deduction rates
+- PDF generation for payslips
+- preparation for future PostgreSQL support
