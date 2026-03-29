@@ -15,3 +15,15 @@ Abhaengigkeiten laufen nur nach innen:
 - Domain -> keine
 
 Damit bleibt die Businesslogik testbar und die Datenhaltung spaeter auf PostgreSQL erweiterbar.
+
+## Verbindliche Entwicklungsprinzipien
+
+Zusaetzlich zur Schichtentrennung gelten folgende Grundsaetze:
+
+- fachliche Logik nur einmal implementieren
+- eine zentrale Quelle fuer Regeln, Konfiguration und Darstellungslogik
+- konsistentes Verhalten und konsistente Darstellung in der gesamten UI
+- keine Businesslogik in Views oder Code-Behind
+- Wiederverwendung vor Neuerstellung
+
+Die vollstaendige Beschreibung steht in [docs/development-principles.md](development-principles.md).

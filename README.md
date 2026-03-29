@@ -24,6 +24,18 @@ Planned core features:
 - `src/Payroll.Desktop`: Avalonia desktop UI and view models
 - `docs`: Architecture notes and project planning
 
+## Development Principles
+
+The project follows a few non-negotiable implementation rules:
+
+- business logic should exist only once and not be duplicated
+- the same kind of data should always be presented consistently
+- UI behavior should remain predictable across all screens
+- UI must not contain business logic
+- existing code should be reused before creating parallel structures
+
+See [docs/development-principles.md](docs/development-principles.md) for the full project rules.
+
 ## Tech Stack
 
 - Language: C#
