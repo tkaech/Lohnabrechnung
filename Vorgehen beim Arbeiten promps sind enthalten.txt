@@ -1,0 +1,30 @@
+ Das Dokument für das Arbeiten und Programieren von Codex NIE verwenden. Der Inhalt ist nur eine Gedankenstütze für das menschliche Arbeiten
+ 
+1. Session-Start-Prompt (immer verwenden)
+START==>Bitte arbeite nach prompts/codex_start.md.
+
+Fasse den aktuellen Stand zusammen, nenne Risiken und schlage die nächsten 3 bis 5 sinnvollen Schritte vor.
+Ändere noch keinen Code.<==STOP
+
+2. Umsetzungs-Prompt (für jeden Schritt)
+START==>Bitte arbeite nach prompts/codex_start.md.
+
+Setze jetzt folgenden Schritt um:
+[HIER SCHRITT EINFÜGEN]
+
+Arbeite fokussiert und nur in den betroffenen Bereichen.<==STOP
+
+Optional (wenn du stärker steuern willst):
+- nur Domain
+- keine UI
+- keine Infrastruktur-Erweiterung
+
+3. Session-Abschluss-Prompt (am Ende)
+==>Bitte arbeite nach prompts/codex_start.md.
+
+Erstelle einen Session-Abschluss:
+- Zusammenfassung der umgesetzten Arbeiten
+- offene Punkte
+- nächste sinnvolle Schritte
+
+Aktualisiere die Progress-Dokumente entsprechend.<==

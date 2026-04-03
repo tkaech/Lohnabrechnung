@@ -5,4 +5,8 @@
     <Project Path="src/Payroll.Domain/Payroll.Domain.csproj" />
     <Project Path="src/Payroll.Infrastructure/Payroll.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Payroll.Application.Tests/Payroll.Application.Tests.csproj" />
+    <Project Path="tests/Payroll.Domain.Tests/Payroll.Domain.Tests.csproj" />
+  </Folder>
 </Solution>

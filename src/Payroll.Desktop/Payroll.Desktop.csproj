@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Payroll.Desktop</RootNamespace>
+    <AssemblyName>Payroll.Desktop</AssemblyName>
+  </PropertyGroup>
+
+</Project>

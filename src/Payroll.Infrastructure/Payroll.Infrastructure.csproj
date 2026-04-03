@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Payroll.Infrastructure</RootNamespace>
+    <AssemblyName>Payroll.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Payroll.Application/Payroll.Application.csproj" SkipGetTargetFrameworkProperties="true" />
+  </ItemGroup>
+</Project>
