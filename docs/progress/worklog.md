@@ -33,3 +33,59 @@ Projekt neu strukturiert
 - `PayrollRunLineDerivationService`, `PayrollWorkSummary` und Ergebnis-Issues für offene Regeln ergänzt
 - `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` nach den Änderungen erfolgreich ausgeführt
 - `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` weiterhin nur an der Sandbox-Socket-Restriktion gescheitert
+- Excel-Datei technisch eingesehen und konkrete Payroll-Begriffe wie `ZUSCHLÄGE NSF`, `Spezialzuschlag gemäss Vertrag`, `BVG Arbeitnehmeranteil`, `Fahrzeitentschädigung`, `Mehrzeit/Unterzeit` und `Unfalltaggeld` als Fachsignale verwendet
+- offene Regeln in gesicherte Erkenntnisse, Annahmen und weiterhin offene Punkte getrennt
+- bei mehrdeutiger Ueberlappung von Spezialstunden wird nun ein fachlicher Konflikt gemeldet statt eine unsichere Zuschlagsberechnung durchgeführt
+- Domain-Tests für diese Konfliktmarkierung ergänzt
+- erster Vertikalschnitt fuer Mitarbeitendenverwaltung umgesetzt
+- `Employee` und `EmploymentContract` um Bearbeitungslogik fuer CRUD-Szenarien ergänzt
+- Application-Contracts, Repository-Abstraktion und `EmployeeService` fuer Liste, Anlegen und Bearbeiten ergänzt
+- EF-Core-`PayrollDbContext` und SQLite-Repository fuer Mitarbeitende und Verträge umgesetzt
+- Avalonia-App mit einfacher Mitarbeiterliste und Erfassungs-/Bearbeitungsformular aufgebaut
+- Domain- und Application-Tests fuer Mitarbeitendenverwaltung ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` nach UI-/Persistence-Erweiterung erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` weiterhin nur an der Sandbox-Socket-Restriktion gescheitert
+- Session-Abschluss erstellt und Übergabe mit offenen Punkten, Risiken, Einschränkungen und drei priorisierten nächsten Schritten bereinigt
+- Mitarbeitendenverwaltung von einfachem CRUD-Schnitt zu einem brauchbaren Stammdatenmodul erweitert
+- `Employee` um Geburtsdatum, Eintritt/Austritt, Aktivstatus, Telefon, E-Mail, Wohnsitzland, Nationalitaet, Bewilligung, Steuerstatus, Quellensteuerpflicht, AHV-Nummer und IBAN ergänzt
+- Adresse als strukturierte Komponente mit Strasse, Hausnummer, Adresszusatz, Postleitzahl, Ort und Land modelliert
+- Application-Contracts und Repository fuer Suche/Filter nach Mitarbeitenden erweitert
+- Avalonia-UI um Suchfeld, Aktiv/Inaktiv-Filter sowie erweitertes Formular fuer Stammdaten, Kontakt, Adresse und vorbereitete payroll-relevante Felder ergänzt
+- Domain- und Application-Tests fuer erweiterte Mitarbeitendenverwaltung ergänzt
+- bestehenden Payroll-Domain-Test fuer Fahrzeugentschaedigung an die bereits implementierte Ableitung angeglichen
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- AppSectionCard-Template von StackPanel auf Grid umgestellt, damit ScrollViewer in der UI sauber begrenzt werden
+- Mitarbeitendenliste als Arbeitsansicht mit sichtbarer Trefferanzahl und besser nutzbarer Such-/Filterleiste geschärft
+- Formularbereich so angepasst, dass Felder scrollen, Statusmeldung und Aktionen aber erreichbar bleiben
+- lokale Entwicklungsdatenbank `payroll.localdev.db` eingeführt und mit 10 plausiblen Demo-Mitarbeitenden geseedet
+- Demo- und Produktivdatenbank im Desktop-Bootstrap explizit getrennt
+- zusätzlicher Test für idempotentes Seed-Verhalten der Demo-Daten ergänzt
+- SQLite-Fehler `SQL APPLY operation, which is not supported on SQLite` in der Mitarbeitendenliste analysiert
+- Ursache identifiziert: neuester Vertrag wurde in einer SQL-Projektion über `OrderByDescending(...).FirstOrDefault()` bestimmt
+- Employee-Repository auf SQLite-kompatiblen Ladepfad umgestellt: Mitarbeitende und Verträge getrennt laden, neuesten Vertrag im Speicher bestimmen
+- Speichern/Reload-Pfad der Mitarbeitendenverwaltung damit wieder funktionsfähig gemacht
+- zusätzlichen SQLite-In-Memory-Repository-Test fuer Save+List ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Mitarbeitenden-UI von permanent editierbarem Formular auf klaren Ansichts- und Bearbeitungsmodus umgebaut
+- ViewModel um expliziten Aktionsfluss fuer `Neu`, `Bearbeiten`, `Speichern`, `Abbrechen` und Loeschbestaetigung erweitert
+- Loeschfunktion fachlich als logisches Archivieren/Deaktivieren im Employee-Modul umgesetzt
+- Desktop-Shell um vorbereitete Navigationsstruktur fuer weitere Bereiche ergänzt
+- UI-Design-System um Shell-/Aktionsleistenregeln erweitert
+- Domain-Test fuer Archivierung und Application-Test fuer Archivierungsfluss ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Session-Abschluss erstellt und aktueller UI-Blocker dokumentiert: Nach dem letzten UI-Umbau ist derzeit keine Person mehr aus der Mitarbeitendenliste auswählbar
+- Auswahl-Blocker in der Mitarbeitendenliste gezielt analysiert: asynchrones Laden von Details und gleichzeitiges Disable der Liste konnten spaetere Selection-Wechsel verschlucken
+- `MainWindowViewModel` um nachgezogene Pending-Selection erweitert; die Liste bleibt waehrend Detail-Ladevorgaengen selektierbar, waehrend Such-/Refresh-Aktionen weiter sauber gesperrt bleiben
+- ViewModel-Tests fuer Initialauswahl, Busy-Selection, Abbrechen nach Neueingabe und Archivieren mit Reload ergänzt
+- Archivieren in der Mitarbeitendenverwaltung auf den Bearbeitungsmodus eingeschraenkt und den Testfall entsprechend abgesichert
+- fehlendes `CanExecuteChanged` fuer die Delete-Bestaetigungsbuttons nach dem Einblenden der Sicherheitsabfrage behoben
+- Suchfeld, Filter und Refresh fuer Mitarbeitende vom Bearbeitungsmodus entkoppelt; aktive Mitarbeitenden-Navigation nicht mehr deaktiviert
+- fehlende `PropertyChanged`-Signale fuer busy-abhaengige UI-Freigaben im ViewModel ergaenzt, damit Suchfeld und weitere Aktionen nach dem Laden wieder aktiv werden
+- fachliche Zielrichtung fuer historisierte `EmploymentContract`-Versionen sowie fuer den naechsten Payroll-Orchestrierungsschritt dokumentiert
+- Planungsdokumente an den realen Ist-Stand angepasst
+- Session-Abschluss erstellt, offene Punkte konsolidiert und `docs/context/ai_summary.md` auf den aktuellen Stand gebracht
+- fachliches Sollbild fuer die gemeinsame Monatserfassung von Zeiten und Spesen in den bestehenden Doku-Dateien verankert
+- manuelle Erfassung vor Import sowie Jahresableitung aus Monatsdaten als naechste Richtung dokumentiert

@@ -44,12 +44,13 @@ public sealed class PayrollRunLineDerivationServiceTests
             vehicleCompensations);
 
         Assert.Empty(result.Issues);
-        Assert.Equal(6, result.Lines.Count);
+        Assert.Equal(7, result.Lines.Count);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.BaseHours && line.AmountChf == 420m);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.NightSupplement && line.AmountChf == 15m);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.SundaySupplement && line.AmountChf == 15m);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.HolidaySupplement && line.AmountChf == 15m);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.Expense && line.ValueOrigin == PayrollLineValueOrigin.Direct);
+        Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.VehicleCompensation && line.AmountChf == 120m);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.BvgDeduction && line.AmountChf == -280m);
     }
 
@@ -95,5 +96,43 @@ public sealed class PayrollRunLineDerivationServiceTests
         Assert.Equal(1.5m, summary.NightHours);
         Assert.Equal(1m, summary.SundayHours);
         Assert.Equal(0.25m, summary.HolidayHours);
+    }
+
+    [Fact]
+    public void WorkSummary_ExposesAmbiguousOverlapWhenSpecialHoursExceedWorkHours()
+    {
+        var summary = new PayrollWorkSummary(Guid.NewGuid(), 8m, 4m, 3m, 2m);
+
+        Assert.True(summary.HasAmbiguousSpecialHourOverlap);
+    }
+
+    [Fact]
+    public void DeriveForEmployee_ReturnsIssueAndSkipsSupplementsWhenOverlapIsAmbiguous()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(
+            employeeId,
+            new DateOnly(2026, 1, 1),
+            null,
+            30m,
+            280m,
+            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m));
+
+        var workSummary = new PayrollWorkSummary(employeeId, 8m, 4m, 3m, 2m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            contract,
+            workSummary,
+            [],
+            []);
+
+        Assert.Contains(result.Issues, issue => issue.Code == "AMBIGUOUS_SPECIAL_HOUR_OVERLAP");
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.NightSupplement);
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.SundaySupplement);
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.HolidaySupplement);
+        Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.BaseHours);
+        Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.BvgDeduction);
     }
 }

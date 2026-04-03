@@ -27,4 +27,12 @@ Erstelle einen Session-Abschluss:
 - offene Punkte
 - nächste sinnvolle Schritte
 
-Aktualisiere die Progress-Dokumente entsprechend.<==
+Aktualisiere die Progress-Dokumente entsprechend.
+
+Aktualisiere docs/context/ai_summary.md:
+- Stand
+- aktuelle Themen
+- offene Risiken
+
+Überschreibe keine stabilen Projektdefinitionen wie Projekt, Stack oder Architektur.
+<==STOP

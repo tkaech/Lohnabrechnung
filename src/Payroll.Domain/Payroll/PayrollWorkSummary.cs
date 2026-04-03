@@ -40,6 +40,7 @@ public sealed class PayrollWorkSummary
     public decimal SundayHours { get; }
     public decimal HolidayHours { get; }
     public decimal SpecialHours => NightHours + SundayHours + HolidayHours;
+    public bool HasAmbiguousSpecialHourOverlap => SpecialHours > WorkHours;
 
     public static PayrollWorkSummary FromTimeEntries(Guid employeeId, IEnumerable<TimeEntry> entries)
     {

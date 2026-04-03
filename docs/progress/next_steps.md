@@ -1,7 +1,6 @@
 # Next Steps
 
-1. Offene Payroll-Regeln zu Stundenüberlappung, BVG-Pro-Rata und weiteren Spezialfällen aus Excel fachlich entscheiden
-2. Application-Services für PayrollRun auf die neue Ableitungslogik und die Ergebnis-Issues ausrichten
-3. Fehlende fachliche Klassifikationen wie Spesenart und gegebenenfalls weitere Zuschlagsarten gezielt im Domain-Modell ergänzen
-4. Persistenzmodell und EF-Core-Mappings für die neuen Payroll- und Vertragsstrukturen vorbereiten
-5. Secplan-Importformat technisch klären und auf die normalisierten Zeitfelder abbilden
+1. Fachliches Sollbild fuer die gemeinsame Monatserfassung pro Mitarbeitenden konkretisieren: Zeiten, Spesen und Monatsvorschau im selben Monatskontext
+2. Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln fachlich konkretisieren
+3. Naechsten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren: gueltigen Vertrag, WorkSummary, Spesen und Fahrzeugentschaedigung zusammenfuehren, ohne offene Spezialfaelle zu automatisieren
+4. Erst danach den ersten Umsetzungschnitt fuer die manuelle Monatserfassung planen, ohne Import oder Jahresdarstellung vorzuziehen

@@ -13,6 +13,7 @@
 - Services
 - Orchestrierung
 - Validierung
+- Monatskontext fuer manuelle Erfassung und spaetere Verdichtung
 
 ### Infrastructure
 - EF Core
@@ -42,3 +43,5 @@
 - keine zirkulären Referenzen
 - Module sind unabhängig
 - Businesslogik nur in Domain/Application
+- manuelle Erfassung und spaetere Importpfade muessen auf dieselben normalisierten Zeit- und Spesendaten fuehren
+- Monatsvorschau ist Verdichtung, nicht Rohdatenerfassung

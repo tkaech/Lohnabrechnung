@@ -23,6 +23,7 @@ Das Excel dient als fachliche Grundlage, wird aber nicht technisch übernommen.
 
 ## Hauptfunktionen
 - Mitarbeiterverwaltung
+- Monatserfassung pro Mitarbeitenden fuer Zeiten und Spesen
 - Import von Arbeitszeitdaten (Secplan)
 - Zeiterfassung (Stunden, Pausen, Überzeit)
 - Spesenverwaltung
@@ -40,6 +41,8 @@ Das Excel dient als fachliche Grundlage, wird aber nicht technisch übernommen.
 - Keine hardcodierten Werte
 - Manuelle Anpassungen sind auditierbar
 - Importdaten sind nachvollziehbar
+- Monatserfassung ist die fuehrende fachliche Arbeitsform fuer Zeiten und Spesen
+- Jahresdarstellungen und Lohnblaetter werden spaeter aus Monatsdaten abgeleitet
 
 ## Nicht-Ziele (MVP)
 - Keine Swissdec-Zertifizierung

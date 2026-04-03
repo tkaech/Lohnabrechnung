@@ -40,35 +40,44 @@ public sealed class PayrollRunLineDerivationService
                 contract.HourlyRateChf));
         }
 
-        AddConfiguredSupplementLine(
-            lines,
-            issues,
-            contract,
-            PayrollLineType.NightSupplement,
-            "NIGHT",
-            "Night supplement",
-            workSummary.NightHours,
-            contract.SupplementSettings.NightSupplementRate);
+        if (workSummary.HasAmbiguousSpecialHourOverlap)
+        {
+            issues.Add(new PayrollDerivationIssue(
+                "AMBIGUOUS_SPECIAL_HOUR_OVERLAP",
+                "Special hours exceed total work hours; overlap rules for night, sunday and holiday hours are unresolved."));
+        }
+        else
+        {
+            AddConfiguredSupplementLine(
+                lines,
+                issues,
+                contract,
+                PayrollLineType.NightSupplement,
+                "NIGHT",
+                "Night supplement",
+                workSummary.NightHours,
+                contract.SupplementSettings.NightSupplementRate);
 
-        AddConfiguredSupplementLine(
-            lines,
-            issues,
-            contract,
-            PayrollLineType.SundaySupplement,
-            "SUN",
-            "Sunday supplement",
-            workSummary.SundayHours,
-            contract.SupplementSettings.SundaySupplementRate);
+            AddConfiguredSupplementLine(
+                lines,
+                issues,
+                contract,
+                PayrollLineType.SundaySupplement,
+                "SUN",
+                "Sunday supplement",
+                workSummary.SundayHours,
+                contract.SupplementSettings.SundaySupplementRate);
 
-        AddConfiguredSupplementLine(
-            lines,
-            issues,
-            contract,
-            PayrollLineType.HolidaySupplement,
-            "HOL",
-            "Holiday supplement",
-            workSummary.HolidayHours,
-            contract.SupplementSettings.HolidaySupplementRate);
+            AddConfiguredSupplementLine(
+                lines,
+                issues,
+                contract,
+                PayrollLineType.HolidaySupplement,
+                "HOL",
+                "Holiday supplement",
+                workSummary.HolidayHours,
+                contract.SupplementSettings.HolidaySupplementRate);
+        }
 
         foreach (var expense in expenses)
         {

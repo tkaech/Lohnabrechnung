@@ -4,6 +4,11 @@ namespace Payroll.Domain.Employees;
 
 public sealed class EmploymentContract : AuditableEntity
 {
+    private EmploymentContract()
+    {
+        SupplementSettings = WorkTimeSupplementSettings.Empty;
+    }
+
     public Guid EmployeeId { get; private set; }
     public DateOnly ValidFrom { get; private set; }
     public DateOnly? ValidTo { get; private set; }
@@ -37,5 +42,22 @@ public sealed class EmploymentContract : AuditableEntity
     public decimal CalculateGrossPay(decimal hours)
     {
         return Guard.AgainstNegative(hours, nameof(hours)) * HourlyRateChf;
+    }
+
+    public void UpdateTerms(
+        DateOnly validFrom,
+        DateOnly? validTo,
+        decimal hourlyRateChf,
+        decimal monthlyBvgDeductionChf,
+        WorkTimeSupplementSettings? supplementSettings = null)
+    {
+        Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
+
+        ValidFrom = validFrom;
+        ValidTo = validTo;
+        HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
+        MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
+        SupplementSettings = supplementSettings ?? WorkTimeSupplementSettings.Empty;
+        Touch();
     }
 }

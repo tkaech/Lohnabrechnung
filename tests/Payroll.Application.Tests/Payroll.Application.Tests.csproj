@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Payroll.Application/Payroll.Application.csproj" SkipGetTargetFrameworkProperties="true" />
+    <ProjectReference Include="../../src/Payroll.Desktop/Payroll.Desktop.csproj" SkipGetTargetFrameworkProperties="true" />
+    <ProjectReference Include="../../src/Payroll.Infrastructure/Payroll.Infrastructure.csproj" SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,1 +1,296 @@
-<!-- Avalonia shell placeholder. UI behavior stays in view models and reusable controls. -->
+<Window
+    x:Class="Payroll.Desktop.Views.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:Payroll.Desktop.Controls"
+    Title="{Binding Title}"
+    Width="1460"
+    Height="920"
+    MinWidth="1200"
+    MinHeight="760"
+    Background="#FFF5F7FA">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20">
+    <Border
+        Grid.Row="0"
+        Padding="18"
+        Background="#FF14324A"
+        CornerRadius="14"
+        Margin="0,0,0,16">
+      <StackPanel Spacing="6">
+        <TextBlock FontSize="24" FontWeight="Bold" Foreground="White" Text="PayrollApp" />
+        <TextBlock Foreground="#FFD1DCE7" Text="Stabile Arbeitsoberflaeche fuer Stammdaten, mit klarer Navigation und wiederverwendbarer Aktionslogik." />
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="1" Background="#FFFFFFFF" BorderBrush="#FFD7DFEA" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button Classes="nav-active" Content="Mitarbeitende" />
+        <Button Classes="nav-placeholder" Content="Zeiten" IsEnabled="False" />
+        <Button Classes="nav-placeholder" Content="Spesen" IsEnabled="False" />
+        <Button Classes="nav-placeholder" Content="Lohnlaeufe" IsEnabled="False" />
+        <Button Classes="nav-placeholder" Content="AHV / Abzuege" IsEnabled="False" />
+        <Button Classes="nav-placeholder" Content="Quellensteuer" IsEnabled="False" />
+        <Button Classes="nav-placeholder" Content="Reporting" IsEnabled="False" />
+        <Button Classes="nav-placeholder" Content="Einstellungen" IsEnabled="False" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="250,1.05*,1.45*" MinHeight="0">
+      <controls:AppSectionCard Grid.Column="0" Header="Bereiche" Margin="0,0,8,0">
+        <StackPanel Spacing="10">
+          <TextBlock Classes="section-caption" Text="Die Navigation ist bereits fuer weitere Module vorbereitet." TextWrapping="Wrap" />
+          <Button Classes="nav-active" Content="Mitarbeitende" />
+          <Button Classes="nav-placeholder" Content="Zeiten (Platzhalter)" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="Spesen (Platzhalter)" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="Lohnlaeufe (Platzhalter)" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="AHV / Abzuege (Platzhalter)" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="Quellensteuer (Platzhalter)" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="Reporting (Platzhalter)" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="Einstellungen (Platzhalter)" IsEnabled="False" />
+        </StackPanel>
+      </controls:AppSectionCard>
+
+      <controls:AppSectionCard Grid.Column="1" Header="Mitarbeitende" Margin="8,0">
+        <Grid RowDefinitions="Auto,Auto,Auto,*" MinHeight="0">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBox
+                IsEnabled="{Binding CanSearchEmployees}"
+                Watermark="Suche nach Name, Personalnummer, Ort oder E-Mail"
+                Text="{Binding SearchText, Mode=TwoWay}" />
+            <ComboBox
+                Grid.Column="1"
+                Width="120"
+                Margin="8,0,0,0"
+                IsEnabled="{Binding CanSearchEmployees}"
+                ItemsSource="{Binding ActivityFilters}"
+                SelectedItem="{Binding SelectedActivityFilter, Mode=TwoWay}" />
+            <Button
+                Grid.Column="2"
+                Margin="8,0,0,0"
+                Command="{Binding SearchCommand}"
+                Content="Suchen" />
+          </Grid>
+
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+            <Button Command="{Binding RefreshCommand}" Content="Aktualisieren" />
+          </StackPanel>
+
+          <TextBlock Grid.Row="2" Margin="0,12,0,0" Foreground="#FF5F6B7A" Text="{Binding EmployeeCountSummary}" />
+
+          <ListBox
+              Grid.Row="3"
+              MinHeight="0"
+              Margin="0,12,0,0"
+              IsEnabled="{Binding CanSelectEmployees}"
+              ItemsSource="{Binding Employees}"
+              SelectedItem="{Binding SelectedEmployee, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Padding="10" Margin="0,0,0,8" Background="#FFF8FAFC" CornerRadius="8">
+                  <StackPanel Spacing="3">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock FontWeight="SemiBold" Text="{Binding FullName}" />
+                      <Border Grid.Column="1" Margin="8,0,0,0" Background="#FFE6EEF5" CornerRadius="999" Padding="8,2">
+                        <TextBlock Classes="section-caption" Text="{Binding StatusSummary}" />
+                      </Border>
+                    </Grid>
+                    <TextBlock Classes="section-caption" Text="{Binding PersonnelNumber}" />
+                    <TextBlock Foreground="#FF4A5868" Text="{Binding ContactSummary}" TextWrapping="Wrap" />
+                    <TextBlock Foreground="#FF4A5868" Text="{Binding ContractSummary}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </controls:AppSectionCard>
+
+      <controls:AppSectionCard Grid.Column="2" Header="Detailbereich" Margin="8,0,0,0">
+        <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" MinHeight="0">
+          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12">
+            <StackPanel Spacing="4">
+              <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding FormTitle}" />
+              <TextBlock Foreground="#FF5F6B7A" Text="{Binding FormDescription}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <ScrollViewer Grid.Row="1" MinHeight="0" Margin="0,12,0,0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,*">
+              <TextBlock Grid.ColumnSpan="2" Classes="section-caption" Text="Stammdaten" />
+
+              <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Personalnummer" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PersonnelNumber, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Vorname" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding FirstName, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="4" Margin="0,10,0,0">
+                <TextBlock Classes="section-caption" Text="Nachname" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding LastName, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="3" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Geburtsdatum" />
+                <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding BirthDate, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="3" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Eintrittsdatum" />
+                <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding EntryDate, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="4" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Austrittsdatum" />
+                <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding ExitDate, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Status" />
+                <CheckBox IsChecked="{Binding IsActiveEmployee, Mode=TwoWay}" IsEnabled="{Binding CanEditFields}" Content="Aktiv" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Adresse und Kontakt" />
+
+              <StackPanel Grid.Row="6" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Strasse" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Street, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="6" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Hausnummer" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding HouseNumber, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Spacing="4" Margin="0,10,0,0">
+                <TextBlock Classes="section-caption" Text="Adresszusatz" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding AddressLine2, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="8" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Postleitzahl" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PostalCode, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="8" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Ort" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding City, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="9" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Land" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Country, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="9" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Wohnsitzland" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding ResidenceCountry, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="10" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Telefon" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PhoneNumber, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="10" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="E-Mail" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Email, Mode=TwoWay}" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Payroll-relevante Stammdaten" />
+
+              <StackPanel Grid.Row="12" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Nationalitaet" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Nationality, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="12" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Bewilligung" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PermitCode, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="13" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Steuerstatus" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding TaxStatus, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="13" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Quellensteuerpflicht" />
+                <ComboBox IsEnabled="{Binding CanEditFields}" ItemsSource="{Binding WithholdingTaxOptions}" SelectedItem="{Binding SelectedWithholdingTaxOption, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="14" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="AHV-Nummer" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding AhvNumber, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="14" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="IBAN" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Iban, Mode=TwoWay}" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="15" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Vertragsdaten" />
+
+              <StackPanel Grid.Row="16" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Gueltig ab" />
+                <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding ContractValidFrom, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="16" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Gueltig bis" />
+                <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding ContractValidTo, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="17" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Stundenlohn CHF" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding HourlyRateChf, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="17" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="BVG pro Monat CHF" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding MonthlyBvgDeductionChf, Mode=TwoWay}" />
+              </StackPanel>
+
+              <TextBlock Grid.Row="18" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Optionale Zuschlagsparameter" />
+
+              <StackPanel Grid.Row="19" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Nachtzuschlag Rate" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Watermark="z. B. 0.25" Text="{Binding NightSupplementRate, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="19" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Sonntagszuschlag Rate" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Watermark="z. B. 0.50" Text="{Binding SundaySupplementRate, Mode=TwoWay}" />
+              </StackPanel>
+
+              <StackPanel Grid.Row="20" Grid.ColumnSpan="2" Spacing="4" Margin="0,10,0,0">
+                <TextBlock Classes="section-caption" Text="Feiertagszuschlag Rate" />
+                <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Watermark="z. B. 1.00" Text="{Binding HolidaySupplementRate, Mode=TwoWay}" />
+              </StackPanel>
+            </Grid>
+          </ScrollViewer>
+
+          <Border
+              Grid.Row="2"
+              Margin="0,12,0,0"
+              Padding="12"
+              Background="#FFFFF1E6"
+              BorderBrush="#FFF1C18A"
+              BorderThickness="1"
+              CornerRadius="8"
+              IsVisible="{Binding ShowDeleteConfirmation}">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Foreground="#FF6B4A1F" Text="{Binding DeleteConfirmationText}" TextWrapping="Wrap" />
+              <Button Grid.Column="1" Margin="10,0,0,0" Classes="danger-action" Command="{Binding ConfirmDeleteCommand}" Content="Archivieren" />
+              <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding DismissDeleteCommand}" Content="Zurueck" />
+            </Grid>
+          </Border>
+
+          <Border Grid.Row="3" Background="#FFF8FAFC" CornerRadius="8" Padding="12" Margin="0,12,0,0">
+            <TextBlock Foreground="#FF304255" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+          </Border>
+
+          <Grid Grid.Row="4" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="0,12,0,0">
+            <Button Grid.Column="0" Command="{Binding NewEmployeeCommand}" Content="Neu" />
+            <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding EditEmployeeCommand}" Content="Bearbeiten" IsVisible="{Binding ShowViewActions}" />
+            <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding DeleteCommand}" Content="Loeschen" IsVisible="{Binding ShowEditActions}" />
+            <Button Grid.Column="4" Margin="10,0,0,0" Command="{Binding CancelCommand}" Content="Abbrechen" IsVisible="{Binding ShowEditActions}" />
+            <Button Grid.Column="5" Classes="primary-action" Command="{Binding SaveCommand}" Content="Speichern" IsVisible="{Binding ShowEditActions}" />
+          </Grid>
+        </Grid>
+      </controls:AppSectionCard>
+    </Grid>
+
+    <TextBlock Grid.Row="3" Foreground="#FF5F6B7A" Text="{Binding WorkspaceLabel}" />
+  </Grid>
+</Window>
