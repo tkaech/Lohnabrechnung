@@ -11,8 +11,11 @@
 - Zeiten und Spesen werden fachlich in derselben Arbeitsflaeche gefuehrt
 - Jahresdarstellungen und Lohnblaetter werden spaeter aus Monatsdaten abgeleitet
 - eine Monatsvorschau ist fachliche Verdichtung, keine zusaetzliche Rohdatenerfassung
-- offen:
-  - ob fuer den Monatskontext spaeter eine eigene explizite Entitaet benoetigt wird, ist noch nicht entschieden
+- `EmployeeMonthlyRecord` ist als eigene explizite Monatsanker-Entitaet umgesetzt
+- diese Entitaet sichert:
+  - eindeutigen Monatskontext
+  - referentielle Integritaet fuer Zeit- und Spesendaten
+  - spaetere Erweiterbarkeit fuer Import, Review, Monatsabschluss und Payroll-Uebernahme
 
 ## Zuschläge
 - werden als Stunden gespeichert
@@ -31,6 +34,7 @@
 ## Fahrzeugentschädigung
 - zentral erfassen
 - nicht pro Formular
+- fachlich getrennt von normalen Spesen, aber an denselben Monatskontext anbindbar
 
 ## BVG
 - fixer CHF-Betrag

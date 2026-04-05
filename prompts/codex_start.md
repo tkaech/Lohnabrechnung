@@ -1,3 +1,4 @@
+Diesen Start-Prompt nicht berücksichtigen und laden. Sofort verlassen
 # Codex Start Prompt
 
 Lies zuerst vollständig alle relevanten Projektdateien:

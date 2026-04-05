@@ -89,3 +89,53 @@ Projekt neu strukturiert
 - Session-Abschluss erstellt, offene Punkte konsolidiert und `docs/context/ai_summary.md` auf den aktuellen Stand gebracht
 - fachliches Sollbild fuer die gemeinsame Monatserfassung von Zeiten und Spesen in den bestehenden Doku-Dateien verankert
 - manuelle Erfassung vor Import sowie Jahresableitung aus Monatsdaten als naechste Richtung dokumentiert
+- `EmployeeMonthlyRecord` als expliziten Monatsanker eingefuehrt und damit referentielle Integritaet fuer Monatsdaten abgesichert
+- `TimeEntry`, `ExpenseEntry` und `VehicleCompensation` an den Monatskontext angebunden
+- Application-Service und Repository fuer Monat laden/anlegen, Zeit-/Spesenpflege und Summen ergänzt
+- ersten funktionalen Avalonia-Schnitt fuer die gemeinsame Monatserfassung pro Mitarbeitenden umgesetzt
+- Domain-, Application- und SQLite-Tests fuer Monatskontext, Uniqueness, Datumsvalidierung und Persistenz ergänzt
+- voller Build- und Testlauf ausserhalb der Sandbox erfolgreich ausgeführt
+- UI-Feedback aufgenommen: Monatserfassung soll nicht unter Personendaten haengen, sondern monatszentriert gefuehrt werden
+- Desktop-Shell entsprechend umgebaut: Monat links als Fuehrungskontext, Personendaten in separatem Tab, Monatserfassung als primaerer Arbeitsbereich
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` nach dem UI-Umbau erfolgreich ausgeführt
+- weiterer UX-Schritt umgesetzt: eigener Bereich `Zeit- und Spesenerfassung` und separater Bereich `Mitarbeitende` statt Personendaten innerhalb derselben Erfassungsflaeche
+- `MonthlyRecordViewModel` so stabilisiert, dass Monatskontext bei Mitarbeitenden- oder Monatswechsel automatisch geladen wird
+- Speichern von Arbeitsstunden und Spesen funktioniert jetzt auch ohne expliziten manuellen `Monat laden`-Zwischenschritt
+- ViewModel-Tests fuer automatisches Nachladen des Monatskontexts und Bereichsumschaltung ergänzt
+- voller Build- und Testlauf ausserhalb der Sandbox erneut erfolgreich ausgeführt
+
+## 2026-04-05
+- Nacht-, Sonntags- und Feiertagszuschlag aus dem Mitarbeitendenformular entfernt und als zentrale `Einstellungen` umgesetzt
+- `PayrollSettings` sowie Service-/Repository-Pfad fuer die drei lohnrelevanten Zuschlagssaetze ergänzt
+- `EmploymentContract` und Mitarbeitenden-Speicherpfad von individuellen Zuschlagsparametern entkoppelt; Payroll-Ableitung auf zentrale Herkunft umgestellt
+- gezielte Settings-, Employee-, ViewModel- und SQLite-Tests fuer den neuen zentralen Pflegeort angepasst und ergänzt
+- Spesenlogik im Monatskontext fachlich vereinfacht: nur noch `Diverse Spesen` als festes Monatstotal je `EmployeeMonthlyRecord`
+- `ExpenseEntry`, `EmployeeMonthlyRecord`, `MonthlyRecordService`, DTOs und EF-Mapping auf Eingabe mit nur Datum und Betrag umgestellt
+- eindeutige Persistenzregel fuer genau einen `ExpenseEntry` pro Monatskontext ergänzt; UI-Felder und Listenanzeige fuer Typ/Beschreibung entfernt
+- Preview- und Payroll-Ableitung fuer die feste Spesenbezeichnung vereinheitlicht
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests fuer die vereinfachte Spesenerfassung angepasst und ergänzt
+- Fahrzeugentschaedigung im Monatserfassungsbereich von reiner Anzeige auf editierbaren Unterbereich erweitert
+- Save-/Delete-Flow fuer `VehicleCompensation` in `EmployeeMonthlyRecord`, `MonthlyRecordService` und `MonthlyRecordViewModel` ergänzt
+- Avalonia-UI fuer Datum, Betrag, Beschreibung, Auswahl und Loeschen von Fahrzeugentschaedigungen erweitert
+- gezielte Tests fuer Service- und ViewModel-Flow der Fahrzeugentschaedigung ergänzt
+- `dotnet build src/Payroll.Desktop/Payroll.Desktop.csproj -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- fokussierter Testlauf `dotnet test tests/Payroll.Application.Tests/Payroll.Application.Tests.csproj --filter "MonthlyRecordServiceTests|MonthlyRecordViewModelTests" -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Fehlerursache fuer inaktive Save-Buttons im Monatsbereich eingegrenzt: veraltete lokale Development-DB enthielt nur `Employees` und `EmploymentContracts`, aber keine Monatstabellen
+- `AppBootstrapper` erweitert, damit eine veraltete Development-DB ohne `EmployeeMonthlyRecords`, `TimeEntries`, `ExpenseEntries` und `VehicleCompensations` automatisch geloescht und neu erstellt wird
+- Ursache fuer weiterhin wirkungsloses Speichern im Monatsbereich eingegrenzt: `DateOnly.TryParse` war kulturabhaengig und akzeptierte im de-CH-Kontext das eingegebene ISO-Datum `yyyy-MM-dd` nicht verlaesslich
+- Datums- und Zahlenparser im `MonthlyRecordViewModel` auf ISO- und lokale Formate sowie Punkt/Komma-Varianten erweitert
+- gezielter ViewModel-Test fuer Speichern mit `de-CH`-Kultur und ISO-Datum ergänzt und ausserhalb der Sandbox erfolgreich ausgeführt
+- EF-Fehler `expected to affect 1 row(s), but actually affected 0 row(s)` im Monatsbereich auf langlebiges Tracking des gemeinsam genutzten Desktop-`DbContext` eingegrenzt
+- `MonthlyRecordService` und Monthly-Repository um explizites `ClearTracking()` vor Save-/Delete-/Load-Operationen erweitert, damit Monatsaggregate immer frisch geladen und ohne stale Tracking-Zustand gespeichert werden
+- In-Memory-Repository-Doubles in den Application-Tests an die neue Tracking-Schnittstelle angepasst
+- fokussierter Testlauf fuer `MonthlyRecordServiceTests|MonthlyRecordViewModelTests` ausserhalb der Sandbox erneut erfolgreich ausgeführt
+- reproduzierbaren SQLite/ViewModel-Integrationstest fuer den echten Speichern-Pfad ergänzt und damit die verbleibende Ursache sichtbar gemacht
+- eigentliche Ursache identifiziert: neue `TimeEntry`-, `ExpenseEntry`- und `VehicleCompensation`-Objekte mit bereits gesetzter GUID wurden von EF im Graph als bestehend interpretiert und deshalb als `Modified` statt `Added` behandelt
+- Monthly-Repository um explizites `MarkAsAdded(...)` erweitert; `MonthlyRecordService` markiert neue Child-Eintraege jetzt bewusst als Inserts
+- fokussierter Monats-Testlauf mit Repository-, Service- und ViewModel-Tests ausserhalb der Sandbox erfolgreich ausgeführt
+- Monatsvorschau im Desktop von summarischer Verdichtung auf tabellarische Zeilenansicht aller Monatseintraege umgestellt
+- neuer `MonthlyPreviewRowViewModel` eingefuehrt; Zeit-, Spesen- und Fahrzeugeintraege werden im ViewModel zu einer sortierten Monatsliste zusammengefuehrt
+- ViewModel-Test fuer tabellarische Monatsvorschau ergänzt und ausserhalb der Sandbox erfolgreich ausgeführt
+- Vorschau danach von Einzelmonat auf Mehrmonatsverlauf der selektierten Person erweitert
+- Repository liefert fuer die Monatsvorschau jetzt Tabellenzeilen ueber alle vorhandenen `EmployeeMonthlyRecord`-Monate derselben Person; Monate ohne Eintraege bleiben als Platzhalterzeile sichtbar
+- Vorschau-Tabelle um Monatsspalte erweitert; ViewModel- und Service-Tests fuer den Verlauf ueber mehrere Monate erfolgreich ausgeführt

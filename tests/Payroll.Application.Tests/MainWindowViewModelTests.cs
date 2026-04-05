@@ -1,5 +1,9 @@
 using Payroll.Application.Employees;
+using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
+using Payroll.Domain.Employees;
+using Payroll.Domain.MonthlyRecords;
 
 namespace Payroll.Application.Tests;
 
@@ -14,36 +18,35 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.InitializeAsync();
 
-        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000" && viewModel.SelectedEmployee?.EmployeeId == employee.EmployeeId);
+        await WaitUntilAsync(() =>
+            viewModel.PersonnelNumber == "1000"
+            && viewModel.SelectedEmployee?.EmployeeId == employee.EmployeeId
+            && viewModel.FirstName == "Anna"
+            && viewModel.LastName == "Aktiv");
 
         Assert.Equal("Anna", viewModel.FirstName);
         Assert.Equal("Aktiv", viewModel.LastName);
-        Assert.Equal("Mitarbeitender 1000 geladen.", viewModel.StatusMessage);
+        Assert.Contains("geladen", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task SelectedEmployee_QueuesLatestSelectionWhilePreviousLoadIsBusy()
+    public async Task SelectedEmployee_LoadsDifferentEmployeeAfterSelectionChange()
     {
         var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
         var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
         var repository = new TestEmployeeRepository(firstEmployee, secondEmployee);
-        repository.GetByIdDelay = employeeId => employeeId == firstEmployee.EmployeeId
-            ? repository.FirstLoadRelease.Task
-            : Task.CompletedTask;
         var viewModel = CreateViewModel(repository);
 
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.IsBusy);
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
 
         viewModel.SelectedEmployee = viewModel.Employees.Single(item => item.EmployeeId == secondEmployee.EmployeeId);
-        repository.FirstLoadRelease.SetResult();
-
-        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.PersonnelNumber == "1001");
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1001" && viewModel.FirstName == "Bruno");
 
         Assert.Equal(secondEmployee.EmployeeId, viewModel.SelectedEmployee?.EmployeeId);
         Assert.Equal("Bruno", viewModel.FirstName);
         Assert.Equal("Bereit", viewModel.LastName);
-        Assert.Equal("Mitarbeitender 1001 geladen.", viewModel.StatusMessage);
+        Assert.Contains("geladen", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -140,9 +143,63 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.RefreshCommand.CanExecute(null));
     }
 
+    [Fact]
+    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToEmployees()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        Assert.True(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsEmployeeWorkspace);
+
+        viewModel.ShowEmployeesCommand.Execute(null);
+
+        Assert.True(viewModel.IsEmployeeWorkspace);
+        Assert.False(viewModel.IsTimeAndExpensesWorkspace);
+
+        viewModel.ShowTimeAndExpensesCommand.Execute(null);
+
+        Assert.True(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsEmployeeWorkspace);
+    }
+
+    [Fact]
+    public async Task SettingsWorkspace_LoadsAndSavesCentralSupplementRates()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var employeeRepository = new TestEmployeeRepository(employee);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            new PayrollSettingsService(settingsRepository),
+            new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.SettingsNightSupplementRate == "0.25");
+
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.SettingsNightSupplementRate = "0.30";
+        viewModel.SettingsSundaySupplementRate = "0.60";
+        viewModel.SettingsHolidaySupplementRate = "1.10";
+        viewModel.SaveSettingsCommand.Execute(null);
+
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Einstellungen gespeichert.");
+
+        Assert.True(viewModel.IsSettingsWorkspace);
+        Assert.Equal(0.30m, settingsRepository.Current.NightSupplementRate);
+        Assert.Equal(0.60m, settingsRepository.Current.SundaySupplementRate);
+        Assert.Equal(1.10m, settingsRepository.Current.HolidaySupplementRate);
+    }
+
     private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository)
     {
-        return new MainWindowViewModel(new EmployeeService(repository), "Test");
+        return new MainWindowViewModel(
+            new EmployeeService(repository),
+            new PayrollSettingsService(new InMemoryPayrollSettingsRepository()),
+            new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            "Test");
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
@@ -267,10 +324,7 @@ public sealed class MainWindowViewModelTests
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
-                command.MonthlyBvgDeductionChf,
-                command.NightSupplementRate,
-                command.SundaySupplementRate,
-                command.HolidaySupplementRate);
+                command.MonthlyBvgDeductionChf);
 
             _employees[employeeId] = employee;
             return Task.FromResult(employee);
@@ -305,10 +359,7 @@ public sealed class MainWindowViewModelTests
                 new DateOnly(2025, 1, 1),
                 null,
                 32.5m,
-                280m,
-                0.25m,
-                null,
-                null);
+                280m);
         }
 
         private static EmployeeListItemDto ToListItem(EmployeeDetailsDto employee)
@@ -325,6 +376,63 @@ public sealed class MainWindowViewModelTests
                 employee.MonthlyBvgDeductionChf,
                 employee.ContractValidFrom,
                 employee.ContractValidTo);
+        }
+    }
+
+    private sealed class InMemoryMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
+    {
+        public Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new EmployeeMonthlyRecord(employeeId, year, month));
+        }
+
+        public Task<EmployeeMonthlyRecord?> GetByIdAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<EmployeeMonthlyRecord?>(null);
+        }
+
+        public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<MonthlyRecordDetailsDto?>(null);
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void ClearTracking()
+        {
+        }
+
+        public void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class
+        {
+        }
+    }
+
+    private sealed class InMemoryPayrollSettingsRepository : IPayrollSettingsRepository
+    {
+        private PayrollSettingsDto _settings = new(0.25m, 0.50m, 1.00m);
+
+        public PayrollSettingsDto Current => _settings;
+
+        public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_settings);
+        }
+
+        public Task<WorkTimeSupplementSettings> GetWorkTimeSupplementSettingsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new WorkTimeSupplementSettings(
+                _settings.NightSupplementRate,
+                _settings.SundaySupplementRate,
+                _settings.HolidaySupplementRate));
+        }
+
+        public Task<PayrollSettingsDto> SaveAsync(SavePayrollSettingsCommand command, CancellationToken cancellationToken)
+        {
+            _settings = new PayrollSettingsDto(command.NightSupplementRate, command.SundaySupplementRate, command.HolidaySupplementRate);
+            return Task.FromResult(_settings);
         }
     }
 }

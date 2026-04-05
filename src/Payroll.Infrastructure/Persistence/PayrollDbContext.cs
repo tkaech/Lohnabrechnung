@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Payroll.Domain.Employees;
+using Payroll.Domain.Expenses;
+using Payroll.Domain.MonthlyRecords;
+using Payroll.Domain.Settings;
+using Payroll.Domain.TimeTracking;
 
 namespace Payroll.Infrastructure.Persistence;
 
@@ -12,6 +16,11 @@ public sealed class PayrollDbContext : DbContext
 
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<EmploymentContract> EmploymentContracts => Set<EmploymentContract>();
+    public DbSet<EmployeeMonthlyRecord> EmployeeMonthlyRecords => Set<EmployeeMonthlyRecord>();
+    public DbSet<PayrollSettings> PayrollSettings => Set<PayrollSettings>();
+    public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
+    public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
+    public DbSet<VehicleCompensation> VehicleCompensations => Set<VehicleCompensation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,17 +62,93 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(contract => contract.EmployeeId).IsRequired();
             builder.Property(contract => contract.HourlyRateChf).HasColumnType("TEXT").IsRequired();
             builder.Property(contract => contract.MonthlyBvgDeductionChf).HasColumnType("TEXT").IsRequired();
-            builder.OwnsOne(contract => contract.SupplementSettings, supplementBuilder =>
-            {
-                supplementBuilder.Property(settings => settings.NightSupplementRate).HasColumnType("TEXT");
-                supplementBuilder.Property(settings => settings.SundaySupplementRate).HasColumnType("TEXT");
-                supplementBuilder.Property(settings => settings.HolidaySupplementRate).HasColumnType("TEXT");
-            });
 
             builder.HasOne<Employee>()
                 .WithMany()
                 .HasForeignKey(contract => contract.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PayrollSettings>(builder =>
+        {
+            builder.ToTable("PayrollSettings");
+            builder.HasKey(settings => settings.Id);
+            builder.OwnsOne(settings => settings.WorkTimeSupplementSettings, supplementBuilder =>
+            {
+                supplementBuilder.Property(item => item.NightSupplementRate).HasColumnType("TEXT");
+                supplementBuilder.Property(item => item.SundaySupplementRate).HasColumnType("TEXT");
+                supplementBuilder.Property(item => item.HolidaySupplementRate).HasColumnType("TEXT");
+            });
+        });
+
+        modelBuilder.Entity<EmployeeMonthlyRecord>(builder =>
+        {
+            builder.ToTable("EmployeeMonthlyRecords");
+            builder.HasKey(record => record.Id);
+            builder.Property(record => record.EmployeeId).IsRequired();
+            builder.Property(record => record.Year).IsRequired();
+            builder.Property(record => record.Month).IsRequired();
+            builder.Property(record => record.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.HasIndex(record => new { record.EmployeeId, record.Year, record.Month }).IsUnique();
+
+            builder.HasOne<Employee>()
+                .WithMany()
+                .HasForeignKey(record => record.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(record => record.TimeEntries)
+                .WithOne()
+                .HasForeignKey(entry => entry.EmployeeMonthlyRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(record => record.ExpenseEntries)
+                .WithOne()
+                .HasForeignKey(entry => entry.EmployeeMonthlyRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(record => record.VehicleCompensations)
+                .WithOne()
+                .HasForeignKey(entry => entry.EmployeeMonthlyRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TimeEntry>(builder =>
+        {
+            builder.ToTable("TimeEntries");
+            builder.HasKey(entry => entry.Id);
+            builder.Property(entry => entry.EmployeeMonthlyRecordId).IsRequired();
+            builder.Property(entry => entry.EmployeeId).IsRequired();
+            builder.Property(entry => entry.WorkDate).IsRequired();
+            builder.Property(entry => entry.HoursWorked).HasColumnType("TEXT").IsRequired();
+            builder.Property(entry => entry.NightHours).HasColumnType("TEXT").IsRequired();
+            builder.Property(entry => entry.SundayHours).HasColumnType("TEXT").IsRequired();
+            builder.Property(entry => entry.HolidayHours).HasColumnType("TEXT").IsRequired();
+            builder.Property(entry => entry.Note).HasMaxLength(500);
+            builder.HasIndex(entry => new { entry.EmployeeMonthlyRecordId, entry.WorkDate }).IsUnique();
+        });
+
+        modelBuilder.Entity<ExpenseEntry>(builder =>
+        {
+            builder.ToTable("ExpenseEntries");
+            builder.HasKey(entry => entry.Id);
+            builder.Property(entry => entry.EmployeeMonthlyRecordId).IsRequired();
+            builder.Property(entry => entry.EmployeeId).IsRequired();
+            builder.Property(entry => entry.ExpenseDate).IsRequired();
+            builder.Property(entry => entry.AmountChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(entry => entry.ExpenseTypeCode).HasMaxLength(50).IsRequired();
+            builder.Property(entry => entry.Description).HasMaxLength(500).IsRequired();
+            builder.HasIndex(entry => entry.EmployeeMonthlyRecordId).IsUnique();
+        });
+
+        modelBuilder.Entity<VehicleCompensation>(builder =>
+        {
+            builder.ToTable("VehicleCompensations");
+            builder.HasKey(entry => entry.Id);
+            builder.Property(entry => entry.EmployeeMonthlyRecordId).IsRequired();
+            builder.Property(entry => entry.EmployeeId).IsRequired();
+            builder.Property(entry => entry.CompensationDate).IsRequired();
+            builder.Property(entry => entry.AmountChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(entry => entry.Description).HasMaxLength(500).IsRequired();
         });
     }
 }

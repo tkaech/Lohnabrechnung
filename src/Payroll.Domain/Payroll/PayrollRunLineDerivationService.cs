@@ -9,11 +9,13 @@ public sealed class PayrollRunLineDerivationService
     public PayrollRunLineDerivationResult DeriveForEmployee(
         DateOnly payrollReferenceDate,
         EmploymentContract contract,
+        WorkTimeSupplementSettings supplementSettings,
         PayrollWorkSummary workSummary,
         IReadOnlyCollection<ExpenseEntry> expenses,
         IReadOnlyCollection<VehicleCompensation> vehicleCompensations)
     {
         ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(supplementSettings);
         ArgumentNullException.ThrowIfNull(workSummary);
         ArgumentNullException.ThrowIfNull(expenses);
         ArgumentNullException.ThrowIfNull(vehicleCompensations);
@@ -56,7 +58,7 @@ public sealed class PayrollRunLineDerivationService
                 "NIGHT",
                 "Night supplement",
                 workSummary.NightHours,
-                contract.SupplementSettings.NightSupplementRate);
+                supplementSettings.NightSupplementRate);
 
             AddConfiguredSupplementLine(
                 lines,
@@ -66,7 +68,7 @@ public sealed class PayrollRunLineDerivationService
                 "SUN",
                 "Sunday supplement",
                 workSummary.SundayHours,
-                contract.SupplementSettings.SundaySupplementRate);
+                supplementSettings.SundaySupplementRate);
 
             AddConfiguredSupplementLine(
                 lines,
@@ -76,7 +78,7 @@ public sealed class PayrollRunLineDerivationService
                 "HOL",
                 "Holiday supplement",
                 workSummary.HolidayHours,
-                contract.SupplementSettings.HolidaySupplementRate);
+                supplementSettings.HolidaySupplementRate);
         }
 
         foreach (var expense in expenses)
@@ -84,8 +86,8 @@ public sealed class PayrollRunLineDerivationService
             lines.Add(PayrollRunLine.CreateDirectChfLine(
                 expense.EmployeeId,
                 PayrollLineType.Expense,
-                expense.ExpenseTypeCode,
-                expense.Description,
+                ExpenseEntry.PayrollCode,
+                ExpenseEntry.DisplayName,
                 expense.AmountChf));
         }
 

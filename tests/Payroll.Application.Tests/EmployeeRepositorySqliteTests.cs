@@ -50,10 +50,7 @@ public sealed class EmployeeRepositorySqliteTests
                 new DateOnly(2026, 1, 1),
                 null,
                 32.5m,
-                280m,
-                0.25m,
-                null,
-                null),
+                280m),
             CancellationToken.None);
 
         var listedEmployees = await repository.ListAsync(

@@ -16,3 +16,4 @@ immer konfigurierbar
 - Zeiten und Spesen werden fachlich gemeinsam im Monatskontext pro Mitarbeitenden gefuehrt
 - manuelle Erfassung kommt vor Import
 - Jahressicht entsteht spaeter aus Monatsdaten
+- `EmployeeMonthlyRecord` ist als expliziter Monatsanker bevorzugt und umgesetzt

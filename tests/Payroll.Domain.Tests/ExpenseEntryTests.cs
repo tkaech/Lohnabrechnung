@@ -7,11 +7,14 @@ public sealed class ExpenseEntryTests
     [Fact]
     public void ExpenseEntry_UsesChfAsCurrency()
     {
-        var entry = new ExpenseEntry(Guid.NewGuid(), new DateOnly(2026, 3, 31), "MEAL", 48.20m, "Meal allowance");
+        var entry = new ExpenseEntry(Guid.NewGuid(), new DateOnly(2026, 3, 31), 48.20m);
 
         Assert.Equal(48.20m, entry.AmountChf);
         Assert.Equal("CHF", entry.Currency);
-        Assert.Equal("MEAL", entry.ExpenseTypeCode);
+        Assert.Equal("EXP", ExpenseEntry.PayrollCode);
+        Assert.Equal("Diverse Spesen", ExpenseEntry.DisplayName);
+        Assert.Equal("EXP", entry.ExpenseTypeCode);
+        Assert.Equal("Diverse Spesen", entry.Description);
     }
 
     [Fact]

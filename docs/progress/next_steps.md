@@ -1,6 +1,7 @@
 # Next Steps
 
-1. Fachliches Sollbild fuer die gemeinsame Monatserfassung pro Mitarbeitenden konkretisieren: Zeiten, Spesen und Monatsvorschau im selben Monatskontext
-2. Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln fachlich konkretisieren
-3. Naechsten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren: gueltigen Vertrag, WorkSummary, Spesen und Fahrzeugentschaedigung zusammenfuehren, ohne offene Spezialfaelle zu automatisieren
-4. Erst danach den ersten Umsetzungschnitt fuer die manuelle Monatserfassung planen, ohne Import oder Jahresdarstellung vorzuziehen
+1. Monatserfassung von der jetzt funktionsfaehigen Einzelperson-Erfassung in eine echte monatszentrierte, tabellarische Erfassung fuer mehrere Mitarbeitende weiterentwickeln
+2. vereinfachte Spesenerfassung als Monatstotal `Diverse Spesen` im Mehrpersonen-Layout konsistent mitfuehren, ohne neue Detailfelder wieder einzufuehren
+3. Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln konkretisieren und sauber an den Monatskontext anschliessen
+4. Naechsten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren: gueltigen Vertrag, zentrale Zuschlagssaetze, WorkSummary, Spesen und Fahrzeugentschaedigung aus `EmployeeMonthlyRecord` zusammenfuehren, ohne offene Spezialfaelle zu automatisieren
+5. Status- und Monatsabschlussfluss fuer `EmployeeMonthlyRecord` fachlich schaerfen

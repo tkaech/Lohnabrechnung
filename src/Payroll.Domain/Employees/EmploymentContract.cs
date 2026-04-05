@@ -6,7 +6,6 @@ public sealed class EmploymentContract : AuditableEntity
 {
     private EmploymentContract()
     {
-        SupplementSettings = WorkTimeSupplementSettings.Empty;
     }
 
     public Guid EmployeeId { get; private set; }
@@ -14,15 +13,13 @@ public sealed class EmploymentContract : AuditableEntity
     public DateOnly? ValidTo { get; private set; }
     public decimal HourlyRateChf { get; private set; }
     public decimal MonthlyBvgDeductionChf { get; private set; }
-    public WorkTimeSupplementSettings SupplementSettings { get; private set; }
 
     public EmploymentContract(
         Guid employeeId,
         DateOnly validFrom,
         DateOnly? validTo,
         decimal hourlyRateChf,
-        decimal monthlyBvgDeductionChf,
-        WorkTimeSupplementSettings? supplementSettings = null)
+        decimal monthlyBvgDeductionChf)
     {
         Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
 
@@ -31,7 +28,6 @@ public sealed class EmploymentContract : AuditableEntity
         ValidTo = validTo;
         HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
         MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
-        SupplementSettings = supplementSettings ?? WorkTimeSupplementSettings.Empty;
     }
 
     public bool IsActiveOn(DateOnly date)
@@ -48,8 +44,7 @@ public sealed class EmploymentContract : AuditableEntity
         DateOnly validFrom,
         DateOnly? validTo,
         decimal hourlyRateChf,
-        decimal monthlyBvgDeductionChf,
-        WorkTimeSupplementSettings? supplementSettings = null)
+        decimal monthlyBvgDeductionChf)
     {
         Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
 
@@ -57,7 +52,6 @@ public sealed class EmploymentContract : AuditableEntity
         ValidTo = validTo;
         HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
         MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
-        SupplementSettings = supplementSettings ?? WorkTimeSupplementSettings.Empty;
         Touch();
     }
 }

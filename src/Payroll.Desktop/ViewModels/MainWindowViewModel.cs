@@ -1,10 +1,18 @@
 using System.Collections.ObjectModel;
 using Payroll.Application.Employees;
+using Payroll.Application.Settings;
 
 namespace Payroll.Desktop.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
+    private enum WorkspaceSection
+    {
+        TimeAndExpenses,
+        Employees,
+        Settings
+    }
+
     private const string ActivityFilterAll = "Alle";
     private const string ActivityFilterActive = "Aktiv";
     private const string ActivityFilterInactive = "Inaktiv";
@@ -13,6 +21,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string WithholdingTaxNo = "Nein";
 
     private readonly EmployeeService _employeeService;
+    private readonly PayrollSettingsService _payrollSettingsService;
     private EmployeeListItemViewModel? _selectedEmployee;
     private Guid? _currentEmployeeId;
     private Guid? _pendingEmployeeId;
@@ -45,19 +54,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DateTimeOffset? _contractValidTo;
     private string _hourlyRateChf = string.Empty;
     private string _monthlyBvgDeductionChf = string.Empty;
-    private string? _nightSupplementRate;
-    private string? _sundaySupplementRate;
-    private string? _holidaySupplementRate;
+    private string? _settingsNightSupplementRate;
+    private string? _settingsSundaySupplementRate;
+    private string? _settingsHolidaySupplementRate;
     private string _statusMessage = "Mitarbeitende koennen links ausgewaehlt werden.";
     private bool _isBusy;
     private bool _isEditing;
     private bool _isCreatingNew;
     private bool _showDeleteConfirmation;
     private string _employeeCountSummary = "Keine Mitarbeitenden geladen.";
+    private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
 
-    public MainWindowViewModel(EmployeeService employeeService, string workspaceLabel)
+    public MainWindowViewModel(EmployeeService employeeService, PayrollSettingsService payrollSettingsService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel)
     {
         _employeeService = employeeService;
+        _payrollSettingsService = payrollSettingsService;
+        MonthlyRecord = monthlyRecord;
         WorkspaceLabel = workspaceLabel;
         Employees = [];
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
@@ -71,12 +83,17 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeleteCommand = new DelegateCommand(RequestDelete, () => CanRequestDelete);
         ConfirmDeleteCommand = new DelegateCommand(ConfirmDeleteAsync, () => CanConfirmDelete);
         DismissDeleteCommand = new DelegateCommand(DismissDeleteConfirmation, () => CanDismissDelete);
+        ShowTimeAndExpensesCommand = new DelegateCommand(SwitchToTimeAndExpensesWorkspace, () => !IsTimeAndExpensesWorkspace);
+        ShowEmployeesCommand = new DelegateCommand(SwitchToEmployeesWorkspace, () => !IsEmployeeWorkspace);
+        ShowSettingsCommand = new DelegateCommand(SwitchToSettingsWorkspace, () => !IsSettingsWorkspace);
+        SaveSettingsCommand = new DelegateCommand(SaveSettingsAsync, () => CanSaveSettings);
 
         ClearFormForEmptyState();
     }
 
-    public string Title => "PayrollApp - Mitarbeitende";
+    public string Title => "PayrollApp - Monatserfassung";
     public string WorkspaceLabel { get; }
+    public MonthlyRecordViewModel MonthlyRecord { get; }
     public ObservableCollection<EmployeeListItemViewModel> Employees { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
@@ -89,6 +106,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand DeleteCommand { get; }
     public DelegateCommand ConfirmDeleteCommand { get; }
     public DelegateCommand DismissDeleteCommand { get; }
+    public DelegateCommand ShowTimeAndExpensesCommand { get; }
+    public DelegateCommand ShowEmployeesCommand { get; }
+    public DelegateCommand ShowSettingsCommand { get; }
+    public DelegateCommand SaveSettingsCommand { get; }
+    public bool IsTimeAndExpensesWorkspace => _currentSection == WorkspaceSection.TimeAndExpenses;
+    public bool IsEmployeeWorkspace => _currentSection == WorkspaceSection.Employees;
+    public bool IsSettingsWorkspace => _currentSection == WorkspaceSection.Settings;
+    public bool ShowTimeAndExpensesWorkspace => IsTimeAndExpensesWorkspace;
+    public bool ShowEmployeeWorkspace => IsEmployeeWorkspace;
+    public bool ShowSettingsWorkspace => IsSettingsWorkspace;
 
     public string FormTitle => _isCreatingNew
         ? "Neuer Mitarbeitender"
@@ -118,6 +145,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanRequestDelete => !IsBusy && _isEditing && _currentEmployeeId.HasValue && IsActiveEmployee;
     public bool CanConfirmDelete => !IsBusy && _showDeleteConfirmation && _currentEmployeeId.HasValue;
     public bool CanDismissDelete => !IsBusy && _showDeleteConfirmation;
+    public bool CanSaveSettings => !IsBusy && IsSettingsWorkspace;
     public bool ShowViewActions => !_isEditing;
     public bool ShowEditActions => _isEditing;
     public bool ShowDeleteConfirmation
@@ -329,22 +357,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _monthlyBvgDeductionChf, value);
     }
 
-    public string? NightSupplementRate
+    public string? SettingsNightSupplementRate
     {
-        get => _nightSupplementRate;
-        set => SetProperty(ref _nightSupplementRate, value);
+        get => _settingsNightSupplementRate;
+        set => SetProperty(ref _settingsNightSupplementRate, value);
     }
 
-    public string? SundaySupplementRate
+    public string? SettingsSundaySupplementRate
     {
-        get => _sundaySupplementRate;
-        set => SetProperty(ref _sundaySupplementRate, value);
+        get => _settingsSundaySupplementRate;
+        set => SetProperty(ref _settingsSundaySupplementRate, value);
     }
 
-    public string? HolidaySupplementRate
+    public string? SettingsHolidaySupplementRate
     {
-        get => _holidaySupplementRate;
-        set => SetProperty(ref _holidaySupplementRate, value);
+        get => _settingsHolidaySupplementRate;
+        set => SetProperty(ref _settingsHolidaySupplementRate, value);
     }
 
     public string StatusMessage
@@ -370,6 +398,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanRequestDelete));
                 RaisePropertyChanged(nameof(CanConfirmDelete));
                 RaisePropertyChanged(nameof(CanDismissDelete));
+                RaisePropertyChanged(nameof(CanSaveSettings));
                 RaiseActionStateChanged();
             }
         }
@@ -377,6 +406,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
+        await LoadSettingsAsync();
         await RefreshAsync();
 
         if (Employees.Count > 0 && _currentEmployeeId is null)
@@ -398,10 +428,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void BeginCreateEmployee()
     {
+        SwitchToEmployeesWorkspace();
         DismissDeleteConfirmation();
         _returnEmployeeId = _currentEmployeeId;
         SelectedEmployee = null;
         _currentEmployeeId = null;
+        MonthlyRecord.Reset();
         ResetFormForNewDraft();
         SetInteractionState(isEditing: true, isCreatingNew: true);
         StatusMessage = "Neuer Mitarbeitender. Daten erfassen und speichern.";
@@ -414,6 +446,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        SwitchToEmployeesWorkspace();
         DismissDeleteConfirmation();
         _returnEmployeeId = _currentEmployeeId;
         SetInteractionState(isEditing: true, isCreatingNew: false);
@@ -476,10 +509,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 DateOnly.FromDateTime(ContractValidFrom.Value.Date),
                 ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null,
                 ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
-                ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)),
-                ParseOptionalDecimal(NightSupplementRate),
-                ParseOptionalDecimal(SundaySupplementRate),
-                ParseOptionalDecimal(HolidaySupplementRate));
+                ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)));
 
             var saved = await _employeeService.SaveAsync(command);
             _currentEmployeeId = saved.EmployeeId;
@@ -551,6 +581,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             await ReloadEmployeesAsync();
             await RestoreSelectionAfterReloadAsync(archivedEmployeeId, selectFirstIfMissing: true);
             StatusMessage = "Mitarbeitender archiviert und auf inaktiv gesetzt.";
+        });
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            var saved = await _payrollSettingsService.SaveAsync(new SavePayrollSettingsCommand(
+                ParseOptionalDecimal(SettingsNightSupplementRate),
+                ParseOptionalDecimal(SettingsSundaySupplementRate),
+                ParseOptionalDecimal(SettingsHolidaySupplementRate)));
+
+            ApplySettings(saved);
+            StatusMessage = "Einstellungen gespeichert.";
         });
     }
 
@@ -630,11 +674,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        SetSelectedEmployeeWithoutReload(null);
-        _currentEmployeeId = null;
-        if (!_isEditing)
-        {
-            ClearFormForEmptyState();
+            SetSelectedEmployeeWithoutReload(null);
+            _currentEmployeeId = null;
+            MonthlyRecord.Reset();
+            if (!_isEditing)
+            {
+                ClearFormForEmptyState();
         }
     }
 
@@ -679,9 +724,6 @@ public sealed class MainWindowViewModel : ViewModelBase
             : null;
         HourlyRateChf = employee.HourlyRateChf.ToString("0.00");
         MonthlyBvgDeductionChf = employee.MonthlyBvgDeductionChf.ToString("0.00");
-        NightSupplementRate = employee.NightSupplementRate?.ToString("0.####");
-        SundaySupplementRate = employee.SundaySupplementRate?.ToString("0.####");
-        HolidaySupplementRate = employee.HolidaySupplementRate?.ToString("0.####");
     }
 
     private void ResetFormForNewDraft()
@@ -712,9 +754,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidTo = null;
         HourlyRateChf = "0";
         MonthlyBvgDeductionChf = "0";
-        NightSupplementRate = null;
-        SundaySupplementRate = null;
-        HolidaySupplementRate = null;
     }
 
     private void ClearFormForEmptyState()
@@ -746,9 +785,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidTo = null;
         HourlyRateChf = string.Empty;
         MonthlyBvgDeductionChf = string.Empty;
-        NightSupplementRate = null;
-        SundaySupplementRate = null;
-        HolidaySupplementRate = null;
         SetInteractionState(isEditing: false, isCreatingNew: false);
     }
 
@@ -756,6 +792,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         _isEditing = isEditing;
         _isCreatingNew = isCreatingNew;
+        MonthlyRecord.IsLocked = isEditing;
         if (!_isEditing)
         {
             DismissDeleteConfirmation();
@@ -789,6 +826,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeleteCommand.RaiseCanExecuteChanged();
         ConfirmDeleteCommand.RaiseCanExecuteChanged();
         DismissDeleteCommand.RaiseCanExecuteChanged();
+        ShowTimeAndExpensesCommand.RaiseCanExecuteChanged();
+        ShowEmployeesCommand.RaiseCanExecuteChanged();
+        ShowSettingsCommand.RaiseCanExecuteChanged();
+        SaveSettingsCommand.RaiseCanExecuteChanged();
     }
 
     private async Task<bool> LoadEmployeeIntoViewAsync(Guid employeeId)
@@ -802,6 +843,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         PopulateForm(employee);
         _currentEmployeeId = employee.EmployeeId;
         _returnEmployeeId = employee.EmployeeId;
+        await MonthlyRecord.SetEmployeeAsync(employee.EmployeeId, employee.FirstName + " " + employee.LastName);
         SetInteractionState(isEditing: false, isCreatingNew: false);
         return true;
     }
@@ -842,6 +884,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         return parsedValue;
     }
 
+    private async Task LoadSettingsAsync()
+    {
+        var settings = await _payrollSettingsService.GetAsync();
+        ApplySettings(settings);
+    }
+
+    private void ApplySettings(PayrollSettingsDto settings)
+    {
+        SettingsNightSupplementRate = settings.NightSupplementRate?.ToString("0.####");
+        SettingsSundaySupplementRate = settings.SundaySupplementRate?.ToString("0.####");
+        SettingsHolidaySupplementRate = settings.HolidaySupplementRate?.ToString("0.####");
+    }
+
     private static bool? ParseOptionalBoolean(string option)
     {
         return option switch
@@ -877,5 +932,38 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         return string.IsNullOrWhiteSpace(email) ? "Keine Kontaktdaten" : email;
+    }
+
+    private void SwitchToTimeAndExpensesWorkspace()
+    {
+        SetWorkspaceSection(WorkspaceSection.TimeAndExpenses);
+    }
+
+    private void SwitchToEmployeesWorkspace()
+    {
+        SetWorkspaceSection(WorkspaceSection.Employees);
+    }
+
+    private void SwitchToSettingsWorkspace()
+    {
+        SetWorkspaceSection(WorkspaceSection.Settings);
+    }
+
+    private void SetWorkspaceSection(WorkspaceSection section)
+    {
+        if (_currentSection == section)
+        {
+            return;
+        }
+
+        _currentSection = section;
+        RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
+        RaisePropertyChanged(nameof(IsEmployeeWorkspace));
+        RaisePropertyChanged(nameof(IsSettingsWorkspace));
+        RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
+        RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
+        RaisePropertyChanged(nameof(ShowSettingsWorkspace));
+        RaisePropertyChanged(nameof(CanSaveSettings));
+        RaiseActionStateChanged();
     }
 }

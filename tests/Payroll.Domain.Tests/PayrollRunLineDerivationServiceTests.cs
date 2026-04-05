@@ -16,8 +16,7 @@ public sealed class PayrollRunLineDerivationServiceTests
             new DateOnly(2026, 1, 1),
             null,
             30m,
-            280m,
-            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m));
+            280m);
 
         var workSummary = PayrollWorkSummary.FromTimeEntries(employeeId, [
             new TimeEntry(employeeId, new DateOnly(2026, 3, 1), 8m, 2m),
@@ -26,7 +25,7 @@ public sealed class PayrollRunLineDerivationServiceTests
 
         var expenses = new[]
         {
-            new ExpenseEntry(employeeId, new DateOnly(2026, 3, 10), "MEAL", 24.50m, "Meal allowance")
+            new ExpenseEntry(employeeId, new DateOnly(2026, 3, 10), 24.50m)
         };
 
         var vehicleCompensations = new[]
@@ -39,6 +38,7 @@ public sealed class PayrollRunLineDerivationServiceTests
         var result = service.DeriveForEmployee(
             new DateOnly(2026, 3, 31),
             contract,
+            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
             workSummary,
             expenses,
             vehicleCompensations);
@@ -63,8 +63,7 @@ public sealed class PayrollRunLineDerivationServiceTests
             new DateOnly(2026, 1, 1),
             null,
             30m,
-            0m,
-            new WorkTimeSupplementSettings(null, 0.50m, null));
+            0m);
 
         var workSummary = new PayrollWorkSummary(employeeId, 8m, 2m, 0m, 0m);
         var service = new PayrollRunLineDerivationService();
@@ -72,6 +71,7 @@ public sealed class PayrollRunLineDerivationServiceTests
         var result = service.DeriveForEmployee(
             new DateOnly(2026, 3, 31),
             contract,
+            new WorkTimeSupplementSettings(null, 0.50m, null),
             workSummary,
             [],
             []);
@@ -115,8 +115,7 @@ public sealed class PayrollRunLineDerivationServiceTests
             new DateOnly(2026, 1, 1),
             null,
             30m,
-            280m,
-            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m));
+            280m);
 
         var workSummary = new PayrollWorkSummary(employeeId, 8m, 4m, 3m, 2m);
         var service = new PayrollRunLineDerivationService();
@@ -124,6 +123,7 @@ public sealed class PayrollRunLineDerivationServiceTests
         var result = service.DeriveForEmployee(
             new DateOnly(2026, 3, 31),
             contract,
+            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
             workSummary,
             [],
             []);

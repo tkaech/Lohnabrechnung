@@ -3,6 +3,32 @@
 Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel-Analyse abgeleitet.
 
 ## Session Abschluss
+- Nacht-, Sonntags- und Feiertagszuschlag aus der individuellen Mitarbeitendenpflege entfernt und in einen zentralen Bereich `Einstellungen` verschoben
+- zentralen Settings-Pfad fuer lohnrelevante Zuschlagssaetze in Domain, Application, Persistence und UI ergänzt
+- Payroll-Ableitung fuer Zuschlaege fachlich beibehalten, aber die Herkunft der drei Prozent-Saetze von `EmploymentContract` auf zentrale Einstellungen umgestellt
+- Spesenlogik im Monatskontext fachlich auf genau ein Monatstotal `Diverse Spesen` reduziert; Eingabefelder fuer Typ und Beschreibung entfernt
+- Domain, Application, EF-Persistenz, Monatsvorschau und UI fuer vereinfachte Spesenerfassung mit nur Datum und Betrag angepasst
+- eindeutige Persistenzregel fuer genau einen `ExpenseEntry` pro `EmployeeMonthlyRecord` ergänzt; gezielte Domain-, Service-, ViewModel- und SQLite-Tests angepasst
+- Monatsvorschau auf Verlauf ueber alle vorhandenen Monate der selektierten Person erweitert; Tabelle zeigt jetzt Monat, Datum, Typ, Stunden/Betrag und Details
+- Monatsvorschau von reiner Summen-/Hinweisverdichtung auf tabellarische Monatsliste aller Zeit-, Spesen- und Fahrzeugeintraege des gewaehlten Monats umgestellt
+- Root Cause fuer verbleibende Speicherfehler im Monatsbereich identifiziert: neue Child-Entitaeten wie `TimeEntry` wurden im EF-Graph mit vorvergebener GUID als `Modified` statt `Added` behandelt
+- Monatsservice markiert neue Zeit-, Spesen- und Fahrzeugeintraege jetzt explizit als Inserts; reproduzierbarer SQLite/ViewModel-Test fuer den echten UI-Speicherpfad erfolgreich
+- langlebiger gemeinsamer `DbContext` im Desktop-Flow als Ursache fuer EF-Tracking-/Concurrency-Probleme im Monats-Speicherpfad eingegrenzt und durch explizites `ChangeTracker.Clear()` vor Monatsoperationen abgesichert
+- Monatsdaten akzeptieren im UI jetzt sowohl ISO-Datum `yyyy-MM-dd` als auch lokale Datumsformate; kulturabhaengiger Save-Fehler im de-CH-Kontext behoben
+- lokale Development-Datenbank wird bei veraltetem Schema ohne Monatstabellen jetzt automatisch neu erstellt, damit der Monatskontext nicht still scheitert
+- Fahrzeugentschaedigung im Monatserfassungsbereich als eigener editierbarer Unterbereich ergaenzt
+- Save-/Delete-Flow fuer Fahrzeugentschaedigung in Domain, Application-Service, ViewModel und Avalonia-UI umgesetzt
+- gezielte Application- und ViewModel-Tests fuer Fahrzeugentschaedigung ergaenzt; Desktop-Build sowie fokussierter Testlauf ausserhalb der Sandbox erfolgreich
+- erster belastbarer Vertikalschnitt fuer die gemeinsame Monatserfassung von Zeiten und Spesen implementiert
+- `EmployeeMonthlyRecord` als expliziter Monatsanker eingefuehrt und mit eindeutiger Employee+Jahr+Monat-Regel abgesichert
+- referentielle Integritaet fuer Zeit-, Spesen- und vorbereitete Fahrzeugentschaedigungsdaten ueber Parent-Child-Beziehungen, Fremdschluessel und Cascade-Delete umgesetzt
+- erster Application-Service fuer Monat laden/anlegen, Zeit-/Speseneintraege speichern/loeschen und Monatssummen aufgebaut
+- Avalonia-UI um einen ersten funktionalen Monatserfassungsbereich fuer Zeiten, Spesen und einfache Monatsvorschau erweitert
+- Monatserfassungs-UI anschliessend auf monatszentrierten Arbeitsfluss umgestellt: Monat links zuerst waehlen, Mitarbeitende daneben selektieren, Personendaten in separatem Tab statt oberhalb der Monatserfassung
+- Monatserfassungs-Flow weiter geschaerft: eigener Bereich `Zeit- und Spesenerfassung`, Monat zuerst, Mitarbeitendenliste darunter, rechts nur Erfassungsflaeche; Personendaten wieder als separater Bereich
+- Save-Flow fuer Zeiten und Spesen stabilisiert: Monatskontext wird bei Mitarbeitenden- oder Monatswechsel automatisch geladen bzw. bei Bedarf vor dem Speichern sichergestellt
+- zusaetzliche ViewModel-Tests fuer Bereichswechsel und automatisches Nachladen des Monatskontexts ergänzt; voller Solution-Testlauf erneut erfolgreich
+- Domain-, Application- und SQLite-Tests fuer Monatskontext, Datumsvalidierung, Uniqueness und Persistenz ergänzt; voller Solution-Testlauf erfolgreich
 - fachliches Sollbild fuer die kuenftige gemeinsame Monatserfassung von Zeiten und Spesen dokumentarisch verankert
 - Monatskontext pro Mitarbeitenden als naechster groesserer Arbeitsbereich in Kontext-, Planungs- und Progress-Dokumenten konsistent beschrieben
 - manuelle Erfassung vor Import sowie Ableitung von Jahresdarstellungen aus Monatsdaten explizit festgehalten
@@ -77,11 +103,22 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Archivieren ist jetzt bewusst an den Bearbeitungsmodus gekoppelt und nicht mehr direkt aus der reinen Ansicht heraus möglich
 - Navigationsstruktur mit klaren Platzhaltern fuer Zeiten, Spesen, Lohnlaeufe, AHV/Abzuege, Quellensteuer, Reporting und Einstellungen vorbereitet
 - UI-Design-System fuer Shell-Struktur und Aktionsleisten konkretisiert
+- `EmployeeMonthlyRecord` als Monatsanker-Entitaet in Domain, Persistence und Application eingefuehrt
+- `TimeEntry`, `ExpenseEntry` und `VehicleCompensation` an den Monatsanker angebunden
+- Unique Constraint fuer Monatskontext pro Mitarbeitenden und Monat ergänzt
+- Unique Constraint fuer Zeiteintrag pro Monatskontext und Datum ergänzt
+- Unique Constraint fuer genau ein monatliches Spesentotal pro Monatskontext ergänzt
+- Monatsservice und Repository fuer Monatskontext, Zeit- und Spesenerfassung ergänzt
+- erster funktionaler UI-Schnitt fuer Monatserfassung innerhalb der Desktop-App ergänzt
+- Fahrzeugentschaedigung fachlich getrennt gehalten und im Monatskontext vorerst sichtbar gemacht
+- Fahrzeugentschaedigung im Monatskontext jetzt auch editierbar, selektierbar und loeschbar gemacht
+- voller `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false -v minimal` ausserhalb der Sandbox erfolgreich
 
 ## Offen
-- konkreter fachlicher Zuschnitt der ersten manuellen Monatserfassung gegen bestehendes Domain-Modell abgleichen
 - Vertragshistorie als historisierte `EmploymentContract`-Versionen fachlich konkretisieren
+- Monatserfassung von personenzentrierter Einzelform weiter in Richtung excel-artiger Monatsliste fuer mehrere Mitarbeitende schärfen
 - Ersten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren
+- Statuswechsel wie `Geprueft` oder `in Lohnlauf uebernommen` fachlich scharfziehen
 - Fachliche Details aus Spezialfällen der Excel-Datei weiter präzisieren
 - Payroll-Orchestrierung in der Application-Schicht auf das neue Domain-Modell ausrichten
 - Secplan-Import fachlich klären
@@ -92,7 +129,6 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 
 ## Risiken
 - Excel enthält verteilte Speziallogik; einzelne Ausnahmefälle aus Unfall-, KTG- oder Sondertabellen können im aktuellen Domain-Modell noch fehlen
-- fuer die kuenftige Monatserfassung ist noch offen, ob der Monatskontext spaeter eine eigene explizite Entitaet benoetigt oder implizit ueber Mitarbeitendenbezug plus Monat gefuehrt wird
 - Überlappung oder Kumulation von Nacht-, Sonntags- und Feiertagsstunden ist fachlich weiterhin nicht abschliessend geklärt; das System markiert solche Fälle jetzt explizit
 - Pro-Rata-Regeln für fixen BVG bei Teilmonaten sind noch offen
 - Weitere Excel-Spezialpositionen wie Fahrzeitentschädigung, Mehrzeit/Unterzeit, Weiterbildung und Unfalltaggeld sind identifiziert, aber noch nicht in die Ableitung integriert
@@ -102,10 +138,14 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Die aktuelle SQLite-kompatible Lösung bevorzugt Robustheit vor maximaler Query-Kompaktheit und lädt Vertragsstände für Listen bewusst separat
 - Die neue Mitarbeitenden-Loeschaktion archiviert bewusst nur logisch; falls spaeter echte Archivierungsregeln je Datenabhaengigkeit noetig werden, muessen diese explizit erweitert werden
 - `dotnet test` bleibt in der Sandbox weiterhin durch eine Socket-Einschraenkung blockiert; neue ViewModel-Tests konnten deshalb lokal nur bis zum erfolgreichen Build verifiziert werden
+- bestehende lokale SQLite-Dateien ausserhalb des automatisch neu aufgebauten Development-Schemas koennen bei kuenftigen Modellwechseln weiterhin explizite Migrationsstrategie brauchen
+- der Desktop nutzt weiterhin einen gemeinsam gehaltenen `DbContext`; die Monatsoperationen sind jetzt defensiv abgesichert, langfristig waere ein klarer DbContext-per-Operation-Ansatz robuster
 
 ## Bekannte Einschränkungen
 - Mitarbeitendenverwaltung deckt aktuell Stammdaten, Kontakt, Adresse und einen bearbeitbaren Vertragsstand ab
-- gemeinsame Monatserfassung fuer Zeiten und Spesen ist bislang nur als fachliches Sollbild dokumentiert
+- gemeinsame Monatserfassung fuer Zeiten und Spesen ist als erster Vertikalschnitt umgesetzt, aber noch ohne Import, Monatsabschluss und tiefe Payroll-Orchestrierung
+- die aktuelle Monatserfassung ist jetzt als eigener Erfassungsbereich fuer Zeiten, Spesen und Fahrzeugentschaedigung benutzbar und speicherbar, arbeitet aber noch pro selektierter Person und noch nicht als echte tabellarische Mehrpersonen-Erfassung
+- die Monatsvorschau zeigt jetzt die Eintraege aller vorhandenen Monate der aktuell selektierten Person tabellarisch untereinander
 - Noch keine vollstaendige Payroll-Orchestrierung auf Basis der vorhandenen Domainregeln
 - Vertragshistorie ist fachlich vorbereitet, aber noch nicht als eigener Bearbeitungsfluss umgesetzt
 - `dotnet test` ist in dieser Sandbox weiterhin nicht verlässlich lokal ausfuehrbar

@@ -4,6 +4,8 @@
 
 - Employee
 - EmploymentContract
+- EmployeeMonthlyRecord
+- PayrollSettings
 - PayrollPeriod
 - PayrollRun
 - PayrollRunLine
@@ -32,8 +34,14 @@
 - Zeiten und Spesen werden fachlich im selben Monatskontext gefuehrt
 - Jahresdarstellungen und Lohnblaetter werden spaeter aus Monatsdaten abgeleitet
 - Monatsvorschau ist eine Verdichtung und keine zusaetzliche Primärerfassung
-- offen:
-  - ob `MonthlyEntryContext` spaeter als eigene Entitaet benoetigt wird oder zunaechst implizit ueber Mitarbeitendenbezug plus Monat gefuehrt wird, ist noch nicht entschieden
+- `EmployeeMonthlyRecord` ist der explizite Monatsanker fuer:
+  - genau einen Mitarbeitenden
+  - genau einen Abrechnungsmonat
+  - Status der Erfassung
+- referentielle Regeln:
+  - genau ein Monatskontext pro Mitarbeitenden und Monat
+  - Zeit- und Speseneintraege verweisen referenziell auf genau einen Monatskontext
+  - Fahrzeugentschaedigung bleibt fachlich getrennt, kann aber am selben Monatskontext haengen
 
 ## Bewegungsdaten
 
@@ -46,9 +54,8 @@
   - optionale Bemerkung
 - `ExpenseEntry`
   - Datum
-  - Spesenart
   - Betrag CHF
-  - optionale Beschreibung oder Referenz
+  - fachlich genau ein Monatstotal `Diverse Spesen` je Monatskontext
 - Fahrzeugentschaedigung bleibt fachlich getrennt von normalen Spesen
 
 ## Employee Stammdaten
@@ -85,6 +92,7 @@
 - Beitragssätze
 - Steuerregeln
 - Versicherungsregeln
+- zentrale Zuschlagssaetze fuer Nacht, Sonntag und Feiertag
 
 ## Audit
 

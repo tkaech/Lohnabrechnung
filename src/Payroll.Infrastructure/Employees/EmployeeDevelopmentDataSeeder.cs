@@ -1,4 +1,5 @@
 using Payroll.Domain.Employees;
+using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Persistence;
 
 namespace Payroll.Infrastructure.Employees;
@@ -14,7 +15,18 @@ public static class EmployeeDevelopmentDataSeeder
             return;
         }
 
-        foreach (var seed in CreateSeeds())
+        var seeds = CreateSeeds();
+
+        if (!dbContext.PayrollSettings.Any())
+        {
+            var settingsSeed = seeds.First();
+            dbContext.PayrollSettings.Add(new PayrollSettings(new WorkTimeSupplementSettings(
+                settingsSeed.NightSupplementRate,
+                settingsSeed.SundaySupplementRate,
+                settingsSeed.HolidaySupplementRate)));
+        }
+
+        foreach (var seed in seeds)
         {
             var employee = new Employee(
                 seed.PersonnelNumber,
@@ -46,11 +58,7 @@ public static class EmployeeDevelopmentDataSeeder
                 seed.ContractValidFrom,
                 seed.ContractValidTo,
                 seed.HourlyRateChf,
-                seed.MonthlyBvgDeductionChf,
-                new WorkTimeSupplementSettings(
-                    seed.NightSupplementRate,
-                    seed.SundaySupplementRate,
-                    seed.HolidaySupplementRate));
+                seed.MonthlyBvgDeductionChf);
 
             dbContext.Employees.Add(employee);
             dbContext.EmploymentContracts.Add(contract);

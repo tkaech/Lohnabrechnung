@@ -18,6 +18,7 @@
 ## Expenses
 - Spesen
 - monatliche Erfassung im selben Kontext wie Zeiten
+- genau ein Monatstotal `Diverse Spesen` je Mitarbeitenden-Monatskontext
 - Fahrzeugentschaedigung bleibt fachlich getrennt
 - manuelle Anpassungen
 

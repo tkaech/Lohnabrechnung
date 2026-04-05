@@ -109,10 +109,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
             contract?.ValidFrom ?? default,
             contract?.ValidTo,
             contract?.HourlyRateChf ?? 0m,
-            contract?.MonthlyBvgDeductionChf ?? 0m,
-            contract?.SupplementSettings.NightSupplementRate,
-            contract?.SupplementSettings.SundaySupplementRate,
-            contract?.SupplementSettings.HolidaySupplementRate);
+            contract?.MonthlyBvgDeductionChf ?? 0m);
     }
 
     public Task<bool> PersonnelNumberExistsAsync(string personnelNumber, Guid? excludingEmployeeId, CancellationToken cancellationToken)
@@ -165,8 +162,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     command.ContractValidFrom,
                     command.ContractValidTo,
                     command.HourlyRateChf,
-                    command.MonthlyBvgDeductionChf,
-                    CreateSupplementSettings(command));
+                    command.MonthlyBvgDeductionChf);
 
             if (contract.EmployeeId == employee.Id && _dbContext.Entry(contract).State != EntityState.Detached)
             {
@@ -174,8 +170,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     command.ContractValidFrom,
                     command.ContractValidTo,
                     command.HourlyRateChf,
-                    command.MonthlyBvgDeductionChf,
-                    CreateSupplementSettings(command));
+                    command.MonthlyBvgDeductionChf);
             }
             else
             {
@@ -207,8 +202,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
-                command.MonthlyBvgDeductionChf,
-                CreateSupplementSettings(command));
+                command.MonthlyBvgDeductionChf);
 
             _dbContext.Employees.Add(employee);
             _dbContext.EmploymentContracts.Add(contract);
@@ -218,14 +212,6 @@ public sealed class EmployeeRepository : IEmployeeRepository
 
         return await GetByIdAsync(employee.Id, cancellationToken)
             ?? throw new InvalidOperationException("Saved employee could not be loaded.");
-    }
-
-    private static WorkTimeSupplementSettings CreateSupplementSettings(SaveEmployeeCommand command)
-    {
-        return new WorkTimeSupplementSettings(
-            command.NightSupplementRate,
-            command.SundaySupplementRate,
-            command.HolidaySupplementRate);
     }
 
     private static EmployeeAddress CreateAddress(SaveEmployeeCommand command)

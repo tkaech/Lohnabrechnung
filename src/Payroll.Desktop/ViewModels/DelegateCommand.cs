@@ -29,6 +29,11 @@ public sealed class DelegateCommand : ICommand
 
     public async void Execute(object? parameter)
     {
+        if (!CanExecute(parameter))
+        {
+            return;
+        }
+
         if (_execute is not null)
         {
             _execute();
