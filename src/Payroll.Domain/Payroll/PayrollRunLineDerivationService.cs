@@ -1,6 +1,8 @@
 using Payroll.Domain.Common;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Expenses;
+using Payroll.Domain.Settings;
+using Payroll.Domain.TimeTracking;
 
 namespace Payroll.Domain.Payroll;
 
@@ -9,16 +11,16 @@ public sealed class PayrollRunLineDerivationService
     public PayrollRunLineDerivationResult DeriveForEmployee(
         DateOnly payrollReferenceDate,
         EmploymentContract contract,
-        WorkTimeSupplementSettings supplementSettings,
+        PayrollSettings payrollSettings,
         PayrollWorkSummary workSummary,
         IReadOnlyCollection<ExpenseEntry> expenses,
-        IReadOnlyCollection<VehicleCompensation> vehicleCompensations)
+        IReadOnlyCollection<TimeEntry> timeEntries)
     {
         ArgumentNullException.ThrowIfNull(contract);
-        ArgumentNullException.ThrowIfNull(supplementSettings);
+        ArgumentNullException.ThrowIfNull(payrollSettings);
         ArgumentNullException.ThrowIfNull(workSummary);
         ArgumentNullException.ThrowIfNull(expenses);
-        ArgumentNullException.ThrowIfNull(vehicleCompensations);
+        ArgumentNullException.ThrowIfNull(timeEntries);
 
         if (contract.EmployeeId != workSummary.EmployeeId)
         {
@@ -26,10 +28,11 @@ public sealed class PayrollRunLineDerivationService
         }
 
         ValidateEmployeeIds(expenses, contract.EmployeeId, nameof(expenses));
-        ValidateEmployeeIds(vehicleCompensations, contract.EmployeeId, nameof(vehicleCompensations));
+        ValidateEmployeeIds(timeEntries, contract.EmployeeId, nameof(timeEntries));
 
         var lines = new List<PayrollRunLine>();
         var issues = new List<PayrollDerivationIssue>();
+        var supplementSettings = payrollSettings.WorkTimeSupplementSettings;
 
         if (workSummary.WorkHours > 0m)
         {
@@ -40,6 +43,17 @@ public sealed class PayrollRunLineDerivationService
                 "Base hours",
                 workSummary.WorkHours,
                 contract.HourlyRateChf));
+        }
+
+        if (workSummary.WorkHours > 0m && contract.SpecialSupplementRateChf > 0m)
+        {
+            lines.Add(PayrollRunLine.CreateCalculatedHourlyLine(
+                contract.EmployeeId,
+                PayrollLineType.SpecialSupplement,
+                "SPECIAL_CONTRACT",
+                "Spezialzuschlag gemaess Vertrag",
+                workSummary.WorkHours,
+                contract.SpecialSupplementRateChf));
         }
 
         if (workSummary.HasAmbiguousSpecialHourOverlap)
@@ -83,23 +97,77 @@ public sealed class PayrollRunLineDerivationService
 
         foreach (var expense in expenses)
         {
-            lines.Add(PayrollRunLine.CreateDirectChfLine(
-                expense.EmployeeId,
-                PayrollLineType.Expense,
-                ExpenseEntry.PayrollCode,
-                ExpenseEntry.DisplayName,
-                expense.AmountChf));
+            if (expense.ExpensesTotalChf > 0m)
+            {
+                lines.Add(PayrollRunLine.CreateDirectChfLine(
+                    expense.EmployeeId,
+                    PayrollLineType.Expense,
+                    ExpenseEntry.PayrollCode,
+                    ExpenseEntry.DisplayName,
+                    expense.ExpensesTotalChf));
+            }
         }
 
-        foreach (var vehicleCompensation in vehicleCompensations)
+        foreach (var timeEntry in timeEntries)
+        {
+            AddConfiguredVehicleLine(
+                lines,
+                timeEntry,
+                "VEHICLE_P1",
+                "Fahrzeugentschaedigung Pauschalzone 1",
+                timeEntry.VehiclePauschalzone1Chf,
+                payrollSettings.VehiclePauschalzone1RateChf);
+
+            AddConfiguredVehicleLine(
+                lines,
+                timeEntry,
+                "VEHICLE_P2",
+                "Fahrzeugentschaedigung Pauschalzone 2",
+                timeEntry.VehiclePauschalzone2Chf,
+                payrollSettings.VehiclePauschalzone2RateChf);
+
+            AddConfiguredVehicleLine(
+                lines,
+                timeEntry,
+                "VEHICLE_R1",
+                "Fahrzeugentschaedigung Regiezone 1",
+                timeEntry.VehicleRegiezone1Chf,
+                payrollSettings.VehicleRegiezone1RateChf);
+        }
+
+        var vacationCompensationBasisChf = lines
+            .Where(line => line.LineType is PayrollLineType.BaseHours
+                or PayrollLineType.NightSupplement
+                or PayrollLineType.SundaySupplement
+                or PayrollLineType.HolidaySupplement
+                or PayrollLineType.SpecialSupplement
+                or PayrollLineType.VehicleCompensation)
+            .Sum(line => line.AmountChf);
+
+        if (vacationCompensationBasisChf > 0m && payrollSettings.VacationCompensationRate > 0m)
         {
             lines.Add(PayrollRunLine.CreateDirectChfLine(
-                vehicleCompensation.EmployeeId,
-                PayrollLineType.VehicleCompensation,
-                "VEHICLE",
-                vehicleCompensation.Description,
-                vehicleCompensation.AmountChf));
+                contract.EmployeeId,
+                PayrollLineType.VacationCompensation,
+                "VACATION_COMP",
+                "Ferienentschaedigung",
+                vacationCompensationBasisChf * payrollSettings.VacationCompensationRate));
         }
+
+        var contributableGrossChf = lines
+            .Where(line => line.LineType is PayrollLineType.BaseHours
+                or PayrollLineType.NightSupplement
+                or PayrollLineType.SundaySupplement
+                or PayrollLineType.HolidaySupplement
+                or PayrollLineType.SpecialSupplement
+                or PayrollLineType.VacationCompensation
+                or PayrollLineType.VehicleCompensation)
+            .Sum(line => line.AmountChf);
+
+        AddPercentageDeductionLine(lines, contract.EmployeeId, "AHV_IV_EO", "AHV/IV/EO", contributableGrossChf, payrollSettings.AhvIvEoRate);
+        AddPercentageDeductionLine(lines, contract.EmployeeId, "ALV", "ALV", contributableGrossChf, payrollSettings.AlvRate);
+        AddPercentageDeductionLine(lines, contract.EmployeeId, "KTG_UVG", "Krankentaggeld/UVG", contributableGrossChf, payrollSettings.SicknessAccidentInsuranceRate);
+        AddPercentageDeductionLine(lines, contract.EmployeeId, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", contributableGrossChf, payrollSettings.TrainingAndHolidayRate);
 
         if (contract.IsActiveOn(payrollReferenceDate) && contract.MonthlyBvgDeductionChf > 0m)
         {
@@ -146,6 +214,48 @@ public sealed class PayrollRunLineDerivationService
             contract.HourlyRateChf * supplementRate.Value));
     }
 
+    private static void AddConfiguredVehicleLine(
+        ICollection<PayrollRunLine> lines,
+        TimeEntry timeEntry,
+        string code,
+        string description,
+        decimal quantity,
+        decimal rateChf)
+    {
+        if (quantity <= 0m || rateChf <= 0m)
+        {
+            return;
+        }
+
+        lines.Add(PayrollRunLine.CreateDirectChfLine(
+            timeEntry.EmployeeId,
+            PayrollLineType.VehicleCompensation,
+            code,
+            description,
+            quantity * rateChf));
+    }
+
+    private static void AddPercentageDeductionLine(
+        ICollection<PayrollRunLine> lines,
+        Guid employeeId,
+        string code,
+        string description,
+        decimal contributableGrossChf,
+        decimal rate)
+    {
+        if (contributableGrossChf <= 0m || rate <= 0m)
+        {
+            return;
+        }
+
+        lines.Add(PayrollRunLine.CreateCalculatedFixedDeduction(
+            employeeId,
+            PayrollLineType.SocialContribution,
+            code,
+            description,
+            contributableGrossChf * rate));
+    }
+
     private static void ValidateEmployeeIds<TEntry>(IEnumerable<TEntry> entries, Guid employeeId, string paramName)
         where TEntry : class
     {
@@ -154,7 +264,7 @@ public sealed class PayrollRunLineDerivationService
             var currentEmployeeId = entry switch
             {
                 ExpenseEntry expenseEntry => expenseEntry.EmployeeId,
-                VehicleCompensation vehicleCompensation => vehicleCompensation.EmployeeId,
+                TimeEntry timeEntry => timeEntry.EmployeeId,
                 _ => throw new ArgumentException("Unsupported entry type.", paramName)
             };
 

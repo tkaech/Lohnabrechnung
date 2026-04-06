@@ -18,6 +18,17 @@ public sealed class TimeEntryTests
     }
 
     [Fact]
+    public void VehicleCompensationTotal_AggregatesThreeVehicleValues()
+    {
+        var entry = new TimeEntry(Guid.NewGuid(), new DateOnly(2026, 3, 15), 8m, 0m, 0m, 0m, null, 10m, 20m, 30m);
+
+        Assert.Equal(10m, entry.VehiclePauschalzone1Chf);
+        Assert.Equal(20m, entry.VehiclePauschalzone2Chf);
+        Assert.Equal(30m, entry.VehicleRegiezone1Chf);
+        Assert.Equal(60m, entry.VehicleCompensationTotalChf);
+    }
+
+    [Fact]
     public void Constructor_RejectsNegativeSpecialHours()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>

@@ -50,7 +50,8 @@ public sealed class EmployeeRepositorySqliteTests
                 new DateOnly(2026, 1, 1),
                 null,
                 32.5m,
-                280m),
+                280m,
+                3.00m),
             CancellationToken.None);
 
         var listedEmployees = await repository.ListAsync(
@@ -62,5 +63,6 @@ public sealed class EmployeeRepositorySqliteTests
         Assert.Equal("2000", listedEmployee.PersonnelNumber);
         Assert.Equal(32.5m, listedEmployee.HourlyRateChf);
         Assert.Equal(280m, listedEmployee.MonthlyBvgDeductionChf);
+        Assert.Equal(3.00m, saved.SpecialSupplementRateChf);
     }
 }

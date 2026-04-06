@@ -159,14 +159,15 @@ public sealed class Employee : AuditableEntity
         string? email)
     {
         ArgumentNullException.ThrowIfNull(address);
-        ValidateDates(birthDate, entryDate, exitDate);
+        var normalizedExitDate = isActive ? null : exitDate;
+        ValidateDates(birthDate, entryDate, normalizedExitDate);
 
         PersonnelNumber = Guard.AgainstNullOrWhiteSpace(personnelNumber, nameof(personnelNumber));
         FirstName = Guard.AgainstNullOrWhiteSpace(firstName, nameof(firstName));
         LastName = Guard.AgainstNullOrWhiteSpace(lastName, nameof(lastName));
         BirthDate = birthDate;
         EntryDate = entryDate;
-        ExitDate = exitDate;
+        ExitDate = normalizedExitDate;
         IsActive = isActive;
         Address = address;
         ResidenceCountry = NormalizeOptional(residenceCountry);

@@ -109,7 +109,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
             contract?.ValidFrom ?? default,
             contract?.ValidTo,
             contract?.HourlyRateChf ?? 0m,
-            contract?.MonthlyBvgDeductionChf ?? 0m);
+            contract?.MonthlyBvgDeductionChf ?? 0m,
+            contract?.SpecialSupplementRateChf ?? 0m);
     }
 
     public Task<bool> PersonnelNumberExistsAsync(string personnelNumber, Guid? excludingEmployeeId, CancellationToken cancellationToken)
@@ -162,7 +163,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     command.ContractValidFrom,
                     command.ContractValidTo,
                     command.HourlyRateChf,
-                    command.MonthlyBvgDeductionChf);
+                    command.MonthlyBvgDeductionChf,
+                    command.SpecialSupplementRateChf);
 
             if (contract.EmployeeId == employee.Id && _dbContext.Entry(contract).State != EntityState.Detached)
             {
@@ -170,7 +172,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     command.ContractValidFrom,
                     command.ContractValidTo,
                     command.HourlyRateChf,
-                    command.MonthlyBvgDeductionChf);
+                    command.MonthlyBvgDeductionChf,
+                    command.SpecialSupplementRateChf);
             }
             else
             {
@@ -202,7 +205,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
-                command.MonthlyBvgDeductionChf);
+                command.MonthlyBvgDeductionChf,
+                command.SpecialSupplementRateChf);
 
             _dbContext.Employees.Add(employee);
             _dbContext.EmploymentContracts.Add(contract);

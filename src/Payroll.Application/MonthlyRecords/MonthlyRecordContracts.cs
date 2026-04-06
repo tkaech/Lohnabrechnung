@@ -30,18 +30,14 @@ public sealed record MonthlyTimeEntryDto(
     decimal NightHours,
     decimal SundayHours,
     decimal HolidayHours,
+    decimal VehiclePauschalzone1Chf,
+    decimal VehiclePauschalzone2Chf,
+    decimal VehicleRegiezone1Chf,
     string? Note);
 
 public sealed record MonthlyExpenseEntryDto(
     Guid ExpenseEntryId,
-    DateOnly ExpenseDate,
-    decimal AmountChf);
-
-public sealed record MonthlyVehicleCompensationDto(
-    Guid VehicleCompensationId,
-    DateOnly CompensationDate,
-    decimal AmountChf,
-    string Description);
+    decimal ExpensesTotalChf);
 
 public sealed record MonthlyPreviewRowDto(
     int Year,
@@ -55,12 +51,23 @@ public sealed record MonthlyRecordPreviewDto(
     IReadOnlyCollection<MonthlyPreviewRowDto> Rows,
     IReadOnlyCollection<string> Notes);
 
+public sealed record MonthlyPayrollPreviewLineDto(
+    string Label,
+    string QuantityDisplay,
+    string RateDisplay,
+    string AmountDisplay,
+    string? Detail);
+
+public sealed record MonthlyPayrollPreviewDto(
+    IReadOnlyCollection<MonthlyPayrollPreviewLineDto> Lines,
+    IReadOnlyCollection<string> Notes);
+
 public sealed record MonthlyRecordDetailsDto(
     MonthlyRecordHeaderDto Header,
     IReadOnlyCollection<MonthlyTimeEntryDto> TimeEntries,
-    IReadOnlyCollection<MonthlyExpenseEntryDto> ExpenseEntries,
-    IReadOnlyCollection<MonthlyVehicleCompensationDto> VehicleCompensations,
-    MonthlyRecordPreviewDto Preview);
+    MonthlyExpenseEntryDto? ExpenseEntry,
+    MonthlyRecordPreviewDto Preview,
+    MonthlyPayrollPreviewDto PayrollPreview);
 
 public sealed record SaveMonthlyTimeEntryCommand(
     Guid MonthlyRecordId,
@@ -70,17 +77,11 @@ public sealed record SaveMonthlyTimeEntryCommand(
     decimal NightHours,
     decimal SundayHours,
     decimal HolidayHours,
+    decimal VehiclePauschalzone1Chf,
+    decimal VehiclePauschalzone2Chf,
+    decimal VehicleRegiezone1Chf,
     string? Note);
 
 public sealed record SaveMonthlyExpenseEntryCommand(
     Guid MonthlyRecordId,
-    Guid? ExpenseEntryId,
-    DateOnly ExpenseDate,
-    decimal AmountChf);
-
-public sealed record SaveMonthlyVehicleCompensationCommand(
-    Guid MonthlyRecordId,
-    Guid? VehicleCompensationId,
-    DateOnly CompensationDate,
-    decimal AmountChf,
-    string Description);
+    decimal ExpensesTotalChf);

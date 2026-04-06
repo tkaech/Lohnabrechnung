@@ -7,8 +7,6 @@ namespace Payroll.Domain.MonthlyRecords;
 public sealed class EmployeeMonthlyRecord : AuditableEntity
 {
     private readonly List<TimeEntry> _timeEntries = [];
-    private readonly List<ExpenseEntry> _expenseEntries = [];
-    private readonly List<VehicleCompensation> _vehicleCompensations = [];
 
     private EmployeeMonthlyRecord()
     {
@@ -34,8 +32,7 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
     public int Month { get; private set; }
     public EmployeeMonthlyRecordStatus Status { get; private set; }
     public IReadOnlyCollection<TimeEntry> TimeEntries => _timeEntries.AsReadOnly();
-    public IReadOnlyCollection<ExpenseEntry> ExpenseEntries => _expenseEntries.AsReadOnly();
-    public IReadOnlyCollection<VehicleCompensation> VehicleCompensations => _vehicleCompensations.AsReadOnly();
+    public ExpenseEntry? ExpenseEntry { get; private set; }
     public DateOnly PeriodStart => new(Year, Month, 1);
     public DateOnly PeriodEnd => new(Year, Month, DateTime.DaysInMonth(Year, Month));
 
@@ -62,6 +59,9 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         decimal nightHours,
         decimal sundayHours,
         decimal holidayHours,
+        decimal vehiclePauschalzone1Chf,
+        decimal vehiclePauschalzone2Chf,
+        decimal vehicleRegiezone1Chf,
         string? note)
     {
         EnsureDateInMonth(workDate, nameof(workDate));
@@ -69,13 +69,33 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         var existingEntry = ResolveTimeEntry(timeEntryId, workDate);
         if (existingEntry is null)
         {
-            var createdEntry = new TimeEntry(Id, EmployeeId, workDate, hoursWorked, nightHours, sundayHours, holidayHours, note);
+            var createdEntry = new TimeEntry(
+                Id,
+                EmployeeId,
+                workDate,
+                hoursWorked,
+                nightHours,
+                sundayHours,
+                holidayHours,
+                note,
+                vehiclePauschalzone1Chf,
+                vehiclePauschalzone2Chf,
+                vehicleRegiezone1Chf);
             _timeEntries.Add(createdEntry);
             return createdEntry;
         }
 
         EnsureNoOtherTimeEntryUsesDate(existingEntry.Id, workDate);
-        existingEntry.Update(workDate, hoursWorked, nightHours, sundayHours, holidayHours, note);
+        existingEntry.Update(
+            workDate,
+            hoursWorked,
+            nightHours,
+            sundayHours,
+            holidayHours,
+            note,
+            vehiclePauschalzone1Chf,
+            vehiclePauschalzone2Chf,
+            vehicleRegiezone1Chf);
         return existingEntry;
     }
 
@@ -87,64 +107,17 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         _timeEntries.Remove(timeEntry);
     }
 
-    public ExpenseEntry SaveExpenseEntry(
-        Guid? expenseEntryId,
-        DateOnly expenseDate,
-        decimal amountChf)
+    public ExpenseEntry SaveExpenseEntry(decimal expensesTotalChf)
     {
-        EnsureDateInMonth(expenseDate, nameof(expenseDate));
-
-        var existingEntry = ResolveExpenseEntry(expenseEntryId);
-
-        if (existingEntry is null)
+        if (ExpenseEntry is null)
         {
-            var createdEntry = new ExpenseEntry(Id, EmployeeId, expenseDate, amountChf);
-            _expenseEntries.Add(createdEntry);
+            var createdEntry = new ExpenseEntry(Id, EmployeeId, expensesTotalChf);
+            ExpenseEntry = createdEntry;
             return createdEntry;
         }
 
-        existingEntry.Update(expenseDate, amountChf);
-        return existingEntry;
-    }
-
-    public void RemoveExpenseEntry(Guid expenseEntryId)
-    {
-        var expenseEntry = _expenseEntries.SingleOrDefault(item => item.Id == expenseEntryId)
-            ?? throw new InvalidOperationException("Expense entry was not found.");
-
-        _expenseEntries.Remove(expenseEntry);
-    }
-
-    public VehicleCompensation SaveVehicleCompensation(
-        Guid? vehicleCompensationId,
-        DateOnly compensationDate,
-        decimal amountChf,
-        string description)
-    {
-        EnsureDateInMonth(compensationDate, nameof(compensationDate));
-
-        var existingEntry = vehicleCompensationId.HasValue
-            ? _vehicleCompensations.SingleOrDefault(item => item.Id == vehicleCompensationId.Value)
-                ?? throw new InvalidOperationException("Vehicle compensation entry was not found.")
-            : null;
-
-        if (existingEntry is null)
-        {
-            var createdEntry = new VehicleCompensation(Id, EmployeeId, compensationDate, amountChf, description);
-            _vehicleCompensations.Add(createdEntry);
-            return createdEntry;
-        }
-
-        existingEntry.Update(compensationDate, amountChf, description);
-        return existingEntry;
-    }
-
-    public void RemoveVehicleCompensation(Guid vehicleCompensationId)
-    {
-        var vehicleCompensation = _vehicleCompensations.SingleOrDefault(item => item.Id == vehicleCompensationId)
-            ?? throw new InvalidOperationException("Vehicle compensation entry was not found.");
-
-        _vehicleCompensations.Remove(vehicleCompensation);
+        ExpenseEntry.Update(expensesTotalChf);
+        return ExpenseEntry;
     }
 
     private TimeEntry? ResolveTimeEntry(Guid? timeEntryId, DateOnly workDate)
@@ -156,17 +129,6 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         }
 
         return _timeEntries.SingleOrDefault(item => item.WorkDate == workDate);
-    }
-
-    private ExpenseEntry? ResolveExpenseEntry(Guid? expenseEntryId)
-    {
-        if (expenseEntryId.HasValue)
-        {
-            return _expenseEntries.SingleOrDefault(item => item.Id == expenseEntryId.Value)
-                ?? throw new InvalidOperationException("Expense entry was not found.");
-        }
-
-        return _expenseEntries.SingleOrDefault();
     }
 
     private void EnsureNoOtherTimeEntryUsesDate(Guid currentTimeEntryId, DateOnly workDate)

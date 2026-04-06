@@ -13,13 +13,15 @@ public sealed class EmploymentContract : AuditableEntity
     public DateOnly? ValidTo { get; private set; }
     public decimal HourlyRateChf { get; private set; }
     public decimal MonthlyBvgDeductionChf { get; private set; }
+    public decimal SpecialSupplementRateChf { get; private set; }
 
     public EmploymentContract(
         Guid employeeId,
         DateOnly validFrom,
         DateOnly? validTo,
         decimal hourlyRateChf,
-        decimal monthlyBvgDeductionChf)
+        decimal monthlyBvgDeductionChf,
+        decimal specialSupplementRateChf)
     {
         Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
 
@@ -28,6 +30,7 @@ public sealed class EmploymentContract : AuditableEntity
         ValidTo = validTo;
         HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
         MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
+        SpecialSupplementRateChf = Guard.AgainstNegative(specialSupplementRateChf, nameof(specialSupplementRateChf));
     }
 
     public bool IsActiveOn(DateOnly date)
@@ -40,11 +43,17 @@ public sealed class EmploymentContract : AuditableEntity
         return Guard.AgainstNegative(hours, nameof(hours)) * HourlyRateChf;
     }
 
+    public decimal CalculateSpecialSupplement(decimal hours)
+    {
+        return Guard.AgainstNegative(hours, nameof(hours)) * SpecialSupplementRateChf;
+    }
+
     public void UpdateTerms(
         DateOnly validFrom,
         DateOnly? validTo,
         decimal hourlyRateChf,
-        decimal monthlyBvgDeductionChf)
+        decimal monthlyBvgDeductionChf,
+        decimal specialSupplementRateChf)
     {
         Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
 
@@ -52,6 +61,7 @@ public sealed class EmploymentContract : AuditableEntity
         ValidTo = validTo;
         HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
         MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
+        SpecialSupplementRateChf = Guard.AgainstNegative(specialSupplementRateChf, nameof(specialSupplementRateChf));
         Touch();
     }
 }

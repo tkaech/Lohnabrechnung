@@ -74,7 +74,6 @@ public sealed class AppBootstrapper
             "EmployeeMonthlyRecords",
             "TimeEntries",
             "ExpenseEntries",
-            "VehicleCompensations",
             "PayrollSettings"
         };
 
@@ -102,7 +101,10 @@ public sealed class AppBootstrapper
                 return false;
             }
 
-            return HasExpectedExpenseEntryColumns(connection);
+            return HasExpectedEmploymentContractColumns(connection)
+                && HasExpectedExpenseEntryColumns(connection)
+                && HasExpectedTimeEntryColumns(connection)
+                && HasExpectedPayrollSettingsColumns(connection);
         }
         finally
         {
@@ -113,6 +115,33 @@ public sealed class AppBootstrapper
         }
     }
 
+    private static bool HasExpectedEmploymentContractColumns(DbConnection connection)
+    {
+        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id",
+            "EmployeeId",
+            "ValidFrom",
+            "ValidTo",
+            "HourlyRateChf",
+            "MonthlyBvgDeductionChf",
+            "SpecialSupplementRateChf",
+            "CreatedAtUtc",
+            "UpdatedAtUtc"
+        };
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info('EmploymentContracts');";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            expectedColumns.Remove(reader.GetString(1));
+        }
+
+        return expectedColumns.Count == 0;
+    }
+
     private static bool HasExpectedExpenseEntryColumns(DbConnection connection)
     {
         var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -120,8 +149,7 @@ public sealed class AppBootstrapper
             "Id",
             "EmployeeMonthlyRecordId",
             "EmployeeId",
-            "ExpenseDate",
-            "AmountChf",
+            "ExpensesTotalChf",
             "ExpenseTypeCode",
             "Description",
             "CreatedAtUtc",
@@ -130,6 +158,70 @@ public sealed class AppBootstrapper
 
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA table_info('ExpenseEntries');";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            expectedColumns.Remove(reader.GetString(1));
+        }
+
+        return expectedColumns.Count == 0;
+    }
+
+    private static bool HasExpectedTimeEntryColumns(DbConnection connection)
+    {
+        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id",
+            "EmployeeMonthlyRecordId",
+            "EmployeeId",
+            "WorkDate",
+            "HoursWorked",
+            "NightHours",
+            "SundayHours",
+            "HolidayHours",
+            "VehiclePauschalzone1Chf",
+            "VehiclePauschalzone2Chf",
+            "VehicleRegiezone1Chf",
+            "Note",
+            "CreatedAtUtc",
+            "UpdatedAtUtc"
+        };
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info('TimeEntries');";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            expectedColumns.Remove(reader.GetString(1));
+        }
+
+        return expectedColumns.Count == 0;
+    }
+
+    private static bool HasExpectedPayrollSettingsColumns(DbConnection connection)
+    {
+        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Id",
+            "AhvIvEoRate",
+            "AlvRate",
+            "SicknessAccidentInsuranceRate",
+            "TrainingAndHolidayRate",
+            "VacationCompensationRate",
+            "VehiclePauschalzone1RateChf",
+            "VehiclePauschalzone2RateChf",
+            "VehicleRegiezone1RateChf",
+            "WorkTimeSupplementSettings_NightSupplementRate",
+            "WorkTimeSupplementSettings_SundaySupplementRate",
+            "WorkTimeSupplementSettings_HolidaySupplementRate",
+            "CreatedAtUtc",
+            "UpdatedAtUtc"
+        };
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info('PayrollSettings');";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())

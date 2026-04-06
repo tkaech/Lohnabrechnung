@@ -2,7 +2,9 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Desktop.ViewModels;
+using Payroll.Domain.Employees;
 using Payroll.Domain.MonthlyRecords;
+using Payroll.Domain.Settings;
 using Payroll.Infrastructure.MonthlyRecords;
 using Payroll.Infrastructure.Persistence;
 
@@ -36,7 +38,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
-    public async Task SaveAndLoadDetailsAsync_PersistsTimeAndExpenseEntriesWithinMonthlyContext()
+    public async Task SaveAndLoadDetailsAsync_PersistsTimeVehicleAndExpenseValuesWithinMonthlyContext()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -50,29 +52,44 @@ public sealed class MonthlyRecordRepositorySqliteTests
 
         var employee = CreateEmployee();
         dbContext.Employees.Add(employee);
-        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m));
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            0.053m,
+            0.011m,
+            0.00821m,
+            0.00015m,
+            0.1064m,
+            5.6m,
+            16.8m,
+            0.32m));
         await dbContext.SaveChangesAsync();
 
         var repository = new EmployeeMonthlyRecordRepository(dbContext);
         var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
-        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, "Fruehdienst");
-        record.SaveExpenseEntry(null, new DateOnly(2026, 4, 10), 18.50m);
-        record.SaveVehicleCompensation(null, new DateOnly(2026, 4, 30), 120m, "Auto April");
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, 120m, 80m, 60m, "Fruehdienst");
+        record.SaveExpenseEntry(18.50m);
         await repository.SaveChangesAsync(CancellationToken.None);
 
         var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
 
         Assert.NotNull(details);
         Assert.Single(details!.TimeEntries);
-        Assert.Single(details.ExpenseEntries);
-        Assert.Single(details.VehicleCompensations);
+        Assert.NotNull(details.ExpenseEntry);
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.AmountDisplay == "247.63 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "18.50 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Total Auszahlung");
         Assert.Equal(8m, details.Header.TotalWorkedHours);
         Assert.Equal(18.50m, details.Header.TotalExpensesChf);
-        Assert.Equal(120m, details.Header.TotalVehicleCompensationChf);
+        Assert.Equal(260m, details.Header.TotalVehicleCompensationChf);
+        Assert.Equal(120m, details.TimeEntries.Single().VehiclePauschalzone1Chf);
     }
 
     [Fact]
-    public async Task ExpenseEntries_AllowOnlySingleMonthlyTotalPerRecord()
+    public async Task ExpenseEntries_ModelEnforcesUniqueMonthlyRecordReference()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -84,18 +101,12 @@ public sealed class MonthlyRecordRepositorySqliteTests
         await using var dbContext = new PayrollDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
 
-        var employee = CreateEmployee();
-        dbContext.Employees.Add(employee);
-        await dbContext.SaveChangesAsync();
+        var entityType = dbContext.Model.FindEntityType(typeof(global::Payroll.Domain.Expenses.ExpenseEntry));
+        var uniqueForeignKeyIndex = entityType!
+            .GetIndexes()
+            .Single(index => index.Properties.Single().Name == nameof(global::Payroll.Domain.Expenses.ExpenseEntry.EmployeeMonthlyRecordId));
 
-        var monthlyRecord = new EmployeeMonthlyRecord(employee.Id, 2026, 4);
-        dbContext.EmployeeMonthlyRecords.Add(monthlyRecord);
-        await dbContext.SaveChangesAsync();
-
-        dbContext.ExpenseEntries.Add(new global::Payroll.Domain.Expenses.ExpenseEntry(monthlyRecord.Id, employee.Id, new DateOnly(2026, 4, 10), 18.50m));
-        dbContext.ExpenseEntries.Add(new global::Payroll.Domain.Expenses.ExpenseEntry(monthlyRecord.Id, employee.Id, new DateOnly(2026, 4, 30), 80m));
-
-        await Assert.ThrowsAsync<DbUpdateException>(() => dbContext.SaveChangesAsync());
+        Assert.True(uniqueForeignKeyIndex.IsUnique);
     }
 
     [Fact]
@@ -122,7 +133,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
-    public async Task MonthlyRecordViewModel_SaveTimeEntry_PersistsAgainstSqliteRepository()
+    public async Task MonthlyRecordViewModel_SaveExpenseEntry_PersistsAgainstSqliteRepository()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -136,7 +147,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
 
         var employee = CreateEmployee();
         dbContext.Employees.Add(employee);
-        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m));
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
         await dbContext.SaveChangesAsync();
 
         var repository = new EmployeeMonthlyRecordRepository(dbContext);
@@ -147,23 +158,19 @@ public sealed class MonthlyRecordRepositorySqliteTests
         };
 
         await viewModel.SetEmployeeAsync(employee.Id, "Anna Aktiv");
-        viewModel.TimeDate = "2026-04-05";
-        viewModel.HoursWorked = "8";
-        viewModel.NightHours = "1";
-        viewModel.SundayHours = "0";
-        viewModel.HolidayHours = "0";
-        viewModel.TimeNote = "Fruehdienst";
+        viewModel.ExpensesTotal = "18.5";
 
-        viewModel.SaveTimeEntryCommand.Execute(null);
+        viewModel.SaveExpenseEntryCommand.Execute(null);
 
         var startedAt = DateTime.UtcNow;
-        while (viewModel.TimeEntries.Count == 0 && (DateTime.UtcNow - startedAt).TotalSeconds < 3)
+        while (viewModel.ActionMessage != "Spesen gespeichert." && (DateTime.UtcNow - startedAt).TotalSeconds < 3)
         {
             await Task.Delay(20);
         }
 
-        Assert.True(viewModel.TimeEntries.Count == 1, viewModel.ActionMessage);
-        Assert.Equal("Zeiteintrag gespeichert.", viewModel.ActionMessage);
+        Assert.Equal("Spesen gespeichert.", viewModel.ActionMessage);
+        Assert.Equal("18.50", viewModel.ExpensesTotal);
+        Assert.Contains("Spesen 18.50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
     private static global::Payroll.Domain.Employees.Employee CreateEmployee()

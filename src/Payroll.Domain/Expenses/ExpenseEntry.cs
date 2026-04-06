@@ -13,28 +13,26 @@ public sealed class ExpenseEntry : AuditableEntity
 
     public Guid EmployeeMonthlyRecordId { get; private set; }
     public Guid EmployeeId { get; private set; }
-    public DateOnly ExpenseDate { get; private set; }
-    public decimal AmountChf { get; private set; }
+    public decimal ExpensesTotalChf { get; private set; }
     public string ExpenseTypeCode { get; private set; } = PayrollCode;
     public string Description { get; private set; } = DisplayName;
     public string Currency => "CHF";
 
-    public ExpenseEntry(Guid employeeId, DateOnly expenseDate, decimal amount)
-        : this(Guid.Empty, employeeId, expenseDate, amount)
+    public ExpenseEntry(Guid employeeId, decimal expensesTotalChf)
+        : this(Guid.Empty, employeeId, expensesTotalChf)
     {
     }
 
-    public ExpenseEntry(Guid employeeMonthlyRecordId, Guid employeeId, DateOnly expenseDate, decimal amount)
+    public ExpenseEntry(Guid employeeMonthlyRecordId, Guid employeeId, decimal expensesTotalChf)
     {
         EmployeeId = employeeId;
         EmployeeMonthlyRecordId = employeeMonthlyRecordId;
-        Update(expenseDate, amount);
+        Update(expensesTotalChf);
     }
 
-    public void Update(DateOnly expenseDate, decimal amount)
+    public void Update(decimal expensesTotalChf)
     {
-        ExpenseDate = expenseDate;
-        AmountChf = Guard.AgainstNegative(amount, nameof(amount));
+        ExpensesTotalChf = Guard.AgainstNegative(expensesTotalChf, nameof(expensesTotalChf));
         ExpenseTypeCode = PayrollCode;
         Description = DisplayName;
         Touch();

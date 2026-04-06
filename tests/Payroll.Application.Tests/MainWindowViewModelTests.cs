@@ -144,31 +144,86 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToEmployees()
+    public async Task ReactivatingEmployee_ClearsExitDateAndSavesActiveStatus()
+    {
+        var employee = TestEmployeeRepository.CreateInactiveDetails("1000", "Anna", "Archiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.EditEmployeeCommand.Execute(null);
+        Assert.True(viewModel.CanClearExitDate);
+
+        viewModel.IsActiveEmployee = true;
+
+        Assert.Null(viewModel.ExitDate);
+        Assert.False(viewModel.CanClearExitDate);
+
+        viewModel.SaveCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Mitarbeitender 1000 gespeichert.");
+
+        Assert.True(viewModel.IsActiveEmployee);
+        Assert.Null(viewModel.ExitDate);
+        Assert.Equal("Aktiv", viewModel.SelectedEmployee?.StatusSummary);
+    }
+
+    [Fact]
+    public async Task ClearExitDateCommand_RemovesExitDateInEditMode()
+    {
+        var employee = TestEmployeeRepository.CreateInactiveDetails("1000", "Anna", "Archiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.EditEmployeeCommand.Execute(null);
+        Assert.True(viewModel.CanClearExitDate);
+
+        viewModel.ClearExitDateCommand.Execute(null);
+
+        Assert.Null(viewModel.ExitDate);
+        Assert.False(viewModel.CanClearExitDate);
+    }
+
+    [Fact]
+    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsAndEmployees()
     {
         var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
         var repository = new TestEmployeeRepository(employee);
         var viewModel = CreateViewModel(repository);
 
         Assert.True(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsPayrollRunsWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
+
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+
+        Assert.True(viewModel.IsPayrollRunsWorkspace);
+        Assert.False(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsEmployeeWorkspace);
+        Assert.True(viewModel.ShowEmployeeSelectionArea);
+        Assert.True(viewModel.ShowPrimaryWorkspaceArea);
 
         viewModel.ShowEmployeesCommand.Execute(null);
 
         Assert.True(viewModel.IsEmployeeWorkspace);
         Assert.False(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsPayrollRunsWorkspace);
 
         viewModel.ShowTimeAndExpensesCommand.Execute(null);
 
         Assert.True(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsPayrollRunsWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
     }
 
     [Fact]
-    public async Task SettingsWorkspace_LoadsAndSavesCentralSupplementRates()
+    public async Task SettingsWorkspace_LoadsAndSavesCentralSupplementRatesWithoutEmployeeSelection()
     {
-        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
-        var employeeRepository = new TestEmployeeRepository(employee);
+        var employeeRepository = new TestEmployeeRepository();
         var settingsRepository = new InMemoryPayrollSettingsRepository();
         var viewModel = new MainWindowViewModel(
             new EmployeeService(employeeRepository),
@@ -183,14 +238,33 @@ public sealed class MainWindowViewModelTests
         viewModel.SettingsNightSupplementRate = "0.30";
         viewModel.SettingsSundaySupplementRate = "0.60";
         viewModel.SettingsHolidaySupplementRate = "1.10";
+        viewModel.SettingsAhvIvEoRate = "0.054";
+        viewModel.SettingsAlvRate = "0.012";
+        viewModel.SettingsSicknessAccidentInsuranceRate = "0.009";
+        viewModel.SettingsTrainingAndHolidayRate = "0.0002";
+        viewModel.SettingsVacationCompensationRate = "0.1064";
+        viewModel.SettingsVehiclePauschalzone1RateChf = "1.5";
+        viewModel.SettingsVehiclePauschalzone2RateChf = "2.5";
+        viewModel.SettingsVehicleRegiezone1RateChf = "3.5";
         viewModel.SaveSettingsCommand.Execute(null);
 
         await WaitUntilAsync(() => viewModel.StatusMessage == "Einstellungen gespeichert.");
 
         Assert.True(viewModel.IsSettingsWorkspace);
+        Assert.False(viewModel.ShowEmployeeSelectionArea);
+        Assert.False(viewModel.ShowPrimaryWorkspaceArea);
+        Assert.Empty(viewModel.Employees);
         Assert.Equal(0.30m, settingsRepository.Current.NightSupplementRate);
         Assert.Equal(0.60m, settingsRepository.Current.SundaySupplementRate);
         Assert.Equal(1.10m, settingsRepository.Current.HolidaySupplementRate);
+        Assert.Equal(0.054m, settingsRepository.Current.AhvIvEoRate);
+        Assert.Equal(0.012m, settingsRepository.Current.AlvRate);
+        Assert.Equal(0.009m, settingsRepository.Current.SicknessAccidentInsuranceRate);
+        Assert.Equal(0.0002m, settingsRepository.Current.TrainingAndHolidayRate);
+        Assert.Equal(0.1064m, settingsRepository.Current.VacationCompensationRate);
+        Assert.Equal(1.5m, settingsRepository.Current.VehiclePauschalzone1RateChf);
+        Assert.Equal(2.5m, settingsRepository.Current.VehiclePauschalzone2RateChf);
+        Assert.Equal(3.5m, settingsRepository.Current.VehicleRegiezone1RateChf);
     }
 
     private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository)
@@ -324,7 +398,8 @@ public sealed class MainWindowViewModelTests
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
-                command.MonthlyBvgDeductionChf);
+                command.MonthlyBvgDeductionChf,
+                command.SpecialSupplementRateChf);
 
             _employees[employeeId] = employee;
             return Task.FromResult(employee);
@@ -359,7 +434,41 @@ public sealed class MainWindowViewModelTests
                 new DateOnly(2025, 1, 1),
                 null,
                 32.5m,
-                280m);
+                280m,
+                3.00m);
+        }
+
+        public static EmployeeDetailsDto CreateInactiveDetails(string personnelNumber, string firstName, string lastName, string city)
+        {
+            return new EmployeeDetailsDto(
+                Guid.NewGuid(),
+                personnelNumber,
+                firstName,
+                lastName,
+                new DateOnly(1990, 1, 1),
+                new DateOnly(2025, 1, 1),
+                new DateOnly(2026, 3, 31),
+                false,
+                "Beispielstrasse",
+                "1",
+                null,
+                "8000",
+                city,
+                "Schweiz",
+                "Schweiz",
+                "CH",
+                "B",
+                "Ordentlich",
+                false,
+                "756.0000.0000.00",
+                "CH9300762011623852957",
+                "+41 79 000 00 00",
+                $"{firstName.ToLowerInvariant()}.{lastName.ToLowerInvariant()}@example.ch",
+                new DateOnly(2025, 1, 1),
+                null,
+                32.5m,
+                280m,
+                3.00m);
         }
 
         private static EmployeeListItemDto ToListItem(EmployeeDetailsDto employee)
@@ -412,7 +521,7 @@ public sealed class MainWindowViewModelTests
 
     private sealed class InMemoryPayrollSettingsRepository : IPayrollSettingsRepository
     {
-        private PayrollSettingsDto _settings = new(0.25m, 0.50m, 1.00m);
+        private PayrollSettingsDto _settings = new(0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0m, 0m, 0m);
 
         public PayrollSettingsDto Current => _settings;
 
@@ -431,7 +540,18 @@ public sealed class MainWindowViewModelTests
 
         public Task<PayrollSettingsDto> SaveAsync(SavePayrollSettingsCommand command, CancellationToken cancellationToken)
         {
-            _settings = new PayrollSettingsDto(command.NightSupplementRate, command.SundaySupplementRate, command.HolidaySupplementRate);
+            _settings = new PayrollSettingsDto(
+                command.NightSupplementRate,
+                command.SundaySupplementRate,
+                command.HolidaySupplementRate,
+                command.AhvIvEoRate,
+                command.AlvRate,
+                command.SicknessAccidentInsuranceRate,
+                command.TrainingAndHolidayRate,
+                command.VacationCompensationRate,
+                command.VehiclePauschalzone1RateChf,
+                command.VehiclePauschalzone2RateChf,
+                command.VehicleRegiezone1RateChf);
             return Task.FromResult(_settings);
         }
     }

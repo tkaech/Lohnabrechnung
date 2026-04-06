@@ -9,6 +9,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private enum WorkspaceSection
     {
         TimeAndExpenses,
+        PayrollRuns,
         Employees,
         Settings
     }
@@ -54,9 +55,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DateTimeOffset? _contractValidTo;
     private string _hourlyRateChf = string.Empty;
     private string _monthlyBvgDeductionChf = string.Empty;
+    private string _specialSupplementRateChf = string.Empty;
     private string? _settingsNightSupplementRate;
     private string? _settingsSundaySupplementRate;
     private string? _settingsHolidaySupplementRate;
+    private string _settingsAhvIvEoRate = string.Empty;
+    private string _settingsAlvRate = string.Empty;
+    private string _settingsSicknessAccidentInsuranceRate = string.Empty;
+    private string _settingsTrainingAndHolidayRate = string.Empty;
+    private string _settingsVacationCompensationRate = string.Empty;
+    private string _settingsVehiclePauschalzone1RateChf = string.Empty;
+    private string _settingsVehiclePauschalzone2RateChf = string.Empty;
+    private string _settingsVehicleRegiezone1RateChf = string.Empty;
     private string _statusMessage = "Mitarbeitende koennen links ausgewaehlt werden.";
     private bool _isBusy;
     private bool _isEditing;
@@ -83,7 +93,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeleteCommand = new DelegateCommand(RequestDelete, () => CanRequestDelete);
         ConfirmDeleteCommand = new DelegateCommand(ConfirmDeleteAsync, () => CanConfirmDelete);
         DismissDeleteCommand = new DelegateCommand(DismissDeleteConfirmation, () => CanDismissDelete);
+        ClearExitDateCommand = new DelegateCommand(ClearExitDate, () => CanClearExitDate);
         ShowTimeAndExpensesCommand = new DelegateCommand(SwitchToTimeAndExpensesWorkspace, () => !IsTimeAndExpensesWorkspace);
+        ShowPayrollRunsCommand = new DelegateCommand(SwitchToPayrollRunsWorkspace, () => !IsPayrollRunsWorkspace);
         ShowEmployeesCommand = new DelegateCommand(SwitchToEmployeesWorkspace, () => !IsEmployeeWorkspace);
         ShowSettingsCommand = new DelegateCommand(SwitchToSettingsWorkspace, () => !IsSettingsWorkspace);
         SaveSettingsCommand = new DelegateCommand(SaveSettingsAsync, () => CanSaveSettings);
@@ -106,16 +118,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand DeleteCommand { get; }
     public DelegateCommand ConfirmDeleteCommand { get; }
     public DelegateCommand DismissDeleteCommand { get; }
+    public DelegateCommand ClearExitDateCommand { get; }
     public DelegateCommand ShowTimeAndExpensesCommand { get; }
+    public DelegateCommand ShowPayrollRunsCommand { get; }
     public DelegateCommand ShowEmployeesCommand { get; }
     public DelegateCommand ShowSettingsCommand { get; }
     public DelegateCommand SaveSettingsCommand { get; }
     public bool IsTimeAndExpensesWorkspace => _currentSection == WorkspaceSection.TimeAndExpenses;
+    public bool IsPayrollRunsWorkspace => _currentSection == WorkspaceSection.PayrollRuns;
     public bool IsEmployeeWorkspace => _currentSection == WorkspaceSection.Employees;
     public bool IsSettingsWorkspace => _currentSection == WorkspaceSection.Settings;
     public bool ShowTimeAndExpensesWorkspace => IsTimeAndExpensesWorkspace;
+    public bool ShowPayrollRunsWorkspace => IsPayrollRunsWorkspace;
     public bool ShowEmployeeWorkspace => IsEmployeeWorkspace;
     public bool ShowSettingsWorkspace => IsSettingsWorkspace;
+    public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace;
+    public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace;
 
     public string FormTitle => _isCreatingNew
         ? "Neuer Mitarbeitender"
@@ -145,6 +163,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanRequestDelete => !IsBusy && _isEditing && _currentEmployeeId.HasValue && IsActiveEmployee;
     public bool CanConfirmDelete => !IsBusy && _showDeleteConfirmation && _currentEmployeeId.HasValue;
     public bool CanDismissDelete => !IsBusy && _showDeleteConfirmation;
+    public bool CanClearExitDate => CanEditFields && ExitDate.HasValue;
     public bool CanSaveSettings => !IsBusy && IsSettingsWorkspace;
     public bool ShowViewActions => !_isEditing;
     public bool ShowEditActions => _isEditing;
@@ -234,13 +253,32 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DateTimeOffset? ExitDate
     {
         get => _exitDate;
-        set => SetProperty(ref _exitDate, value);
+        set
+        {
+            if (SetProperty(ref _exitDate, value))
+            {
+                RaisePropertyChanged(nameof(CanClearExitDate));
+                ClearExitDateCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     public bool IsActiveEmployee
     {
         get => _isActive;
-        set => SetProperty(ref _isActive, value);
+        set
+        {
+            if (SetProperty(ref _isActive, value))
+            {
+                if (value && ExitDate.HasValue)
+                {
+                    ExitDate = null;
+                }
+
+                RaisePropertyChanged(nameof(CanRequestDelete));
+                DeleteCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     public string Street
@@ -357,6 +395,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _monthlyBvgDeductionChf, value);
     }
 
+    public string SpecialSupplementRateChf
+    {
+        get => _specialSupplementRateChf;
+        set => SetProperty(ref _specialSupplementRateChf, value);
+    }
+
     public string? SettingsNightSupplementRate
     {
         get => _settingsNightSupplementRate;
@@ -373,6 +417,54 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _settingsHolidaySupplementRate;
         set => SetProperty(ref _settingsHolidaySupplementRate, value);
+    }
+
+    public string SettingsAhvIvEoRate
+    {
+        get => _settingsAhvIvEoRate;
+        set => SetProperty(ref _settingsAhvIvEoRate, value);
+    }
+
+    public string SettingsAlvRate
+    {
+        get => _settingsAlvRate;
+        set => SetProperty(ref _settingsAlvRate, value);
+    }
+
+    public string SettingsSicknessAccidentInsuranceRate
+    {
+        get => _settingsSicknessAccidentInsuranceRate;
+        set => SetProperty(ref _settingsSicknessAccidentInsuranceRate, value);
+    }
+
+    public string SettingsTrainingAndHolidayRate
+    {
+        get => _settingsTrainingAndHolidayRate;
+        set => SetProperty(ref _settingsTrainingAndHolidayRate, value);
+    }
+
+    public string SettingsVacationCompensationRate
+    {
+        get => _settingsVacationCompensationRate;
+        set => SetProperty(ref _settingsVacationCompensationRate, value);
+    }
+
+    public string SettingsVehiclePauschalzone1RateChf
+    {
+        get => _settingsVehiclePauschalzone1RateChf;
+        set => SetProperty(ref _settingsVehiclePauschalzone1RateChf, value);
+    }
+
+    public string SettingsVehiclePauschalzone2RateChf
+    {
+        get => _settingsVehiclePauschalzone2RateChf;
+        set => SetProperty(ref _settingsVehiclePauschalzone2RateChf, value);
+    }
+
+    public string SettingsVehicleRegiezone1RateChf
+    {
+        get => _settingsVehicleRegiezone1RateChf;
+        set => SetProperty(ref _settingsVehicleRegiezone1RateChf, value);
     }
 
     public string StatusMessage
@@ -509,7 +601,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 DateOnly.FromDateTime(ContractValidFrom.Value.Date),
                 ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null,
                 ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
-                ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)));
+                ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)),
+                ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf)));
 
             var saved = await _employeeService.SaveAsync(command);
             _currentEmployeeId = saved.EmployeeId;
@@ -566,6 +659,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         ShowDeleteConfirmation = false;
     }
 
+    private void ClearExitDate()
+    {
+        ExitDate = null;
+    }
+
     private async Task ConfirmDeleteAsync()
     {
         if (!_currentEmployeeId.HasValue)
@@ -591,7 +689,15 @@ public sealed class MainWindowViewModel : ViewModelBase
             var saved = await _payrollSettingsService.SaveAsync(new SavePayrollSettingsCommand(
                 ParseOptionalDecimal(SettingsNightSupplementRate),
                 ParseOptionalDecimal(SettingsSundaySupplementRate),
-                ParseOptionalDecimal(SettingsHolidaySupplementRate)));
+                ParseOptionalDecimal(SettingsHolidaySupplementRate),
+                ParseRequiredDecimal(SettingsAhvIvEoRate, nameof(SettingsAhvIvEoRate)),
+                ParseRequiredDecimal(SettingsAlvRate, nameof(SettingsAlvRate)),
+                ParseRequiredDecimal(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate)),
+                ParseRequiredDecimal(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate)),
+                ParseRequiredDecimal(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
+                ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf)),
+                ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf)),
+                ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf))));
 
             ApplySettings(saved);
             StatusMessage = "Einstellungen gespeichert.";
@@ -724,6 +830,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             : null;
         HourlyRateChf = employee.HourlyRateChf.ToString("0.00");
         MonthlyBvgDeductionChf = employee.MonthlyBvgDeductionChf.ToString("0.00");
+        SpecialSupplementRateChf = employee.SpecialSupplementRateChf.ToString("0.00");
     }
 
     private void ResetFormForNewDraft()
@@ -754,6 +861,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidTo = null;
         HourlyRateChf = "0";
         MonthlyBvgDeductionChf = "0";
+        SpecialSupplementRateChf = "3.00";
     }
 
     private void ClearFormForEmptyState()
@@ -785,6 +893,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidTo = null;
         HourlyRateChf = string.Empty;
         MonthlyBvgDeductionChf = string.Empty;
+        SpecialSupplementRateChf = string.Empty;
         SetInteractionState(isEditing: false, isCreatingNew: false);
     }
 
@@ -812,6 +921,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanRequestDelete));
         RaisePropertyChanged(nameof(ShowViewActions));
         RaisePropertyChanged(nameof(ShowEditActions));
+        RaisePropertyChanged(nameof(CanClearExitDate));
         RaiseActionStateChanged();
     }
 
@@ -826,7 +936,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeleteCommand.RaiseCanExecuteChanged();
         ConfirmDeleteCommand.RaiseCanExecuteChanged();
         DismissDeleteCommand.RaiseCanExecuteChanged();
+        ClearExitDateCommand.RaiseCanExecuteChanged();
         ShowTimeAndExpensesCommand.RaiseCanExecuteChanged();
+        ShowPayrollRunsCommand.RaiseCanExecuteChanged();
         ShowEmployeesCommand.RaiseCanExecuteChanged();
         ShowSettingsCommand.RaiseCanExecuteChanged();
         SaveSettingsCommand.RaiseCanExecuteChanged();
@@ -878,7 +990,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (!decimal.TryParse(value, out var parsedValue))
         {
-            throw new InvalidOperationException("Zuschlagswerte muessen gueltige Zahlen sein.");
+            throw new InvalidOperationException("Einstellungswerte muessen gueltige Zahlen sein.");
         }
 
         return parsedValue;
@@ -895,6 +1007,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsNightSupplementRate = settings.NightSupplementRate?.ToString("0.####");
         SettingsSundaySupplementRate = settings.SundaySupplementRate?.ToString("0.####");
         SettingsHolidaySupplementRate = settings.HolidaySupplementRate?.ToString("0.####");
+        SettingsAhvIvEoRate = settings.AhvIvEoRate.ToString("0.#####");
+        SettingsAlvRate = settings.AlvRate.ToString("0.#####");
+        SettingsSicknessAccidentInsuranceRate = settings.SicknessAccidentInsuranceRate.ToString("0.#####");
+        SettingsTrainingAndHolidayRate = settings.TrainingAndHolidayRate.ToString("0.#####");
+        SettingsVacationCompensationRate = settings.VacationCompensationRate.ToString("0.####");
+        SettingsVehiclePauschalzone1RateChf = settings.VehiclePauschalzone1RateChf.ToString("0.##");
+        SettingsVehiclePauschalzone2RateChf = settings.VehiclePauschalzone2RateChf.ToString("0.##");
+        SettingsVehicleRegiezone1RateChf = settings.VehicleRegiezone1RateChf.ToString("0.##");
     }
 
     private static bool? ParseOptionalBoolean(string option)
@@ -944,6 +1064,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         SetWorkspaceSection(WorkspaceSection.Employees);
     }
 
+    private void SwitchToPayrollRunsWorkspace()
+    {
+        SetWorkspaceSection(WorkspaceSection.PayrollRuns);
+    }
+
     private void SwitchToSettingsWorkspace()
     {
         SetWorkspaceSection(WorkspaceSection.Settings);
@@ -958,11 +1083,15 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         _currentSection = section;
         RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
+        RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
         RaisePropertyChanged(nameof(IsEmployeeWorkspace));
         RaisePropertyChanged(nameof(IsSettingsWorkspace));
         RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
+        RaisePropertyChanged(nameof(ShowPayrollRunsWorkspace));
         RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
         RaisePropertyChanged(nameof(ShowSettingsWorkspace));
+        RaisePropertyChanged(nameof(ShowEmployeeSelectionArea));
+        RaisePropertyChanged(nameof(ShowPrimaryWorkspaceArea));
         RaisePropertyChanged(nameof(CanSaveSettings));
         RaiseActionStateChanged();
     }

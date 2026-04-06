@@ -34,6 +34,15 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.NightSupplementRate,
             command.SundaySupplementRate,
             command.HolidaySupplementRate));
+        settings.UpdateDeductionAndVehicleRates(
+            command.AhvIvEoRate,
+            command.AlvRate,
+            command.SicknessAccidentInsuranceRate,
+            command.TrainingAndHolidayRate,
+            command.VacationCompensationRate,
+            command.VehiclePauschalzone1RateChf,
+            command.VehiclePauschalzone2RateChf,
+            command.VehicleRegiezone1RateChf);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return ToDto(settings);
@@ -58,6 +67,14 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         return new PayrollSettingsDto(
             settings.WorkTimeSupplementSettings.NightSupplementRate,
             settings.WorkTimeSupplementSettings.SundaySupplementRate,
-            settings.WorkTimeSupplementSettings.HolidaySupplementRate);
+            settings.WorkTimeSupplementSettings.HolidaySupplementRate,
+            settings.AhvIvEoRate,
+            settings.AlvRate,
+            settings.SicknessAccidentInsuranceRate,
+            settings.TrainingAndHolidayRate,
+            settings.VacationCompensationRate,
+            settings.VehiclePauschalzone1RateChf,
+            settings.VehiclePauschalzone2RateChf,
+            settings.VehicleRegiezone1RateChf);
     }
 }

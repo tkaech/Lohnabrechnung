@@ -41,6 +41,9 @@ public sealed class MonthlyRecordViewModelTests
         viewModel.NightHours = "0";
         viewModel.SundayHours = "0";
         viewModel.HolidayHours = "0";
+        viewModel.VehiclePauschalzone1 = "10";
+        viewModel.VehiclePauschalzone2 = "11";
+        viewModel.VehicleRegiezone1 = "12";
         viewModel.TimeNote = "Fruehdienst";
 
         viewModel.SaveTimeEntryCommand.Execute(null);
@@ -49,10 +52,11 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Single(viewModel.TimeEntries);
         Assert.Contains("05/2026", viewModel.ContextDescription, StringComparison.Ordinal);
         Assert.Contains("8", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Contains("Fahrzeug 33.00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task VehicleCompensation_SaveAndSelectFlow_WorksWithinMonthlyContext()
+    public async Task MonthlyExpenseValues_SaveAndReloadFlow_WorksWithinMonthlyContext()
     {
         var employeeId = Guid.NewGuid();
         var repository = new InMemoryMonthlyRecordRepository();
@@ -61,20 +65,14 @@ public sealed class MonthlyRecordViewModelTests
 
         await viewModel.SetEmployeeAsync(employeeId, "Clara Car");
 
-        viewModel.VehicleCompensationDate = "2026-04-30";
-        viewModel.VehicleCompensationAmount = "95.5";
-        viewModel.VehicleCompensationDescription = "Privatfahrzeug April";
+        viewModel.ExpensesTotal = "40";
 
-        viewModel.SaveVehicleCompensationCommand.Execute(null);
-        await WaitUntilAsync(() => viewModel.VehicleCompensations.Count == 1);
+        viewModel.SaveExpenseEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ActionMessage == "Spesen gespeichert.");
 
-        var savedEntry = viewModel.VehicleCompensations.Single();
-        viewModel.SelectedVehicleCompensation = savedEntry;
-
-        Assert.Equal("2026-04-30", viewModel.VehicleCompensationDate);
-        Assert.Equal("95.50", viewModel.VehicleCompensationAmount);
-        Assert.Equal("Privatfahrzeug April", viewModel.VehicleCompensationDescription);
-        Assert.Contains("Fahrzeug 95.50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Equal("40.00", viewModel.ExpensesTotal);
+        Assert.Contains("Spesen 40.00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "40.00 CHF");
     }
 
     [Fact]
@@ -99,6 +97,9 @@ public sealed class MonthlyRecordViewModelTests
             viewModel.NightHours = "2";
             viewModel.SundayHours = "2";
             viewModel.HolidayHours = "2";
+            viewModel.VehiclePauschalzone1 = "1";
+            viewModel.VehiclePauschalzone2 = "2";
+            viewModel.VehicleRegiezone1 = "3";
             viewModel.TimeNote = "test";
 
             viewModel.SaveTimeEntryCommand.Execute(null);
@@ -106,6 +107,7 @@ public sealed class MonthlyRecordViewModelTests
 
             Assert.Single(viewModel.TimeEntries);
             Assert.Contains("Stunden 3", viewModel.TotalsSummary, StringComparison.Ordinal);
+            Assert.Contains("Fahrzeug 6.00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
         }
         finally
         {
@@ -115,7 +117,7 @@ public sealed class MonthlyRecordViewModelTests
     }
 
     [Fact]
-    public async Task PreviewRows_ListAllAvailableMonthsTabularly()
+    public async Task TimePayrollMonth_TracksSelectedMonth()
     {
         var employeeId = Guid.NewGuid();
         var repository = new InMemoryMonthlyRecordRepository();
@@ -123,45 +125,35 @@ public sealed class MonthlyRecordViewModelTests
         var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
 
         await viewModel.SetEmployeeAsync(employeeId, "Eva Eintrag");
-
-        viewModel.TimeDate = "2026-04-02";
-        viewModel.HoursWorked = "8";
-        viewModel.NightHours = "1";
-        viewModel.SundayHours = "0";
-        viewModel.HolidayHours = "0";
-        viewModel.TimeNote = "Fruehdienst";
-        viewModel.SaveTimeEntryCommand.Execute(null);
-        await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
-
-        viewModel.ExpenseDate = "2026-04-03";
-        viewModel.ExpenseAmount = "18.50";
-        viewModel.SaveExpenseEntryCommand.Execute(null);
-        await WaitUntilAsync(() => viewModel.ExpenseEntries.Count == 1);
-
-        viewModel.VehicleCompensationDate = "2026-04-04";
-        viewModel.VehicleCompensationAmount = "95";
-        viewModel.VehicleCompensationDescription = "Auto";
-        viewModel.SaveVehicleCompensationCommand.Execute(null);
-        await WaitUntilAsync(() => viewModel.VehicleCompensations.Count == 1);
-
         viewModel.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
         await WaitUntilAsync(() => viewModel.CanSaveTimeEntry);
 
-        viewModel.TimeDate = "2026-05-06";
-        viewModel.HoursWorked = "6";
-        viewModel.NightHours = "0";
-        viewModel.SundayHours = "0";
-        viewModel.HolidayHours = "0";
-        viewModel.TimeNote = "Spaetdienst";
-        viewModel.SaveTimeEntryCommand.Execute(null);
-        await WaitUntilAsync(() => viewModel.PreviewRows.Any(row => row.MonthLabel == "05/2026"));
+        Assert.Equal("05/2026", viewModel.TimePayrollMonth);
+        Assert.Equal("05/2026", viewModel.ExpensePayrollMonth);
+    }
 
-        Assert.True(viewModel.PreviewRows.Count >= 4);
-        Assert.Contains(viewModel.PreviewRows, row => row.MonthLabel == "04/2026" && row.EntryType == "Zeit");
-        Assert.Contains(viewModel.PreviewRows, row => row.MonthLabel == "04/2026" && row.EntryType == "Spese");
-        Assert.Contains(viewModel.PreviewRows, row => row.MonthLabel == "04/2026" && row.EntryType == "Fahrzeug");
-        Assert.Contains(viewModel.PreviewRows, row => row.MonthLabel == "05/2026" && row.EntryType == "Zeit");
-        Assert.Contains("alle vorhandenen Monate", viewModel.PreviewSummary, StringComparison.Ordinal);
+    [Fact]
+    public async Task PayrollPreview_LoadsBaseTotalAndPayoutForCurrentMonth()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Fina Vorschau");
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        await viewModel.SetEmployeeAsync(employeeId, "Fina Vorschau");
+
+        viewModel.TimeDate = "2026-04-03";
+        viewModel.HoursWorked = "8";
+        viewModel.SaveTimeEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
+
+        viewModel.ExpensesTotal = "18.50";
+        viewModel.SaveExpenseEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ActionMessage == "Spesen gespeichert.");
+
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Basislohn" && line.AmountDisplay == "240.00 CHF");
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "AHV-pflichtiger Bruttolohn" && line.AmountDisplay == "240.00 CHF");
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Total Auszahlung");
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
@@ -233,23 +225,21 @@ public sealed class MonthlyRecordViewModelTests
                     null,
                     record.TimeEntries.Sum(item => item.HoursWorked),
                     record.TimeEntries.Sum(item => item.NightHours + item.SundayHours + item.HolidayHours),
-                    record.ExpenseEntries.Sum(item => item.AmountChf),
-                    record.VehicleCompensations.Sum(item => item.AmountChf)),
+                    record.ExpenseEntry?.ExpensesTotalChf ?? 0m,
+                    record.TimeEntries.Sum(item => item.VehicleCompensationTotalChf)),
                 record.TimeEntries
                     .OrderBy(item => item.WorkDate)
-                    .Select(item => new MonthlyTimeEntryDto(item.Id, item.WorkDate, item.HoursWorked, item.NightHours, item.SundayHours, item.HolidayHours, item.Note))
+                    .Select(item => new MonthlyTimeEntryDto(item.Id, item.WorkDate, item.HoursWorked, item.NightHours, item.SundayHours, item.HolidayHours, item.VehiclePauschalzone1Chf, item.VehiclePauschalzone2Chf, item.VehicleRegiezone1Chf, item.Note))
                     .ToArray(),
-                record.ExpenseEntries
-                    .OrderBy(item => item.ExpenseDate)
-                    .Select(item => new MonthlyExpenseEntryDto(item.Id, item.ExpenseDate, item.AmountChf))
-                    .ToArray(),
-                record.VehicleCompensations
-                    .OrderBy(item => item.CompensationDate)
-                    .Select(item => new MonthlyVehicleCompensationDto(item.Id, item.CompensationDate, item.AmountChf, item.Description))
-                    .ToArray(),
+                record.ExpenseEntry is null
+                    ? null
+                    : new MonthlyExpenseEntryDto(
+                        record.ExpenseEntry.Id,
+                        record.ExpenseEntry.ExpensesTotalChf),
                 new MonthlyRecordPreviewDto(
                     BuildPreviewRows(_records.Values.Where(item => item.EmployeeId == record.EmployeeId)),
-                    Array.Empty<string>()));
+                    Array.Empty<string>()),
+                BuildPayrollPreview(record));
 
             return Task.FromResult<MonthlyRecordDetailsDto?>(details);
         }
@@ -267,6 +257,21 @@ public sealed class MonthlyRecordViewModelTests
         {
         }
 
+        private static MonthlyPayrollPreviewDto BuildPayrollPreview(EmployeeMonthlyRecord record)
+        {
+            var baseAmount = record.TimeEntries.Sum(item => item.HoursWorked) * 30m;
+            var expenses = record.ExpenseEntry?.ExpensesTotalChf ?? 0m;
+
+            return new MonthlyPayrollPreviewDto(
+                [
+                    new MonthlyPayrollPreviewLineDto("Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null),
+                    new MonthlyPayrollPreviewLineDto("AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null),
+                    new MonthlyPayrollPreviewLineDto("Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null),
+                    new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null)
+                ],
+                ["Test-Lohnvorschau"]);
+        }
+
         private static IReadOnlyCollection<MonthlyPreviewRowDto> BuildPreviewRows(IEnumerable<EmployeeMonthlyRecord> records)
         {
             var rows = records
@@ -282,20 +287,26 @@ public sealed class MonthlyRecordViewModelTests
                             "Zeit",
                             $"{item.HoursWorked:0.##} h",
                             string.IsNullOrWhiteSpace(item.Note) ? "Keine Zusatzangaben" : item.Note!))
-                        .Concat(record.ExpenseEntries.Select(item => new MonthlyPreviewRowDto(
-                            record.Year,
-                            record.Month,
-                            item.ExpenseDate,
-                            "Spese",
-                            $"{item.AmountChf:0.00} CHF",
-                            global::Payroll.Domain.Expenses.ExpenseEntry.DisplayName)))
-                        .Concat(record.VehicleCompensations.Select(item => new MonthlyPreviewRowDto(
-                            record.Year,
-                            record.Month,
-                            item.CompensationDate,
-                            "Fahrzeug",
-                            $"{item.AmountChf:0.00} CHF",
-                            item.Description)))
+                        .Concat(record.TimeEntries
+                            .Where(item => item.VehicleCompensationTotalChf > 0m)
+                            .Select(item => new MonthlyPreviewRowDto(
+                                record.Year,
+                                record.Month,
+                                item.WorkDate,
+                                "Fahrzeug",
+                                $"{item.VehicleCompensationTotalChf:0.00} CHF",
+                                $"P1 {item.VehiclePauschalzone1Chf:0.00} | P2 {item.VehiclePauschalzone2Chf:0.00} | R1 {item.VehicleRegiezone1Chf:0.00}")))
+                        .Concat(record.ExpenseEntry is null
+                            ? []
+                            : [
+                                new MonthlyPreviewRowDto(
+                                    record.Year,
+                                    record.Month,
+                                    null,
+                                    "Spesen",
+                                    $"{record.ExpenseEntry.ExpensesTotalChf:0.00} CHF",
+                                    $"Diverse Spesen {record.ExpenseEntry.ExpensesTotalChf:0.00}")]
+                        )
                         .OrderBy(item => item.EntryDate)
                         .ThenBy(item => item.EntryType)
                         .ToArray();

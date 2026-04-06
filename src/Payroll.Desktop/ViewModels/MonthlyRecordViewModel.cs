@@ -11,7 +11,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private Guid? _currentMonthlyRecordId;
     private bool _isBusy;
     private bool _isLocked;
-    private DateTimeOffset? _selectedMonth = new DateTimeOffset(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero);
+    private DateTimeOffset? _selectedMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero);
     private string _contextTitle = "Keine Monatserfassung geladen.";
     private string _contextDescription = "Zuerst eine Person auswaehlen, dann den Monat laden.";
     private string _statusSummary = "Kein Monatskontext aktiv.";
@@ -23,54 +23,44 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _nightHours = "0";
     private string _sundayHours = "0";
     private string _holidayHours = "0";
+    private string _vehiclePauschalzone1 = "0";
+    private string _vehiclePauschalzone2 = "0";
+    private string _vehicleRegiezone1 = "0";
     private string? _timeNote;
     private MonthlyTimeEntryItemViewModel? _selectedTimeEntry;
-    private string _expenseDate = DateTime.Today.ToString("yyyy-MM-dd");
-    private string _expenseAmount = "0";
-    private MonthlyExpenseEntryItemViewModel? _selectedExpenseEntry;
-    private string _vehicleCompensationDate = DateTime.Today.ToString("yyyy-MM-dd");
-    private string _vehicleCompensationAmount = "0";
-    private string _vehicleCompensationDescription = string.Empty;
-    private MonthlyVehicleCompensationItemViewModel? _selectedVehicleCompensation;
+    private string _expensesTotal = "0";
     private string _previewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
     private string _previewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
     private string _previewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
+    private string _payrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
 
     public MonthlyRecordViewModel(MonthlyRecordService monthlyRecordService)
     {
         _monthlyRecordService = monthlyRecordService;
         TimeEntries = [];
-        ExpenseEntries = [];
-        VehicleCompensations = [];
         PreviewRows = [];
         PreviewNotes = [];
+        PayrollPreviewLines = [];
+        PayrollPreviewNotes = [];
         LoadMonthlyRecordCommand = new DelegateCommand(LoadAsync, () => CanManageRecord);
         NewTimeEntryCommand = new DelegateCommand(PrepareNewTimeEntry, () => CanManageRecord);
         SaveTimeEntryCommand = new DelegateCommand(SaveTimeEntryAsync, () => CanSaveTimeEntry);
         DeleteTimeEntryCommand = new DelegateCommand(DeleteTimeEntryAsync, () => CanDeleteTimeEntry);
-        NewExpenseEntryCommand = new DelegateCommand(PrepareNewExpenseEntry, () => CanManageRecord);
+        ResetExpenseValuesCommand = new DelegateCommand(PrepareNewExpenseEntry, () => CanManageRecord);
         SaveExpenseEntryCommand = new DelegateCommand(SaveExpenseEntryAsync, () => CanSaveExpenseEntry);
-        DeleteExpenseEntryCommand = new DelegateCommand(DeleteExpenseEntryAsync, () => CanDeleteExpenseEntry);
-        NewVehicleCompensationCommand = new DelegateCommand(PrepareNewVehicleCompensation, () => CanManageRecord);
-        SaveVehicleCompensationCommand = new DelegateCommand(SaveVehicleCompensationAsync, () => CanSaveVehicleCompensation);
-        DeleteVehicleCompensationCommand = new DelegateCommand(DeleteVehicleCompensationAsync, () => CanDeleteVehicleCompensation);
     }
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
-    public ObservableCollection<MonthlyExpenseEntryItemViewModel> ExpenseEntries { get; }
-    public ObservableCollection<MonthlyVehicleCompensationItemViewModel> VehicleCompensations { get; }
     public ObservableCollection<MonthlyPreviewRowViewModel> PreviewRows { get; }
     public ObservableCollection<string> PreviewNotes { get; }
+    public ObservableCollection<MonthlyPayrollPreviewLineDto> PayrollPreviewLines { get; }
+    public ObservableCollection<string> PayrollPreviewNotes { get; }
     public DelegateCommand LoadMonthlyRecordCommand { get; }
     public DelegateCommand NewTimeEntryCommand { get; }
     public DelegateCommand SaveTimeEntryCommand { get; }
     public DelegateCommand DeleteTimeEntryCommand { get; }
-    public DelegateCommand NewExpenseEntryCommand { get; }
+    public DelegateCommand ResetExpenseValuesCommand { get; }
     public DelegateCommand SaveExpenseEntryCommand { get; }
-    public DelegateCommand DeleteExpenseEntryCommand { get; }
-    public DelegateCommand NewVehicleCompensationCommand { get; }
-    public DelegateCommand SaveVehicleCompensationCommand { get; }
-    public DelegateCommand DeleteVehicleCompensationCommand { get; }
 
     public bool IsBusy
     {
@@ -83,9 +73,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
-                RaisePropertyChanged(nameof(CanDeleteExpenseEntry));
-                RaisePropertyChanged(nameof(CanSaveVehicleCompensation));
-                RaisePropertyChanged(nameof(CanDeleteVehicleCompensation));
                 RaiseActionStateChanged();
             }
         }
@@ -102,9 +89,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
-                RaisePropertyChanged(nameof(CanDeleteExpenseEntry));
-                RaisePropertyChanged(nameof(CanSaveVehicleCompensation));
-                RaisePropertyChanged(nameof(CanDeleteVehicleCompensation));
                 RaiseActionStateChanged();
             }
         }
@@ -114,9 +98,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public bool CanSaveTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
     public bool CanDeleteTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedTimeEntry is not null;
     public bool CanSaveExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
-    public bool CanDeleteExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedExpenseEntry is not null;
-    public bool CanSaveVehicleCompensation => CanManageRecord && _currentMonthlyRecordId.HasValue;
-    public bool CanDeleteVehicleCompensation => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedVehicleCompensation is not null;
 
     public DateTimeOffset? SelectedMonth
     {
@@ -134,7 +115,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(ExpensePayrollMonth));
                 PrepareNewTimeEntry();
                 PrepareNewExpenseEntry();
-                PrepareNewVehicleCompensation();
                 ResetLoadedRecordState();
 
                 if (_currentEmployeeId.HasValue)
@@ -148,6 +128,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public string ExpensePayrollMonth => SelectedMonth.HasValue
         ? $"{SelectedMonth.Value:MM/yyyy}"
         : "-";
+
+    public string TimePayrollMonth => ExpensePayrollMonth;
 
     public string ContextTitle
     {
@@ -203,6 +185,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         private set => SetProperty(ref _previewEntryCounts, value);
     }
 
+    public string PayrollPreviewSummary
+    {
+        get => _payrollPreviewSummary;
+        private set => SetProperty(ref _payrollPreviewSummary, value);
+    }
+
     public string TimeDate
     {
         get => _timeDate;
@@ -239,6 +227,24 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         set => SetProperty(ref _timeNote, value);
     }
 
+    public string VehiclePauschalzone1
+    {
+        get => _vehiclePauschalzone1;
+        set => SetProperty(ref _vehiclePauschalzone1, value);
+    }
+
+    public string VehiclePauschalzone2
+    {
+        get => _vehiclePauschalzone2;
+        set => SetProperty(ref _vehiclePauschalzone2, value);
+    }
+
+    public string VehicleRegiezone1
+    {
+        get => _vehicleRegiezone1;
+        set => SetProperty(ref _vehicleRegiezone1, value);
+    }
+
     public MonthlyTimeEntryItemViewModel? SelectedTimeEntry
     {
         get => _selectedTimeEntry;
@@ -257,70 +263,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
     }
 
-    public string ExpenseDate
+    public string ExpensesTotal
     {
-        get => _expenseDate;
-        set => SetProperty(ref _expenseDate, value);
-    }
-
-    public string ExpenseAmount
-    {
-        get => _expenseAmount;
-        set => SetProperty(ref _expenseAmount, value);
-    }
-
-    public MonthlyExpenseEntryItemViewModel? SelectedExpenseEntry
-    {
-        get => _selectedExpenseEntry;
-        set
-        {
-            if (SetProperty(ref _selectedExpenseEntry, value))
-            {
-                RaisePropertyChanged(nameof(CanDeleteExpenseEntry));
-                DeleteExpenseEntryCommand.RaiseCanExecuteChanged();
-
-                if (value is not null)
-                {
-                    PopulateExpenseEntryForm(value);
-                }
-            }
-        }
-    }
-
-    public string VehicleCompensationDate
-    {
-        get => _vehicleCompensationDate;
-        set => SetProperty(ref _vehicleCompensationDate, value);
-    }
-
-    public string VehicleCompensationAmount
-    {
-        get => _vehicleCompensationAmount;
-        set => SetProperty(ref _vehicleCompensationAmount, value);
-    }
-
-    public string VehicleCompensationDescription
-    {
-        get => _vehicleCompensationDescription;
-        set => SetProperty(ref _vehicleCompensationDescription, value);
-    }
-
-    public MonthlyVehicleCompensationItemViewModel? SelectedVehicleCompensation
-    {
-        get => _selectedVehicleCompensation;
-        set
-        {
-            if (SetProperty(ref _selectedVehicleCompensation, value))
-            {
-                RaisePropertyChanged(nameof(CanDeleteVehicleCompensation));
-                DeleteVehicleCompensationCommand.RaiseCanExecuteChanged();
-
-                if (value is not null)
-                {
-                    PopulateVehicleCompensationForm(value);
-                }
-            }
-        }
+        get => _expensesTotal;
+        set => SetProperty(ref _expensesTotal, value);
     }
 
     public async Task SetEmployeeAsync(Guid? employeeId, string? employeeName)
@@ -354,14 +300,14 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
         PreviewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
+        PayrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
         TimeEntries.Clear();
-        ExpenseEntries.Clear();
-        VehicleCompensations.Clear();
         PreviewRows.Clear();
         PreviewNotes.Clear();
+        PayrollPreviewLines.Clear();
+        PayrollPreviewNotes.Clear();
         PrepareNewTimeEntry();
         PrepareNewExpenseEntry();
-        PrepareNewVehicleCompensation();
     }
 
     private async Task LoadAsync()
@@ -371,10 +317,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             return;
         }
 
-        await ExecuteBusyAsync(async () =>
-        {
-            await LoadCurrentRecordAsync();
-        });
+        await ExecuteBusyAsync(LoadCurrentRecordAsync);
     }
 
     private void PrepareNewTimeEntry()
@@ -387,7 +330,15 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         NightHours = "0";
         SundayHours = "0";
         HolidayHours = "0";
+        VehiclePauschalzone1 = "0";
+        VehiclePauschalzone2 = "0";
+        VehicleRegiezone1 = "0";
         TimeNote = null;
+    }
+
+    private void PrepareNewExpenseEntry()
+    {
+        ExpensesTotal = "0";
     }
 
     private async Task SaveTimeEntryAsync()
@@ -410,6 +361,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                     ParseRequiredDecimal(NightHours, nameof(NightHours)),
                     ParseRequiredDecimal(SundayHours, nameof(SundayHours)),
                     ParseRequiredDecimal(HolidayHours, nameof(HolidayHours)),
+                    ParseRequiredDecimal(VehiclePauschalzone1, nameof(VehiclePauschalzone1)),
+                    ParseRequiredDecimal(VehiclePauschalzone2, nameof(VehiclePauschalzone2)),
+                    ParseRequiredDecimal(VehicleRegiezone1, nameof(VehicleRegiezone1)),
                     TimeNote));
 
             ApplyDetails(details);
@@ -439,15 +393,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         });
     }
 
-    private void PrepareNewExpenseEntry()
-    {
-        SelectedExpenseEntry = null;
-        ExpenseDate = SelectedMonth.HasValue
-            ? new DateOnly(SelectedMonth.Value.Year, SelectedMonth.Value.Month, 1).ToString("yyyy-MM-dd")
-            : DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
-        ExpenseAmount = "0";
-    }
-
     private async Task SaveExpenseEntryAsync()
     {
         await EnsureCurrentRecordLoadedAsync();
@@ -462,90 +407,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             var details = await _monthlyRecordService.SaveExpenseEntryAsync(
                 new SaveMonthlyExpenseEntryCommand(
                     _currentMonthlyRecordId.Value,
-                    SelectedExpenseEntry?.ExpenseEntryId,
-                    ParseRequiredDate(ExpenseDate, nameof(ExpenseDate)),
-                    ParseRequiredDecimal(ExpenseAmount, nameof(ExpenseAmount))));
+                    ParseRequiredDecimal(ExpensesTotal, nameof(ExpensesTotal))));
 
             ApplyDetails(details);
-            ActionMessage = SelectedExpenseEntry is null
-                ? "Spese gespeichert."
-                : "Spese aktualisiert.";
-            PrepareNewExpenseEntry();
-        });
-    }
-
-    private async Task DeleteExpenseEntryAsync()
-    {
-        if (!_currentMonthlyRecordId.HasValue || SelectedExpenseEntry is null)
-        {
-            return;
-        }
-
-        await ExecuteBusyAsync(async () =>
-        {
-            await _monthlyRecordService.DeleteExpenseEntryAsync(_currentMonthlyRecordId.Value, SelectedExpenseEntry.ExpenseEntryId);
-            var details = await _monthlyRecordService.GetOrCreateAsync(
-                new MonthlyRecordQuery(_currentEmployeeId!.Value, SelectedMonth!.Value.Year, SelectedMonth.Value.Month));
-
-            ApplyDetails(details);
-            ActionMessage = "Spese geloescht.";
-            PrepareNewExpenseEntry();
-        });
-    }
-
-    private void PrepareNewVehicleCompensation()
-    {
-        SelectedVehicleCompensation = null;
-        VehicleCompensationDate = SelectedMonth.HasValue
-            ? new DateOnly(SelectedMonth.Value.Year, SelectedMonth.Value.Month, 1).ToString("yyyy-MM-dd")
-            : DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
-        VehicleCompensationAmount = "0";
-        VehicleCompensationDescription = string.Empty;
-    }
-
-    private async Task SaveVehicleCompensationAsync()
-    {
-        await EnsureCurrentRecordLoadedAsync();
-
-        if (!_currentMonthlyRecordId.HasValue)
-        {
-            return;
-        }
-
-        await ExecuteBusyAsync(async () =>
-        {
-            var details = await _monthlyRecordService.SaveVehicleCompensationAsync(
-                new SaveMonthlyVehicleCompensationCommand(
-                    _currentMonthlyRecordId.Value,
-                    SelectedVehicleCompensation?.VehicleCompensationId,
-                    ParseRequiredDate(VehicleCompensationDate, nameof(VehicleCompensationDate)),
-                    ParseRequiredDecimal(VehicleCompensationAmount, nameof(VehicleCompensationAmount)),
-                    VehicleCompensationDescription));
-
-            ApplyDetails(details);
-            ActionMessage = SelectedVehicleCompensation is null
-                ? "Fahrzeugentschaedigung gespeichert."
-                : "Fahrzeugentschaedigung aktualisiert.";
-            PrepareNewVehicleCompensation();
-        });
-    }
-
-    private async Task DeleteVehicleCompensationAsync()
-    {
-        if (!_currentMonthlyRecordId.HasValue || SelectedVehicleCompensation is null)
-        {
-            return;
-        }
-
-        await ExecuteBusyAsync(async () =>
-        {
-            await _monthlyRecordService.DeleteVehicleCompensationAsync(_currentMonthlyRecordId.Value, SelectedVehicleCompensation.VehicleCompensationId);
-            var details = await _monthlyRecordService.GetOrCreateAsync(
-                new MonthlyRecordQuery(_currentEmployeeId!.Value, SelectedMonth!.Value.Year, SelectedMonth.Value.Month));
-
-            ApplyDetails(details);
-            ActionMessage = "Fahrzeugentschaedigung geloescht.";
-            PrepareNewVehicleCompensation();
+            ActionMessage = "Spesen gespeichert.";
         });
     }
 
@@ -561,7 +426,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         TotalsSummary = $"Stunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
         PreviewSummary = "Monatsvorschau zeigt alle vorhandenen Monate der selektierten Person tabellarisch untereinander.";
         PreviewTotals = $"Arbeitsstunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
-        PreviewEntryCounts = $"Eintraege im aktuellen Monat: Zeiten {details.TimeEntries.Count} | Spesen {details.ExpenseEntries.Count} | Fahrzeugentschaedigungen {details.VehicleCompensations.Count}";
+        PreviewEntryCounts = $"Eintraege im aktuellen Monat: Zeiten {details.TimeEntries.Count} | Spesenblock {(details.ExpenseEntry is null ? 0 : 1)}";
+        PayrollPreviewSummary = $"Lohn-Voransicht fuer {details.Header.Month:00}/{details.Header.Year} nach aktuellem Berechnungsstand.";
 
         TimeEntries.Clear();
         foreach (var entry in details.TimeEntries)
@@ -574,35 +440,15 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 NightHours = entry.NightHours,
                 SundayHours = entry.SundayHours,
                 HolidayHours = entry.HolidayHours,
+                VehiclePauschalzone1Chf = entry.VehiclePauschalzone1Chf,
+                VehiclePauschalzone2Chf = entry.VehiclePauschalzone2Chf,
+                VehicleRegiezone1Chf = entry.VehicleRegiezone1Chf,
                 Note = entry.Note,
-                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##}"
+                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
             });
         }
 
-        ExpenseEntries.Clear();
-        foreach (var entry in details.ExpenseEntries)
-        {
-            ExpenseEntries.Add(new MonthlyExpenseEntryItemViewModel
-            {
-                ExpenseEntryId = entry.ExpenseEntryId,
-                ExpenseDate = entry.ExpenseDate,
-                AmountChf = entry.AmountChf,
-                Summary = $"{entry.ExpenseDate:dd.MM.yyyy} | {entry.AmountChf:0.00} CHF"
-            });
-        }
-
-        VehicleCompensations.Clear();
-        foreach (var entry in details.VehicleCompensations)
-        {
-            VehicleCompensations.Add(new MonthlyVehicleCompensationItemViewModel
-            {
-                VehicleCompensationId = entry.VehicleCompensationId,
-                CompensationDate = entry.CompensationDate,
-                AmountChf = entry.AmountChf,
-                Description = entry.Description,
-                Summary = $"{entry.CompensationDate:dd.MM.yyyy} | {entry.AmountChf:0.00} CHF | {entry.Description}"
-            });
-        }
+        ExpensesTotal = details.ExpenseEntry?.ExpensesTotalChf.ToString("0.00") ?? "0";
 
         PreviewRows.Clear();
         foreach (var row in BuildPreviewRows(details.Preview.Rows))
@@ -616,12 +462,21 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             PreviewNotes.Add(note);
         }
 
+        PayrollPreviewLines.Clear();
+        foreach (var line in details.PayrollPreview.Lines)
+        {
+            PayrollPreviewLines.Add(line);
+        }
+
+        PayrollPreviewNotes.Clear();
+        foreach (var note in details.PayrollPreview.Notes)
+        {
+            PayrollPreviewNotes.Add(note);
+        }
+
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
-        RaisePropertyChanged(nameof(CanDeleteExpenseEntry));
-        RaisePropertyChanged(nameof(CanSaveVehicleCompensation));
-        RaisePropertyChanged(nameof(CanDeleteVehicleCompensation));
         RaiseActionStateChanged();
     }
 
@@ -632,20 +487,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         NightHours = entry.NightHours.ToString("0.##");
         SundayHours = entry.SundayHours.ToString("0.##");
         HolidayHours = entry.HolidayHours.ToString("0.##");
+        VehiclePauschalzone1 = entry.VehiclePauschalzone1Chf.ToString("0.00");
+        VehiclePauschalzone2 = entry.VehiclePauschalzone2Chf.ToString("0.00");
+        VehicleRegiezone1 = entry.VehicleRegiezone1Chf.ToString("0.00");
         TimeNote = entry.Note;
-    }
-
-    private void PopulateExpenseEntryForm(MonthlyExpenseEntryItemViewModel entry)
-    {
-        ExpenseDate = entry.ExpenseDate.ToString("yyyy-MM-dd");
-        ExpenseAmount = entry.AmountChf.ToString("0.00");
-    }
-
-    private void PopulateVehicleCompensationForm(MonthlyVehicleCompensationItemViewModel entry)
-    {
-        VehicleCompensationDate = entry.CompensationDate.ToString("yyyy-MM-dd");
-        VehicleCompensationAmount = entry.AmountChf.ToString("0.00");
-        VehicleCompensationDescription = entry.Description;
     }
 
     private async Task ExecuteBusyAsync(Func<Task> action)
@@ -665,6 +510,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             var message = FormatExceptionMessage(exception);
             ActionMessage = $"Fehler: {message}";
             PreviewSummary = message;
+            PayrollPreviewSummary = message;
         }
         finally
         {
@@ -700,17 +546,16 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
         PreviewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
+        PayrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
         TimeEntries.Clear();
-        ExpenseEntries.Clear();
-        VehicleCompensations.Clear();
         PreviewRows.Clear();
         PreviewNotes.Clear();
+        PayrollPreviewLines.Clear();
+        PayrollPreviewNotes.Clear();
+        PrepareNewExpenseEntry();
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
-        RaisePropertyChanged(nameof(CanDeleteExpenseEntry));
-        RaisePropertyChanged(nameof(CanSaveVehicleCompensation));
-        RaisePropertyChanged(nameof(CanDeleteVehicleCompensation));
         RaiseActionStateChanged();
     }
 
@@ -720,12 +565,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         NewTimeEntryCommand.RaiseCanExecuteChanged();
         SaveTimeEntryCommand.RaiseCanExecuteChanged();
         DeleteTimeEntryCommand.RaiseCanExecuteChanged();
-        NewExpenseEntryCommand.RaiseCanExecuteChanged();
+        ResetExpenseValuesCommand.RaiseCanExecuteChanged();
         SaveExpenseEntryCommand.RaiseCanExecuteChanged();
-        DeleteExpenseEntryCommand.RaiseCanExecuteChanged();
-        NewVehicleCompensationCommand.RaiseCanExecuteChanged();
-        SaveVehicleCompensationCommand.RaiseCanExecuteChanged();
-        DeleteVehicleCompensationCommand.RaiseCanExecuteChanged();
     }
 
     private static DateOnly ParseRequiredDate(string value, string fieldName)

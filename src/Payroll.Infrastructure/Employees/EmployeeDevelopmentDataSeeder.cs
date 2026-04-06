@@ -58,7 +58,8 @@ public static class EmployeeDevelopmentDataSeeder
                 seed.ContractValidFrom,
                 seed.ContractValidTo,
                 seed.HourlyRateChf,
-                seed.MonthlyBvgDeductionChf);
+                seed.MonthlyBvgDeductionChf,
+                3.00m);
 
             dbContext.Employees.Add(employee);
             dbContext.EmploymentContracts.Add(contract);

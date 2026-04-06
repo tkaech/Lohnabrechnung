@@ -37,30 +37,14 @@ public sealed class MonthlyRecordServiceTests
                     0m,
                     0m,
                     0m,
+                    0m,
+                    0m,
+                    0m,
                     null)));
     }
 
     [Fact]
-    public async Task SaveExpenseEntryAsync_KeepsVehicleCompensationSeparated()
-    {
-        var employeeId = Guid.NewGuid();
-        var repository = new InMemoryMonthlyRecordRepository(employeeId, "Anna Aktiv");
-        var service = new MonthlyRecordService(repository);
-        var details = await service.GetOrCreateAsync(new MonthlyRecordQuery(employeeId, 2026, 4));
-
-        var updated = await service.SaveExpenseEntryAsync(
-            new SaveMonthlyExpenseEntryCommand(
-                details.Header.MonthlyRecordId,
-                null,
-                new DateOnly(2026, 4, 10),
-                18.50m));
-
-        Assert.Single(updated.ExpenseEntries);
-        Assert.Empty(updated.VehicleCompensations);
-    }
-
-    [Fact]
-    public async Task SaveExpenseEntryAsync_StoresSingleMonthlyExpenseTotal()
+    public async Task SaveExpenseEntryAsync_StoresSingleMonthlyExpenseBlock()
     {
         var employeeId = Guid.NewGuid();
         var repository = new InMemoryMonthlyRecordRepository(employeeId, "Anna Aktiv");
@@ -70,41 +54,17 @@ public sealed class MonthlyRecordServiceTests
         await service.SaveExpenseEntryAsync(
             new SaveMonthlyExpenseEntryCommand(
                 details.Header.MonthlyRecordId,
-                null,
-                new DateOnly(2026, 4, 10),
                 18.50m));
 
         var updated = await service.SaveExpenseEntryAsync(
             new SaveMonthlyExpenseEntryCommand(
                 details.Header.MonthlyRecordId,
-                null,
-                new DateOnly(2026, 4, 30),
                 80m));
 
-        Assert.Single(updated.ExpenseEntries);
+        Assert.NotNull(updated.ExpenseEntry);
         Assert.Equal(80m, updated.Header.TotalExpensesChf);
-        Assert.Equal(new DateOnly(2026, 4, 30), updated.ExpenseEntries.Single().ExpenseDate);
-    }
-
-    [Fact]
-    public async Task SaveVehicleCompensationAsync_SavesSeparateVehicleCompensation()
-    {
-        var employeeId = Guid.NewGuid();
-        var repository = new InMemoryMonthlyRecordRepository(employeeId, "Anna Aktiv");
-        var service = new MonthlyRecordService(repository);
-        var details = await service.GetOrCreateAsync(new MonthlyRecordQuery(employeeId, 2026, 4));
-
-        var updated = await service.SaveVehicleCompensationAsync(
-            new SaveMonthlyVehicleCompensationCommand(
-                details.Header.MonthlyRecordId,
-                null,
-                new DateOnly(2026, 4, 30),
-                120m,
-                "Firmenfahrzeug"));
-
-        Assert.Empty(updated.ExpenseEntries);
-        Assert.Single(updated.VehicleCompensations);
-        Assert.Equal(120m, updated.Header.TotalVehicleCompensationChf);
+        Assert.Equal(0m, updated.Header.TotalVehicleCompensationChf);
+        Assert.Equal(80m, updated.ExpenseEntry!.ExpensesTotalChf);
     }
 
     private sealed class InMemoryMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
@@ -164,8 +124,8 @@ public sealed class MonthlyRecordServiceTests
                     null,
                     record.TimeEntries.Sum(entry => entry.HoursWorked),
                     record.TimeEntries.Sum(entry => entry.SupplementHours),
-                    record.ExpenseEntries.Sum(entry => entry.AmountChf),
-                    record.VehicleCompensations.Sum(entry => entry.AmountChf)),
+                    record.ExpenseEntry?.ExpensesTotalChf ?? 0m,
+                    record.TimeEntries.Sum(entry => entry.VehicleCompensationTotalChf)),
                 record.TimeEntries.Select(entry => new MonthlyTimeEntryDto(
                     entry.Id,
                     entry.WorkDate,
@@ -173,19 +133,24 @@ public sealed class MonthlyRecordServiceTests
                     entry.NightHours,
                     entry.SundayHours,
                     entry.HolidayHours,
+                    entry.VehiclePauschalzone1Chf,
+                    entry.VehiclePauschalzone2Chf,
+                    entry.VehicleRegiezone1Chf,
                     entry.Note)).ToArray(),
-                record.ExpenseEntries.Select(entry => new MonthlyExpenseEntryDto(
-                    entry.Id,
-                    entry.ExpenseDate,
-                    entry.AmountChf)).ToArray(),
-                record.VehicleCompensations.Select(entry => new MonthlyVehicleCompensationDto(
-                    entry.Id,
-                    entry.CompensationDate,
-                    entry.AmountChf,
-                    entry.Description)).ToArray(),
+                record.ExpenseEntry is null
+                    ? null
+                    : new MonthlyExpenseEntryDto(
+                        record.ExpenseEntry.Id,
+                        record.ExpenseEntry.ExpensesTotalChf),
                 new MonthlyRecordPreviewDto(
                     Array.Empty<MonthlyPreviewRowDto>(),
-                    ["Testvorschau"]));
+                    ["Testvorschau"]),
+                new MonthlyPayrollPreviewDto(
+                    [
+                        new MonthlyPayrollPreviewLineDto("Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null),
+                        new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null)
+                    ],
+                    ["Test-Lohnvorschau"]));
 
             return Task.FromResult<MonthlyRecordDetailsDto?>(details);
         }

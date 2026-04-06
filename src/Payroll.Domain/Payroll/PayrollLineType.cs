@@ -6,6 +6,8 @@ public enum PayrollLineType
     NightSupplement,
     SundaySupplement,
     HolidaySupplement,
+    SpecialSupplement,
+    VacationCompensation,
     Expense,
     VehicleCompensation,
     BvgDeduction,

@@ -44,7 +44,8 @@ public sealed record EmployeeDetailsDto(
     DateOnly ContractValidFrom,
     DateOnly? ContractValidTo,
     decimal HourlyRateChf,
-    decimal MonthlyBvgDeductionChf);
+    decimal MonthlyBvgDeductionChf,
+    decimal SpecialSupplementRateChf);
 
 public sealed record SaveEmployeeCommand(
     Guid? EmployeeId,
@@ -73,4 +74,5 @@ public sealed record SaveEmployeeCommand(
     DateOnly ContractValidFrom,
     DateOnly? ContractValidTo,
     decimal HourlyRateChf,
-    decimal MonthlyBvgDeductionChf);
+    decimal MonthlyBvgDeductionChf,
+    decimal SpecialSupplementRateChf);

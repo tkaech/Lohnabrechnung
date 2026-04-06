@@ -37,7 +37,8 @@ public sealed class EmployeeServiceTests
                 nationality: "DE",
                 isSubjectToWithholdingTax: true,
                 hourlyRateChf: 34m,
-                monthlyBvgDeductionChf: 300m));
+                monthlyBvgDeductionChf: 300m,
+                specialSupplementRateChf: 3.50m));
 
         Assert.Equal("1001", employee.PersonnelNumber);
         Assert.Equal("Mia", employee.FirstName);
@@ -45,6 +46,7 @@ public sealed class EmployeeServiceTests
         Assert.Equal("DE", employee.Nationality);
         Assert.True(employee.IsSubjectToWithholdingTax);
         Assert.Equal(34m, employee.HourlyRateChf);
+        Assert.Equal(3.50m, employee.SpecialSupplementRateChf);
     }
 
     [Fact]
@@ -80,7 +82,8 @@ public sealed class EmployeeServiceTests
                 isActive: false,
                 exitDate: new DateOnly(2026, 8, 31),
                 hourlyRateChf: 36m,
-                monthlyBvgDeductionChf: 310m));
+                monthlyBvgDeductionChf: 310m,
+                specialSupplementRateChf: 4.00m));
 
         Assert.Equal(created.EmployeeId, updated.EmployeeId);
         Assert.Equal("1003A", updated.PersonnelNumber);
@@ -88,6 +91,7 @@ public sealed class EmployeeServiceTests
         Assert.Equal("Basel", updated.City);
         Assert.False(updated.IsActive);
         Assert.Equal(36m, updated.HourlyRateChf);
+        Assert.Equal(4.00m, updated.SpecialSupplementRateChf);
     }
 
     [Fact]
@@ -224,7 +228,8 @@ public sealed class EmployeeServiceTests
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
-                command.MonthlyBvgDeductionChf);
+                command.MonthlyBvgDeductionChf,
+                command.SpecialSupplementRateChf);
 
             _employees[employeeId] = employee;
             return Task.FromResult(employee);
@@ -244,7 +249,8 @@ public sealed class EmployeeServiceTests
         string? email = null,
         DateOnly? exitDate = null,
         decimal hourlyRateChf = 32.5m,
-        decimal monthlyBvgDeductionChf = 280m)
+        decimal monthlyBvgDeductionChf = 280m,
+        decimal specialSupplementRateChf = 3.00m)
     {
         return new SaveEmployeeCommand(
             employeeId,
@@ -273,6 +279,7 @@ public sealed class EmployeeServiceTests
             new DateOnly(2026, 1, 1),
             null,
             hourlyRateChf,
-            monthlyBvgDeductionChf);
+            monthlyBvgDeductionChf,
+            specialSupplementRateChf);
     }
 }

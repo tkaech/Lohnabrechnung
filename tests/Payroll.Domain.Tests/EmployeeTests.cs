@@ -110,6 +110,35 @@ public sealed class EmployeeTests
         Assert.NotNull(employee.UpdatedAtUtc);
     }
 
+    [Fact]
+    public void UpdateCoreData_ReactivatingEmployeeClearsExitDate()
+    {
+        var employee = CreateEmployee();
+        employee.Archive(new DateOnly(2026, 3, 31));
+
+        employee.UpdateCoreData(
+            "1000",
+            "Max",
+            "Muster",
+            new DateOnly(1990, 1, 1),
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 3, 31),
+            true,
+            new EmployeeAddress("Musterstrasse", "10a", null, "8000", "Zuerich", "Schweiz"),
+            null,
+            "CH",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "+41 79 123 45 67",
+            "max@example.ch");
+
+        Assert.True(employee.IsActive);
+        Assert.Null(employee.ExitDate);
+    }
+
     private static Employee CreateEmployee(
         string personnelNumber = "1000",
         string firstName = "Max",

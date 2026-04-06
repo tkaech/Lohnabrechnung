@@ -41,6 +41,9 @@ public sealed class MonthlyRecordService
             command.NightHours,
             command.SundayHours,
             command.HolidayHours,
+            command.VehiclePauschalzone1Chf,
+            command.VehiclePauschalzone2Chf,
+            command.VehicleRegiezone1Chf,
             command.Note);
 
         if (isNewEntry)
@@ -69,12 +72,10 @@ public sealed class MonthlyRecordService
 
         _repository.ClearTracking();
         var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
-        var expenseEntry = monthlyRecord.SaveExpenseEntry(
-            command.ExpenseEntryId,
-            command.ExpenseDate,
-            command.AmountChf);
+        var hadExpenseEntry = monthlyRecord.ExpenseEntry is not null;
+        var expenseEntry = monthlyRecord.SaveExpenseEntry(command.ExpensesTotalChf);
 
-        if (!command.ExpenseEntryId.HasValue)
+        if (!hadExpenseEntry)
         {
             _repository.MarkAsAdded(expenseEntry);
         }
@@ -82,46 +83,6 @@ public sealed class MonthlyRecordService
         await _repository.SaveChangesAsync(cancellationToken);
         _repository.ClearTracking();
         return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
-    }
-
-    public async Task DeleteExpenseEntryAsync(Guid monthlyRecordId, Guid expenseEntryId, CancellationToken cancellationToken = default)
-    {
-        _repository.ClearTracking();
-        var monthlyRecord = await LoadAggregateAsync(monthlyRecordId, cancellationToken);
-        monthlyRecord.RemoveExpenseEntry(expenseEntryId);
-        await _repository.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task<MonthlyRecordDetailsDto> SaveVehicleCompensationAsync(
-        SaveMonthlyVehicleCompensationCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        _repository.ClearTracking();
-        var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
-        var vehicleCompensation = monthlyRecord.SaveVehicleCompensation(
-            command.VehicleCompensationId,
-            command.CompensationDate,
-            command.AmountChf,
-            command.Description);
-
-        if (!command.VehicleCompensationId.HasValue)
-        {
-            _repository.MarkAsAdded(vehicleCompensation);
-        }
-
-        await _repository.SaveChangesAsync(cancellationToken);
-        _repository.ClearTracking();
-        return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
-    }
-
-    public async Task DeleteVehicleCompensationAsync(Guid monthlyRecordId, Guid vehicleCompensationId, CancellationToken cancellationToken = default)
-    {
-        _repository.ClearTracking();
-        var monthlyRecord = await LoadAggregateAsync(monthlyRecordId, cancellationToken);
-        monthlyRecord.RemoveVehicleCompensation(vehicleCompensationId);
-        await _repository.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<EmployeeMonthlyRecord> LoadAggregateAsync(Guid monthlyRecordId, CancellationToken cancellationToken)

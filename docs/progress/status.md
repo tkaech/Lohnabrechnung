@@ -3,6 +3,19 @@
 Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel-Analyse abgeleitet.
 
 ## Session Abschluss
+- Lohn-Voransicht fuer den aktuell gewaehlten Mitarbeitenden und Monat in der Monatserfassung ergänzt, fachlich an der Excel-Struktur aus dem Register `BleR` orientiert
+- Voransicht berechnet jetzt Basislohn, ableitbare Zeitzuschlaege, drei Fahrzeitentschaedigungen, AHV-pflichtigen Bruttolohn, zentrale Abzuege, optionales BVG, Spesen und `Total Auszahlung`
+- `Total Auszahlung` in der Voransicht analog Excel auf 5 Rappen gerundet; `Spezialzuschlag gemaess Vertrag` ist jetzt als CHF-Betrag pro Arbeitsstunde im Vertragsstand modelliert und `Ferienentschaedigung` wird ueber eine zentrale `FerienentschaedigungRate` aus den globalen Settings berechnet
+- globale Payroll-Settings um zentrale Abzugsparameter fuer `AHV/IV/EO`, `ALV`, `Krankentaggeld/UVG` und `Aus- und Weiterbildung inkl. Ferien` erweitert
+- zentrale CHF-Ansatzwerte fuer `Pauschalzone 1`, `Pauschalzone 2` und `Regiezone 1` in `PayrollSettings` ergänzt und im Settings-Tab pflegbar gemacht
+- Payroll-Ableitung so angepasst, dass Fahrzeugentschaedigungen aus Mengen * Settings-Ansatz berechnet und prozentuale Sozialabzuege nicht mehr hart codiert, sondern aus den zentralen Settings gelesen werden
+- die drei Fahrzeugwerte `Pauschalzone 1`, `Pauschalzone 2` und `Regiezone 1` aus dem Spesenblock in die Zeitzeile verschoben, weil sie fachlich lohnrelevante Lohnbestandteile sind
+- Monatsmodell, EF-Persistenz, Monatsvorschau und Avalonia-UI so angepasst, dass Fahrzeugwerte jetzt pro `TimeEntry` und Spesen wieder als reines Monatstotal im `ExpenseEntry` erfasst werden
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests auf den neuen Schnitt `Zeiten + Fahrzeugwerte` versus `reine Spesen` angepasst
+- Monats-Spesenbereich von Listen-/Detailerfassung auf genau einen Monatsdatensatz mit vier Feldern pro Mitarbeitendem umgestellt
+- Fahrzeugentschaedigung im Monatskontext nicht mehr als eigener Unterbereich, sondern als drei feste Monatswerte innerhalb desselben `ExpenseEntry`
+- Domain, Application, EF-Persistenz, SQLite-Schema-Check und Avalonia-UI fuer den neuen Vier-Felder-Spesenblock minimal-invasiv angepasst
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests auf den neuen Monats-Spesenblock aktualisiert
 - Nacht-, Sonntags- und Feiertagszuschlag aus der individuellen Mitarbeitendenpflege entfernt und in einen zentralen Bereich `Einstellungen` verschoben
 - zentralen Settings-Pfad fuer lohnrelevante Zuschlagssaetze in Domain, Application, Persistence und UI ergänzt
 - Payroll-Ableitung fuer Zuschlaege fachlich beibehalten, aber die Herkunft der drei Prozent-Saetze von `EmploymentContract` auf zentrale Einstellungen umgestellt
@@ -145,6 +158,7 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Mitarbeitendenverwaltung deckt aktuell Stammdaten, Kontakt, Adresse und einen bearbeitbaren Vertragsstand ab
 - gemeinsame Monatserfassung fuer Zeiten und Spesen ist als erster Vertikalschnitt umgesetzt, aber noch ohne Import, Monatsabschluss und tiefe Payroll-Orchestrierung
 - die aktuelle Monatserfassung ist jetzt als eigener Erfassungsbereich fuer Zeiten, Spesen und Fahrzeugentschaedigung benutzbar und speicherbar, arbeitet aber noch pro selektierter Person und noch nicht als echte tabellarische Mehrpersonen-Erfassung
+- die aktuelle Monatserfassung fuehrt Spesen wieder als reines Monatstotal; die drei Fahrzeugwerte werden in derselben Zeile wie Stunden und Zuschlagsstunden erfasst
 - die Monatsvorschau zeigt jetzt die Eintraege aller vorhandenen Monate der aktuell selektierten Person tabellarisch untereinander
 - Noch keine vollstaendige Payroll-Orchestrierung auf Basis der vorhandenen Domainregeln
 - Vertragshistorie ist fachlich vorbereitet, aber noch nicht als eigener Bearbeitungsfluss umgesetzt
