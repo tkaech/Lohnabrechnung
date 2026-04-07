@@ -11,6 +11,8 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
     private EmployeeMonthlyRecord()
     {
         Status = EmployeeMonthlyRecordStatus.Draft;
+        PayrollParameterSnapshot = new PayrollParameterSnapshot();
+        EmploymentContractSnapshot = new EmploymentContractSnapshot();
     }
 
     public EmployeeMonthlyRecord(Guid employeeId, int year, int month)
@@ -25,12 +27,16 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         Year = year;
         Month = month;
         Status = EmployeeMonthlyRecordStatus.Draft;
+        PayrollParameterSnapshot = new PayrollParameterSnapshot();
+        EmploymentContractSnapshot = new EmploymentContractSnapshot();
     }
 
     public Guid EmployeeId { get; private set; }
     public int Year { get; private set; }
     public int Month { get; private set; }
     public EmployeeMonthlyRecordStatus Status { get; private set; }
+    public PayrollParameterSnapshot PayrollParameterSnapshot { get; private set; }
+    public EmploymentContractSnapshot EmploymentContractSnapshot { get; private set; }
     public IReadOnlyCollection<TimeEntry> TimeEntries => _timeEntries.AsReadOnly();
     public ExpenseEntry? ExpenseEntry { get; private set; }
     public DateOnly PeriodStart => new(Year, Month, 1);
@@ -49,6 +55,30 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         }
 
         Status = status;
+        Touch();
+    }
+
+    public void InitializePayrollParameterSnapshot(Settings.PayrollSettings payrollSettings)
+    {
+        ArgumentNullException.ThrowIfNull(payrollSettings);
+
+        if (PayrollParameterSnapshot.IsInitialized)
+        {
+            return;
+        }
+
+        PayrollParameterSnapshot = PayrollParameterSnapshot.Create(payrollSettings);
+        Touch();
+    }
+
+    public void InitializeEmploymentContractSnapshot(Employees.EmploymentContract? contract)
+    {
+        if (contract is null || EmploymentContractSnapshot.IsInitialized)
+        {
+            return;
+        }
+
+        EmploymentContractSnapshot = EmploymentContractSnapshot.Create(contract);
         Touch();
     }
 

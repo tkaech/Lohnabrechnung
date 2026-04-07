@@ -19,6 +19,12 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
     public async Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
     {
+        var currentPayrollSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
+        var contractForSnapshot = await LoadBestAvailableContractForMonthAsync(
+            employeeId,
+            new DateOnly(year, month, 1),
+            new DateOnly(year, month, DateTime.DaysInMonth(year, month)),
+            cancellationToken);
         var existingRecord = await _dbContext.EmployeeMonthlyRecords
             .Include(record => record.TimeEntries)
             .Include(record => record.ExpenseEntry)
@@ -28,20 +34,34 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
         if (existingRecord is not null)
         {
+            existingRecord.InitializePayrollParameterSnapshot(currentPayrollSettings);
+            existingRecord.InitializeEmploymentContractSnapshot(contractForSnapshot);
             return existingRecord;
         }
 
         var createdRecord = new EmployeeMonthlyRecord(employeeId, year, month);
+        createdRecord.InitializePayrollParameterSnapshot(currentPayrollSettings);
+        createdRecord.InitializeEmploymentContractSnapshot(contractForSnapshot);
         _dbContext.EmployeeMonthlyRecords.Add(createdRecord);
         return createdRecord;
     }
 
-    public Task<EmployeeMonthlyRecord?> GetByIdAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
+    public async Task<EmployeeMonthlyRecord?> GetByIdAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
     {
-        return _dbContext.EmployeeMonthlyRecords
+        var monthlyRecord = await _dbContext.EmployeeMonthlyRecords
             .Include(record => record.TimeEntries)
             .Include(record => record.ExpenseEntry)
             .SingleOrDefaultAsync(record => record.Id == monthlyRecordId, cancellationToken);
+
+        if (monthlyRecord is null)
+        {
+            return null;
+        }
+
+        monthlyRecord.InitializePayrollParameterSnapshot(await LoadCurrentPayrollSettingsAsync(cancellationToken));
+        monthlyRecord.InitializeEmploymentContractSnapshot(
+            await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken));
+        return monthlyRecord;
     }
 
     public async Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
@@ -61,15 +81,16 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .AsNoTracking()
             .SingleAsync(item => item.Id == monthlyRecord.EmployeeId, cancellationToken);
 
-        var contract = await LoadRelevantContractAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken);
-        var payrollSettings = await _dbContext.PayrollSettings
-            .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken)
-            ?? new PayrollSettings();
+        var contract = ResolveContractForMonth(
+            monthlyRecord,
+            await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken));
+        var payrollSettings = ResolvePayrollSettingsForMonth(
+            monthlyRecord,
+            await LoadCurrentPayrollSettingsAsync(cancellationToken));
 
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
         var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
-        var payrollPreview = BuildPayrollPreview(monthlyRecord, contract, payrollSettings);
+        var payrollPreview = BuildPayrollPreview(monthlyRecord, employee.BirthDate, contract, payrollSettings);
         var employeeMonthlyRecords = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Where(record => record.EmployeeId == monthlyRecord.EmployeeId)
@@ -186,6 +207,25 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .FirstOrDefault();
     }
 
+    private async Task<Domain.Employees.EmploymentContract?> LoadBestAvailableContractForMonthAsync(
+        Guid employeeId,
+        DateOnly periodStart,
+        DateOnly periodEnd,
+        CancellationToken cancellationToken)
+    {
+        var relevantContract = await LoadRelevantContractAsync(employeeId, periodStart, periodEnd, cancellationToken);
+        if (relevantContract is not null)
+        {
+            return relevantContract;
+        }
+
+        return await _dbContext.EmploymentContracts
+            .AsNoTracking()
+            .Where(contract => contract.EmployeeId == employeeId)
+            .OrderByDescending(contract => contract.ValidFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private static IReadOnlyCollection<string> BuildPreviewNotes(EmployeeMonthlyRecord monthlyRecord, bool hasContract)
     {
         var notes = new List<string>();
@@ -224,12 +264,18 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
     private MonthlyPayrollPreviewDto BuildPayrollPreview(
         EmployeeMonthlyRecord monthlyRecord,
+        DateOnly? employeeBirthDate,
         Domain.Employees.EmploymentContract? contract,
         PayrollSettings payrollSettings)
     {
+        var timeEntries = monthlyRecord.TimeEntries.OrderBy(entry => entry.WorkDate).ToArray();
+        if (timeEntries.Length == 0)
+        {
+            return new MonthlyPayrollPreviewDto([], ["Monat noch nicht erfasst"]);
+        }
+
         var lines = new List<MonthlyPayrollPreviewLineDto>();
         var notes = new List<string>();
-        var timeEntries = monthlyRecord.TimeEntries.OrderBy(entry => entry.WorkDate).ToArray();
         var workSummary = PayrollWorkSummary.FromTimeEntries(monthlyRecord.EmployeeId, timeEntries);
         var expenses = monthlyRecord.ExpenseEntry is null
             ? Array.Empty<Domain.Expenses.ExpenseEntry>()
@@ -244,6 +290,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         {
             derivationResult = _payrollRunLineDerivationService.DeriveForEmployee(
                 monthlyRecord.PeriodEnd,
+                employeeBirthDate,
                 contract,
                 payrollSettings,
                 workSummary,
@@ -294,7 +341,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Stunden mit Zeitzuschlag",
             supplementLines.Length == 0 ? $"{workSummary.SpecialHours:0.##} h" : $"{supplementLines.Sum(line => line.Quantity ?? 0m):0.##} h",
-            "gem. Settings",
+            "gem. Monatsparameter",
             FormatAmountOrPending(
                 supplementLines.Sum(line => line.AmountChf),
                 contract is not null && workSummary.SpecialHours > 0m && supplementLines.Length == 0),
@@ -341,14 +388,18 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Summe der aktuell fachlich ableitbaren lohnrelevanten Positionen.",
             true));
 
+        var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, monthlyRecord.PeriodEnd);
+
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Ferienentschaedigung",
             "-",
-            contract is null ? "-" : $"{payrollSettings.VacationCompensationRate:0.####}",
+            contract is null ? "-" : $"{effectiveVacationCompensationRate:0.####}",
             FormatAmount(contract is null ? null : vacationCompensationLine?.AmountChf ?? 0m),
             contract is null
                 ? "Ohne gueltigen Vertrag nicht ableitbar."
-                : "Rate aus Einstellungen multipliziert mit Basislohn, Zeitzuschlaegen, Spezialzuschlag und Fahrzeitentschaedigung.",
+                : employeeBirthDate.HasValue
+                    ? "Automatisch nach Alter aus Geburtsdatum und gespeicherten Monatsparametern gewaehlt."
+                    : "Ohne Geburtsdatum wird der Standardsatz aus den gespeicherten Monatsparametern verwendet.",
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
@@ -412,7 +463,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
         if (notes.Count == 0)
         {
-            notes.Add("Lohn-Voransicht basiert auf Monatsdaten, aktuellem Vertrag und zentralen Settings.");
+            notes.Add("Lohn-Voransicht basiert auf Monatsdaten, aktuellem Vertrag und dem gespeicherten Monatsparameter-Snapshot.");
         }
 
         return new MonthlyPayrollPreviewDto(lines, notes);
@@ -562,10 +613,33 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return new MonthlyPayrollPreviewLineDto(
             label,
             "-",
-            matchingLine is null ? "-" : "gem. Settings",
+            matchingLine is null ? "-" : "gem. Monatsparameter",
             FormatAmount(matchingLine?.AmountChf),
             null,
             false);
+    }
+
+    private async Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken)
+    {
+        return await _dbContext.PayrollSettings
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? new PayrollSettings();
+    }
+
+    private static PayrollSettings ResolvePayrollSettingsForMonth(EmployeeMonthlyRecord monthlyRecord, PayrollSettings currentPayrollSettings)
+    {
+        return monthlyRecord.PayrollParameterSnapshot.IsInitialized
+            ? monthlyRecord.PayrollParameterSnapshot.ToPayrollSettings()
+            : currentPayrollSettings;
+    }
+
+    private static Domain.Employees.EmploymentContract? ResolveContractForMonth(
+        EmployeeMonthlyRecord monthlyRecord,
+        Domain.Employees.EmploymentContract? currentContract)
+    {
+        return monthlyRecord.EmploymentContractSnapshot.IsInitialized
+            ? monthlyRecord.EmploymentContractSnapshot.ToEmploymentContract(monthlyRecord.EmployeeId)
+            : currentContract;
     }
 
     private static decimal GetVehicleAmount(IEnumerable<PayrollRunLine> derivationLines, string code)

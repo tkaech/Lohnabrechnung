@@ -18,9 +18,10 @@ public sealed partial class App : global::Avalonia.Application
             try
             {
                 var bootstrapper = new global::Payroll.Desktop.Bootstrapping.AppBootstrapper();
+                var runtimeOptions = global::Payroll.Desktop.Bootstrapping.DesktopRuntimeOptionsLoader.Load(global::Payroll.Desktop.Bootstrapping.StartupArguments.Current.ToArray());
                 desktop.MainWindow = new Views.MainWindow
                 {
-                    DataContext = bootstrapper.CreateMainWindowViewModel()
+                    DataContext = bootstrapper.CreateMainWindowViewModel(runtimeOptions)
                 };
             }
             catch (Exception exception)

@@ -1,0 +1,84 @@
+Windows-Teststart Payroll.Desktop
+================================
+
+Ziel
+----
+Diese Version ist fuer einen ersten Windows-Testlauf gedacht.
+Sie verwendet SQLite und legt die Datenbank beim ersten Start automatisch an.
+
+
+Standardverhalten
+-----------------
+- Die Anwendung liest standardmaessig `appsettings.json`.
+- Der dort konfigurierte Datenbankpfad ist:
+  `{LocalAppData}/PayrollApp/payroll.test.db`
+- Unter Windows wird `{LocalAppData}` typischerweise auf
+  `C:\Users\<Benutzer>\AppData\Local`
+  aufgeloest.
+
+Beispiel:
+`C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.test.db`
+
+
+Erster Start
+------------
+1. `Payroll.Desktop.exe` starten
+2. Falls die Datenbank noch nicht existiert:
+   - wird die SQLite-Datei angelegt
+   - werden EF-Migrationen ausgefuehrt
+   - werden nur Konfigurationsdaten initialisiert
+3. Es werden keine Demo-Mitarbeitenden oder Personendaten angelegt
+
+
+Weitere Starts
+--------------
+- Die bestehende Datenbank wird weiterverwendet
+- Bestehende Daten werden nicht geloescht
+- Die Anwendung fuehrt nur noch erforderliche Migrationen aus
+
+
+DB-Pfad ueberschreiben
+----------------------
+Es gibt drei Moeglichkeiten:
+
+1. Startparameter
+`Payroll.Desktop.exe --db-path="C:\Pfad\zur\payroll.test.db"`
+
+2. Environment-Variable
+`PAYROLLAPP_DATABASE_PATH`
+
+3. Appsettings
+- `appsettings.json`
+- `appsettings.Development.json`
+
+
+Environment setzen
+------------------
+Optional kann das Environment gesetzt werden:
+
+`Payroll.Desktop.exe --environment=Production`
+
+Moegliche Werte:
+- `Development`
+- `Production`
+- `Test`
+
+
+Beispiele
+---------
+Standardstart:
+`Payroll.Desktop.exe`
+
+Start mit explizitem Testpfad:
+`Payroll.Desktop.exe --db-path="C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.test.db"`
+
+Start mit anderem Environment:
+`Payroll.Desktop.exe --environment=Production`
+
+
+Wichtige Hinweise
+-----------------
+- `appsettings.json` liegt im gleichen Ordner wie die Anwendung
+- Der Ordner fuer die Datenbank wird bei Bedarf automatisch angelegt
+- Die Anwendung verwendet SQLite
+- Fuer diesen Testlauf gibt es noch keinen Installer

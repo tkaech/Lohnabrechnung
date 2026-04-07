@@ -61,7 +61,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
             "BSD",
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
-            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 1.10m, 2.20m, 3.30m,
+            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit"), new SettingOptionDto(Guid.NewGuid(), "Buero")],
             [new SettingOptionDto(Guid.NewGuid(), "A"), new SettingOptionDto(Guid.NewGuid(), "B")],
             [new SettingOptionDto(Guid.NewGuid(), "Schachenstr. 7, Emmenbruecke")]),
@@ -83,6 +83,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Assert.Equal(0.00821m, loaded.SicknessAccidentInsuranceRate);
         Assert.Equal(0.00015m, loaded.TrainingAndHolidayRate);
         Assert.Equal(0.1064m, loaded.VacationCompensationRate);
+        Assert.Equal(0.1264m, loaded.VacationCompensationRateAge50Plus);
         Assert.Equal(1.10m, loaded.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, loaded.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, loaded.VehicleRegiezone1RateChf);

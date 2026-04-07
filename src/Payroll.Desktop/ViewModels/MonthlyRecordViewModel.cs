@@ -278,6 +278,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         private set => SetProperty(ref _payrollPreviewSummary, value);
     }
 
+    public bool HasPayrollPreviewLines => PayrollPreviewLines.Count > 0;
+
     public string TimeDate
     {
         get => _timeDate;
@@ -488,7 +490,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             RaisePropertyChanged(nameof(SelectedMonthPickerDate));
             PrepareNewTimeEntry();
             PrepareNewExpenseEntry();
-            ResetLoadedRecordState();
+            ResetLoadedRecordState(preservePendingSelection: true);
         }
 
         if ((changed || forceReload) && _currentEmployeeId.HasValue)
@@ -604,7 +606,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewSummary = "Monatsvorschau zeigt alle vorhandenen Monate der selektierten Person tabellarisch untereinander.";
         PreviewTotals = $"Arbeitsstunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
         PreviewEntryCounts = $"Eintraege im aktuellen Monat: Zeiten {details.TimeEntries.Count} | Spesenblock {(details.ExpenseEntry is null ? 0 : 1)}";
-        PayrollPreviewSummary = $"Lohn-Voransicht fuer {details.Header.Month:00}/{details.Header.Year} nach aktuellem Berechnungsstand.";
+        PayrollPreviewSummary = details.PayrollPreview.Lines.Count == 0
+            ? "Monat noch nicht erfasst"
+            : $"Lohn-Voransicht fuer {details.Header.Month:00}/{details.Header.Year} nach aktuellem Berechnungsstand.";
 
         TimeEntries.Clear();
         foreach (var entry in details.TimeEntries)
@@ -706,6 +710,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         {
             PayrollPreviewLines.Add(line);
         }
+        RaisePropertyChanged(nameof(HasPayrollPreviewLines));
 
         PayrollPreviewNotes.Clear();
         foreach (var note in details.PayrollPreview.Notes)
@@ -775,7 +780,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         await LoadCurrentRecordAsync();
     }
 
-    private void ResetLoadedRecordState()
+    private void ResetLoadedRecordState(bool preservePendingSelection = false)
     {
         _currentMonthlyRecordId = null;
         StatusSummary = "Kein Monatskontext aktiv.";
@@ -791,12 +796,16 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         ExpenseEntryHistory.Clear();
         SelectedTimeEntry = null;
         SelectedExpenseEntry = null;
-        _pendingTimeEntrySelectionId = null;
-        _pendingExpenseEntrySelectionId = null;
+        if (!preservePendingSelection)
+        {
+            _pendingTimeEntrySelectionId = null;
+            _pendingExpenseEntrySelectionId = null;
+        }
         PreviewRows.Clear();
         PreviewNotes.Clear();
         PayrollPreviewLines.Clear();
         PayrollPreviewNotes.Clear();
+        RaisePropertyChanged(nameof(HasPayrollPreviewLines));
         PrepareNewExpenseEntry();
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));

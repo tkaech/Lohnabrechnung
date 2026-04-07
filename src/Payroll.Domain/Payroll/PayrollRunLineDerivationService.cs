@@ -10,6 +10,7 @@ public sealed class PayrollRunLineDerivationService
 {
     public PayrollRunLineDerivationResult DeriveForEmployee(
         DateOnly payrollReferenceDate,
+        DateOnly? employeeBirthDate,
         EmploymentContract contract,
         PayrollSettings payrollSettings,
         PayrollWorkSummary workSummary,
@@ -144,14 +145,16 @@ public sealed class PayrollRunLineDerivationService
                 or PayrollLineType.VehicleCompensation)
             .Sum(line => line.AmountChf);
 
-        if (vacationCompensationBasisChf > 0m && payrollSettings.VacationCompensationRate > 0m)
+        var vacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, payrollReferenceDate);
+
+        if (vacationCompensationBasisChf > 0m && vacationCompensationRate > 0m)
         {
             lines.Add(PayrollRunLine.CreateDirectChfLine(
                 contract.EmployeeId,
                 PayrollLineType.VacationCompensation,
                 "VACATION_COMP",
                 "Ferienentschaedigung",
-                vacationCompensationBasisChf * payrollSettings.VacationCompensationRate));
+                vacationCompensationBasisChf * vacationCompensationRate));
         }
 
         var contributableGrossChf = lines

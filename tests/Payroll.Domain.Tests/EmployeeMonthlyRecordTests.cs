@@ -1,4 +1,6 @@
+using Payroll.Domain.Employees;
 using Payroll.Domain.MonthlyRecords;
+using Payroll.Domain.Settings;
 
 namespace Payroll.Domain.Tests;
 
@@ -15,6 +17,7 @@ public sealed class EmployeeMonthlyRecordTests
         Assert.Equal(2026, record.Year);
         Assert.Equal(4, record.Month);
         Assert.Equal(EmployeeMonthlyRecordStatus.Draft, record.Status);
+        Assert.False(record.PayrollParameterSnapshot.IsInitialized);
         Assert.Equal(new DateOnly(2026, 4, 1), record.PeriodStart);
         Assert.Equal(new DateOnly(2026, 4, 30), record.PeriodEnd);
     }
@@ -54,5 +57,65 @@ public sealed class EmployeeMonthlyRecordTests
         Assert.NotNull(record.ExpenseEntry);
         Assert.Equal(created.Id, updated.Id);
         Assert.Equal(80m, updated.ExpensesTotalChf);
+    }
+
+    [Fact]
+    public void InitializePayrollParameterSnapshot_CapturesRatesOnlyOnce()
+    {
+        var record = new EmployeeMonthlyRecord(Guid.NewGuid(), 2026, 4);
+        var originalSettings = new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m);
+        var laterSettings = new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.40m, 0.80m, 1.20m),
+            ahvIvEoRate: 0.06m,
+            alvRate: 0.02m,
+            sicknessAccidentInsuranceRate: 0.01m,
+            trainingAndHolidayRate: 0.0003m,
+            vacationCompensationRate: 0.12m,
+            vacationCompensationRateAge50Plus: 0.14m,
+            vehiclePauschalzone1RateChf: 8m,
+            vehiclePauschalzone2RateChf: 18m,
+            vehicleRegiezone1RateChf: 1m);
+
+        record.InitializePayrollParameterSnapshot(originalSettings);
+        var firstCapturedAt = record.PayrollParameterSnapshot.CapturedAtUtc;
+
+        record.InitializePayrollParameterSnapshot(laterSettings);
+
+        Assert.True(record.PayrollParameterSnapshot.IsInitialized);
+        Assert.Equal(firstCapturedAt, record.PayrollParameterSnapshot.CapturedAtUtc);
+        Assert.Equal(0.25m, record.PayrollParameterSnapshot.NightSupplementRate);
+        Assert.Equal(0.1064m, record.PayrollParameterSnapshot.VacationCompensationRate);
+        Assert.Equal(0.1264m, record.PayrollParameterSnapshot.VacationCompensationRateAge50Plus);
+        Assert.Equal(5.6m, record.PayrollParameterSnapshot.VehiclePauschalzone1RateChf);
+    }
+
+    [Fact]
+    public void InitializeEmploymentContractSnapshot_CapturesContractOnlyOnce()
+    {
+        var record = new EmployeeMonthlyRecord(Guid.NewGuid(), 2026, 4);
+        var originalContract = new EmploymentContract(record.EmployeeId, new DateOnly(2026, 1, 1), null, 33.5m, 310m, 3m);
+        var laterContract = new EmploymentContract(record.EmployeeId, new DateOnly(2026, 6, 1), null, 39m, 450m, 5m);
+
+        record.InitializeEmploymentContractSnapshot(originalContract);
+        var firstCapturedAt = record.EmploymentContractSnapshot.CapturedAtUtc;
+
+        record.InitializeEmploymentContractSnapshot(laterContract);
+
+        Assert.True(record.EmploymentContractSnapshot.IsInitialized);
+        Assert.Equal(firstCapturedAt, record.EmploymentContractSnapshot.CapturedAtUtc);
+        Assert.Equal(new DateOnly(2026, 1, 1), record.EmploymentContractSnapshot.ValidFrom);
+        Assert.Equal(33.5m, record.EmploymentContractSnapshot.HourlyRateChf);
+        Assert.Equal(310m, record.EmploymentContractSnapshot.MonthlyBvgDeductionChf);
+        Assert.Equal(3m, record.EmploymentContractSnapshot.SpecialSupplementRateChf);
     }
 }

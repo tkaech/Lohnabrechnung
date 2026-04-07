@@ -39,6 +39,7 @@
   - genau einen Mitarbeitenden
   - genau einen Abrechnungsmonat
   - Status der Erfassung
+  - einen Snapshot der fuer diesen Monat verwendeten lohnrelevanten Berechnungsparameter
 - referentielle Regeln:
   - genau ein Monatskontext pro Mitarbeitenden und Monat
   - Zeit- und Spesenwerte verweisen referenziell auf genau einen Monatskontext
@@ -74,13 +75,16 @@
     - `Krankentaggeld/UVG`
     - `Aus- und Weiterbildung inkl. Ferien`
   - zentrale `FerienentschaedigungRate`
+  - zentrale `FerienentschaedigungRateAb50`
   - zentrale CHF-Ansatzwerte fuer:
     - `Pauschalzone 1`
     - `Pauschalzone 2`
     - `Regiezone 1`
 - Payroll-Regel:
+  - pro `EmployeeMonthlyRecord` wird beim erstmaligen Arbeiten im Monat ein Snapshot der lohnrelevanten Berechnungsparameter gespeichert; spaetere Aenderungen in `PayrollSettings` wirken nicht rueckwirkend auf bereits erfasste Monate
   - Fahrzeugentschaedigung in der Lohnberechnung = erfasste Menge aus den Zeitdaten * zentraler CHF-Ansatz aus `PayrollSettings`
-  - `Ferienentschaedigung` = `FerienentschaedigungRate` * (Basislohn + Zeitzuschlaege + Spezialzuschlag + Fahrzeitentschaedigung)
+  - `Ferienentschaedigung` = altersabhaengiger Satz aus `PayrollSettings` * (Basislohn + Zeitzuschlaege + Spezialzuschlag + Fahrzeitentschaedigung)
+  - Alter wird aus dem Geburtsdatum des Mitarbeitenden auf Basis des Abrechnungsmonats bestimmt; ab 50 Jahren gilt `FerienentschaedigungRateAb50`, sonst `FerienentschaedigungRate`
   - prozentuale Abzuege werden auf den lohnrelevanten Bruttobetrag angewendet
   - `Total Auszahlung` der Voransicht wird analog Excel-Vorlage auf 5 Rappen gerundet
   - die Seite `Lohnlaeufe` kann aus Monatsdaten, Mitarbeitendenstammdaten und `PayrollSettings` ein PDF-Lohnblatt ableiten; der PDF-Kopf verwendet die zentrale Firmenadresse aus den Settings

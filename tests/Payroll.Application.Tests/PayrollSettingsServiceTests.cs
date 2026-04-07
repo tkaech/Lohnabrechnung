@@ -29,7 +29,7 @@ public sealed class PayrollSettingsServiceTests
             "BSD",
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
-            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 1.10m, 2.20m, 3.30m,
+            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit")],
             [new SettingOptionDto(Guid.NewGuid(), "A")],
             [new SettingOptionDto(Guid.NewGuid(), "Schachenstr. 7, Emmenbruecke")]));
@@ -51,6 +51,7 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal(0.00821m, saved.SicknessAccidentInsuranceRate);
         Assert.Equal(0.00015m, saved.TrainingAndHolidayRate);
         Assert.Equal(0.1064m, saved.VacationCompensationRate);
+        Assert.Equal(0.1264m, saved.VacationCompensationRateAge50Plus);
         Assert.Equal(1.10m, saved.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, saved.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, saved.VehicleRegiezone1RateChf);
@@ -82,7 +83,7 @@ public sealed class PayrollSettingsServiceTests
             "PA",
             string.Empty,
             string.Empty,
-            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0m, 0m, 0m, [], [], []);
+            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, [], [], []);
 
         public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
         {
@@ -125,6 +126,7 @@ public sealed class PayrollSettingsServiceTests
                 command.SicknessAccidentInsuranceRate,
                 command.TrainingAndHolidayRate,
                 command.VacationCompensationRate,
+                command.VacationCompensationRateAge50Plus,
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
                 command.VehicleRegiezone1RateChf,

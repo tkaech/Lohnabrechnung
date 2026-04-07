@@ -1,11 +1,11 @@
 using System.Data.Common;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
-using Payroll.Application.BackupRestore;
 using Payroll.Desktop.ViewModels;
 using Payroll.Infrastructure.BackupRestore;
 using Payroll.Infrastructure.Employees;
@@ -18,114 +18,39 @@ namespace Payroll.Desktop.Bootstrapping;
 
 public sealed class AppBootstrapper
 {
-    private const string AppDataDirectoryName = "PayrollApp";
-
-    public MainWindowViewModel CreateMainWindowViewModel()
+    public MainWindowViewModel CreateMainWindowViewModel(DesktopRuntimeOptions runtimeOptions)
     {
-        var isDevelopment = IsDevelopmentEnvironment();
-        var databasePath = GetDatabasePath(isDevelopment);
+        var databasePath = runtimeOptions.DatabasePath;
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory);
+
         var dbContext = CreateDbContext(databasePath);
-        var requiresFreshContext = EnsureDatabaseSchema(dbContext, databasePath, isDevelopment);
-
-        if (requiresFreshContext)
-        {
-            dbContext.Dispose();
-            dbContext = CreateDbContext(databasePath);
-        }
-
-        if (isDevelopment)
-        {
-            EmployeeDevelopmentDataSeeder.Seed(dbContext);
-        }
+        BaselineExistingDatabaseIfNeeded(dbContext);
+        dbContext.Database.Migrate();
+        EnsureCompatibleSchema(dbContext);
 
         var repository = new EmployeeRepository(dbContext);
         var employeeService = new EmployeeService(repository);
         var payrollSettingsRepository = new PayrollSettingsRepository(dbContext);
         var payrollSettingsService = new PayrollSettingsService(payrollSettingsRepository);
+        EnsureConfigurationSeeded(payrollSettingsService);
         var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
-        var backupDirectory = Path.Combine(GetAppDataRootDirectory(), "backups");
+        var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
         var backupRestoreService = new BackupRestoreService(() => CreateDbContext(databasePath), employeeService, monthlyRecordService, payrollSettingsService, backupDirectory);
         var pdfExportService = new PdfExportService();
         var reportingService = new ReportingService(employeeService, monthlyRecordService, payrollSettingsService, pdfExportService);
         var monthlyRecordViewModel = new MonthlyRecordViewModel(monthlyRecordService);
+        var workspaceLabel = $"Datenbank unter `{databasePath}`. Schema wird ueber EF-Migrationen aktualisiert; bestehende Daten bleiben erhalten.";
 
-        var workspaceLabel = isDevelopment
-            ? $"Lokale Entwicklungsdatenbank mit Demo-Mitarbeitenden (`payroll.localdev.db`) unter `{databasePath}`. Produktive Daten bleiben davon getrennt."
-            : $"Produktive Datenbank ohne Demo-Seeddaten (`payroll.db`) unter `{databasePath}`.";
-
-        return new MainWindowViewModel(employeeService, backupRestoreService, payrollSettingsService, reportingService, monthlyRecordViewModel, workspaceLabel);
-    }
-
-    private static bool IsDevelopmentEnvironment()
-    {
-        var environmentName = Environment.GetEnvironmentVariable("PAYROLLAPP_ENVIRONMENT")
-            ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
-            ?? "Development";
-
-        return string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool EnsureDatabaseSchema(PayrollDbContext dbContext, string databasePath, bool isDevelopment)
-    {
-        if (!File.Exists(databasePath))
-        {
-            dbContext.Database.EnsureCreated();
-            return false;
-        }
-
-        TryApplySafeSchemaUpgrades(dbContext);
-
-        if (HasMonthlyRecordSchema(dbContext))
-        {
-            return false;
-        }
-
-        if (isDevelopment && string.Equals(Path.GetFileName(databasePath), "payroll.localdev.db", StringComparison.OrdinalIgnoreCase))
-        {
-            dbContext.Database.CloseConnection();
-            File.Delete(databasePath);
-
-            using var recreatedContext = CreateDbContext(databasePath);
-            recreatedContext.Database.EnsureCreated();
-            return true;
-        }
-
-        var databaseKind = isDevelopment ? "Entwicklungsdatenbank" : "Datenbank";
-        throw new InvalidOperationException(
-            $"{databaseKind} unter '{databasePath}' hat ein nicht unterstuetztes Schema. Die Datei wurde nicht veraendert. Bitte Daten sichern und eine explizite Migration oder einen manuellen Neuaufbau durchfuehren.");
-    }
-
-    private static string GetDatabasePath(bool isDevelopment)
-    {
-        var rootDirectory = GetAppDataRootDirectory();
-        Directory.CreateDirectory(rootDirectory);
-
-        var databaseFileName = isDevelopment ? "payroll.localdev.db" : "payroll.db";
-        return Path.Combine(rootDirectory, databaseFileName);
-    }
-
-    private static string GetAppDataRootDirectory()
-    {
-        var specialFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (!string.IsNullOrWhiteSpace(specialFolderPath))
-        {
-            return Path.Combine(specialFolderPath, AppDataDirectoryName);
-        }
-
-        var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-        if (!string.IsNullOrWhiteSpace(xdgDataHome))
-        {
-            return Path.Combine(xdgDataHome, AppDataDirectoryName);
-        }
-
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (string.IsNullOrWhiteSpace(userProfile))
-        {
-            userProfile = AppContext.BaseDirectory;
-        }
-
-        return Path.Combine(userProfile, ".local", "share", AppDataDirectoryName);
+        return new MainWindowViewModel(
+            employeeService,
+            backupRestoreService,
+            payrollSettingsService,
+            reportingService,
+            monthlyRecordViewModel,
+            workspaceLabel,
+            databasePath,
+            runtimeOptions.EnvironmentName);
     }
 
     private static string BuildConnectionString(string databasePath)
@@ -147,19 +72,8 @@ public sealed class AppBootstrapper
         return new PayrollDbContext(dbContextOptions);
     }
 
-    private static bool HasMonthlyRecordSchema(PayrollDbContext dbContext)
+    private static void BaselineExistingDatabaseIfNeeded(PayrollDbContext dbContext)
     {
-        var requiredTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "EmployeeMonthlyRecords",
-            "TimeEntries",
-            "ExpenseEntries",
-            "PayrollSettings",
-            "DepartmentOptions",
-            "EmploymentCategoryOptions",
-            "EmploymentLocationOptions"
-        };
-
         using var connection = dbContext.Database.GetDbConnection();
         var shouldCloseConnection = connection.State != System.Data.ConnectionState.Open;
         if (shouldCloseConnection)
@@ -169,26 +83,36 @@ public sealed class AppBootstrapper
 
         try
         {
-            using var command = connection.CreateCommand();
-            command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table';";
-
-            using var reader = command.ExecuteReader();
-            while (reader.Read())
+            if (TableExists(connection, "__EFMigrationsHistory"))
             {
-                var tableName = reader.GetString(0);
-                requiredTables.Remove(tableName);
+                return;
             }
 
-            if (requiredTables.Count > 0)
+            if (!HasExistingApplicationTables(connection))
             {
-                return false;
+                return;
             }
 
-            return HasExpectedEmployeeColumns(connection)
-                && HasExpectedEmploymentContractColumns(connection)
-                && HasExpectedExpenseEntryColumns(connection)
-                && HasExpectedTimeEntryColumns(connection)
-                && HasExpectedPayrollSettingsColumns(connection);
+            using var createHistoryCommand = connection.CreateCommand();
+            createHistoryCommand.CommandText =
+                "CREATE TABLE IF NOT EXISTS \"__EFMigrationsHistory\" (\"MigrationId\" TEXT NOT NULL CONSTRAINT \"PK___EFMigrationsHistory\" PRIMARY KEY, \"ProductVersion\" TEXT NOT NULL);";
+            createHistoryCommand.ExecuteNonQuery();
+
+            using var insertBaselineCommand = connection.CreateCommand();
+            insertBaselineCommand.CommandText =
+                "INSERT OR IGNORE INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ($migrationId, $productVersion);";
+
+            var migrationIdParameter = insertBaselineCommand.CreateParameter();
+            migrationIdParameter.ParameterName = "$migrationId";
+            migrationIdParameter.Value = global::Payroll.Infrastructure.Persistence.Migrations.InitialCreate.MigrationIdValue;
+            insertBaselineCommand.Parameters.Add(migrationIdParameter);
+
+            var productVersionParameter = insertBaselineCommand.CreateParameter();
+            productVersionParameter.ParameterName = "$productVersion";
+            productVersionParameter.Value = "8.0.10";
+            insertBaselineCommand.Parameters.Add(productVersionParameter);
+
+            insertBaselineCommand.ExecuteNonQuery();
         }
         finally
         {
@@ -199,45 +123,24 @@ public sealed class AppBootstrapper
         }
     }
 
-    private static void TryApplySafeSchemaUpgrades(PayrollDbContext dbContext)
+    private static void EnsureConfigurationSeeded(PayrollSettingsService payrollSettingsService)
     {
-        using var connection = dbContext.Database.GetDbConnection();
-        var shouldCloseConnection = connection.State != System.Data.ConnectionState.Open;
-        if (shouldCloseConnection)
-        {
-            connection.Open();
-        }
+        payrollSettingsService.GetAsync(CancellationToken.None).GetAwaiter().GetResult();
+    }
 
-        try
+    private static bool HasExistingApplicationTables(DbConnection connection)
+    {
+        var applicationTables = new[]
         {
-            if (TableExists(connection, "PayrollSettings"))
-            {
-                EnsureColumnExists(connection, "PayrollSettings", "CompanyAddress", "TEXT NOT NULL DEFAULT ''");
-                EnsureColumnExists(connection, "PayrollSettings", "AppFontFamily", "TEXT NOT NULL DEFAULT 'Segoe UI, DejaVu Sans, Arial'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppFontSize", "TEXT NOT NULL DEFAULT '13'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppTextColorHex", "TEXT NOT NULL DEFAULT '#FF1A2530'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppMutedTextColorHex", "TEXT NOT NULL DEFAULT '#FF5F6B7A'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppBackgroundColorHex", "TEXT NOT NULL DEFAULT '#FFF5F7FA'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppAccentColorHex", "TEXT NOT NULL DEFAULT '#FF14324A'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppLogoText", "TEXT NOT NULL DEFAULT 'PA'");
-                EnsureColumnExists(connection, "PayrollSettings", "AppLogoPath", "TEXT NOT NULL DEFAULT ''");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintFontFamily", "TEXT NOT NULL DEFAULT 'Helvetica'");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintFontSize", "TEXT NOT NULL DEFAULT '9'");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintTextColorHex", "TEXT NOT NULL DEFAULT '#FF000000'");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintMutedTextColorHex", "TEXT NOT NULL DEFAULT '#FF4B5563'");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintAccentColorHex", "TEXT NOT NULL DEFAULT '#FFFFFF00'");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintLogoText", "TEXT NOT NULL DEFAULT 'PA'");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintLogoPath", "TEXT NOT NULL DEFAULT ''");
-                EnsureColumnExists(connection, "PayrollSettings", "PrintTemplate", "TEXT NOT NULL DEFAULT ''");
-            }
-        }
-        finally
-        {
-            if (shouldCloseConnection)
-            {
-                connection.Close();
-            }
-        }
+            "Employees",
+            "EmploymentContracts",
+            "EmployeeMonthlyRecords",
+            "TimeEntries",
+            "ExpenseEntries",
+            "PayrollSettings"
+        };
+
+        return applicationTables.Any(tableName => TableExists(connection, tableName));
     }
 
     private static bool TableExists(DbConnection connection, string tableName)
@@ -253,212 +156,164 @@ public sealed class AppBootstrapper
         return Convert.ToInt32(command.ExecuteScalar()) > 0;
     }
 
+    private static void EnsureCompatibleSchema(PayrollDbContext dbContext)
+    {
+        using var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != System.Data.ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            connection.Open();
+        }
+
+        try
+        {
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "VacationCompensationRateAge50Plus",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"VacationCompensationRateAge50Plus\" TEXT NOT NULL DEFAULT 0.1064;");
+
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_IsInitialized",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_IsInitialized\" INTEGER NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_CapturedAtUtc",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_CapturedAtUtc\" TEXT NOT NULL DEFAULT '0001-01-01 00:00:00+00:00';");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_NightSupplementRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_NightSupplementRate\" TEXT NULL;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_SundaySupplementRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_SundaySupplementRate\" TEXT NULL;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_HolidaySupplementRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_HolidaySupplementRate\" TEXT NULL;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_AhvIvEoRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_AhvIvEoRate\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_AlvRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_AlvRate\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_SicknessAccidentInsuranceRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_SicknessAccidentInsuranceRate\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_TrainingAndHolidayRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_TrainingAndHolidayRate\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_VacationCompensationRate",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_VacationCompensationRate\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_VacationCompensationRateAge50Plus",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_VacationCompensationRateAge50Plus\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_VehiclePauschalzone1RateChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_VehiclePauschalzone1RateChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_VehiclePauschalzone2RateChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_VehiclePauschalzone2RateChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "PayrollParameterSnapshot_VehicleRegiezone1RateChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"PayrollParameterSnapshot_VehicleRegiezone1RateChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_IsInitialized",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_IsInitialized\" INTEGER NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_CapturedAtUtc",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_CapturedAtUtc\" TEXT NOT NULL DEFAULT '0001-01-01 00:00:00+00:00';");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_ValidFrom",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_ValidFrom\" TEXT NOT NULL DEFAULT '0001-01-01';");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_ValidTo",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_ValidTo\" TEXT NULL;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_HourlyRateChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_HourlyRateChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_MonthlyBvgDeductionChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_MonthlyBvgDeductionChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_SpecialSupplementRateChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_SpecialSupplementRateChf\" TEXT NOT NULL DEFAULT 0;");
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                connection.Close();
+            }
+        }
+    }
+
+    private static void EnsureTableColumn(DbConnection connection, string tableName, string columnName, string addColumnSql)
+    {
+        if (!TableExists(connection, tableName) || ColumnExists(connection, tableName, columnName))
+        {
+            return;
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = addColumnSql;
+        command.ExecuteNonQuery();
+    }
+
     private static bool ColumnExists(DbConnection connection, string tableName, string columnName)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = $"PRAGMA table_info('{tableName}');";
+        command.CommandText = $"PRAGMA table_info(\"{tableName}\");";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(reader["name"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private static void EnsureColumnExists(DbConnection connection, string tableName, string columnName, string columnDefinition)
-    {
-        if (ColumnExists(connection, tableName, columnName))
-        {
-            return;
-        }
-
-        using var command = connection.CreateCommand();
-        command.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
-        command.ExecuteNonQuery();
-    }
-
-    private static bool HasExpectedEmployeeColumns(DbConnection connection)
-    {
-        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Id",
-            "PersonnelNumber",
-            "FirstName",
-            "LastName",
-            "BirthDate",
-            "EntryDate",
-            "ExitDate",
-            "IsActive",
-            "ResidenceCountry",
-            "Nationality",
-            "PermitCode",
-            "TaxStatus",
-            "IsSubjectToWithholdingTax",
-            "AhvNumber",
-            "Iban",
-            "PhoneNumber",
-            "Email",
-            "DepartmentOptionId",
-            "EmploymentCategoryOptionId",
-            "EmploymentLocationOptionId",
-            "Street",
-            "HouseNumber",
-            "AddressLine2",
-            "PostalCode",
-            "City",
-            "Country",
-            "CreatedAtUtc",
-            "UpdatedAtUtc"
-        };
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info('Employees');";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            expectedColumns.Remove(reader.GetString(1));
-        }
-
-        return expectedColumns.Count == 0;
-    }
-
-    private static bool HasExpectedEmploymentContractColumns(DbConnection connection)
-    {
-        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Id",
-            "EmployeeId",
-            "ValidFrom",
-            "ValidTo",
-            "HourlyRateChf",
-            "MonthlyBvgDeductionChf",
-            "SpecialSupplementRateChf",
-            "CreatedAtUtc",
-            "UpdatedAtUtc"
-        };
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info('EmploymentContracts');";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            expectedColumns.Remove(reader.GetString(1));
-        }
-
-        return expectedColumns.Count == 0;
-    }
-
-    private static bool HasExpectedExpenseEntryColumns(DbConnection connection)
-    {
-        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Id",
-            "EmployeeMonthlyRecordId",
-            "EmployeeId",
-            "ExpensesTotalChf",
-            "ExpenseTypeCode",
-            "Description",
-            "CreatedAtUtc",
-            "UpdatedAtUtc"
-        };
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info('ExpenseEntries');";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            expectedColumns.Remove(reader.GetString(1));
-        }
-
-        return expectedColumns.Count == 0;
-    }
-
-    private static bool HasExpectedTimeEntryColumns(DbConnection connection)
-    {
-        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Id",
-            "EmployeeMonthlyRecordId",
-            "EmployeeId",
-            "WorkDate",
-            "HoursWorked",
-            "NightHours",
-            "SundayHours",
-            "HolidayHours",
-            "VehiclePauschalzone1Chf",
-            "VehiclePauschalzone2Chf",
-            "VehicleRegiezone1Chf",
-            "Note",
-            "CreatedAtUtc",
-            "UpdatedAtUtc"
-        };
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info('TimeEntries');";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            expectedColumns.Remove(reader.GetString(1));
-        }
-
-        return expectedColumns.Count == 0;
-    }
-
-    private static bool HasExpectedPayrollSettingsColumns(DbConnection connection)
-    {
-        var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Id",
-            "CompanyAddress",
-            "AppFontFamily",
-            "AppFontSize",
-            "AppTextColorHex",
-            "AppMutedTextColorHex",
-            "AppBackgroundColorHex",
-            "AppAccentColorHex",
-            "AppLogoText",
-            "AppLogoPath",
-            "PrintFontFamily",
-            "PrintFontSize",
-            "PrintTextColorHex",
-            "PrintMutedTextColorHex",
-            "PrintAccentColorHex",
-            "PrintLogoText",
-            "PrintLogoPath",
-            "PrintTemplate",
-            "AhvIvEoRate",
-            "AlvRate",
-            "SicknessAccidentInsuranceRate",
-            "TrainingAndHolidayRate",
-            "VacationCompensationRate",
-            "VehiclePauschalzone1RateChf",
-            "VehiclePauschalzone2RateChf",
-            "VehicleRegiezone1RateChf",
-            "WorkTimeSupplementSettings_NightSupplementRate",
-            "WorkTimeSupplementSettings_SundaySupplementRate",
-            "WorkTimeSupplementSettings_HolidaySupplementRate",
-            "CreatedAtUtc",
-            "UpdatedAtUtc"
-        };
-
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info('PayrollSettings');";
-
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            expectedColumns.Remove(reader.GetString(1));
-        }
-
-        return expectedColumns.Count == 0;
     }
 }

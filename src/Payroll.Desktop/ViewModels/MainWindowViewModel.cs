@@ -28,6 +28,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string BackupTypeConfigurationLabel = "Nur Konfiguration";
     private const string BackupTypeUserDataLabel = "Nur Nutzdaten";
     private const string BackupTypeBothLabel = "Beides";
+    private const string DefaultEnvironmentLabel = "Unbekannt";
+    private static readonly string StartupArgumentsHelpText =
+        "--db-path=/voller/pfad/zur/datei.db" + Environment.NewLine +
+        "--environment=Development|Production|Test";
 
     private readonly EmployeeService _employeeService;
     private readonly IBackupRestoreService _backupRestoreService;
@@ -83,6 +87,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsSicknessAccidentInsuranceRate = string.Empty;
     private string _settingsTrainingAndHolidayRate = string.Empty;
     private string _settingsVacationCompensationRate = string.Empty;
+    private string _settingsVacationCompensationRateAge50Plus = string.Empty;
     private string _settingsVehiclePauschalzone1RateChf = string.Empty;
     private string _settingsVehiclePauschalzone2RateChf = string.Empty;
     private string _settingsVehicleRegiezone1RateChf = string.Empty;
@@ -118,7 +123,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _employeeCountSummary = "Keine Mitarbeitenden geladen.";
     private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
 
-    public MainWindowViewModel(EmployeeService employeeService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel)
+    public MainWindowViewModel(EmployeeService employeeService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
     {
         _employeeService = employeeService;
         _backupRestoreService = backupRestoreService;
@@ -126,6 +131,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         _reportingService = reportingService;
         MonthlyRecord = monthlyRecord;
         WorkspaceLabel = workspaceLabel;
+        DatabasePathDisplay = string.IsNullOrWhiteSpace(databasePath) ? "Kein Pfad verfuegbar." : databasePath;
+        EnvironmentNameDisplay = string.IsNullOrWhiteSpace(environmentName) ? DefaultEnvironmentLabel : environmentName;
         Employees = [];
         DepartmentOptions = [];
         EmploymentCategoryOptions = [];
@@ -166,6 +173,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public string Title => "PayrollApp - Monatserfassung";
     public string WorkspaceLabel { get; }
+    public string DatabasePathDisplay { get; }
+    public string EnvironmentNameDisplay { get; }
+    public string StartupArgumentsHelp => StartupArgumentsHelpText;
     public MonthlyRecordViewModel MonthlyRecord { get; }
     public string AppLogoText
     {
@@ -625,6 +635,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _settingsVacationCompensationRate;
         set => SetProperty(ref _settingsVacationCompensationRate, value);
+    }
+
+    public string SettingsVacationCompensationRateAge50Plus
+    {
+        get => _settingsVacationCompensationRateAge50Plus;
+        set => SetProperty(ref _settingsVacationCompensationRateAge50Plus, value);
     }
 
     public string SettingsVehiclePauschalzone1RateChf
@@ -1095,6 +1111,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ParseRequiredDecimal(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate)),
                 ParseRequiredDecimal(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate)),
                 ParseRequiredDecimal(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
+                ParseRequiredDecimal(SettingsVacationCompensationRateAge50Plus, nameof(SettingsVacationCompensationRateAge50Plus)),
                 ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf)),
                 ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf)),
                 ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf)),
@@ -1622,6 +1639,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsSicknessAccidentInsuranceRate = settings.SicknessAccidentInsuranceRate.ToString("0.#####");
         SettingsTrainingAndHolidayRate = settings.TrainingAndHolidayRate.ToString("0.#####");
         SettingsVacationCompensationRate = settings.VacationCompensationRate.ToString("0.####");
+        SettingsVacationCompensationRateAge50Plus = settings.VacationCompensationRateAge50Plus.ToString("0.####");
         SettingsVehiclePauschalzone1RateChf = settings.VehiclePauschalzone1RateChf.ToString("0.##");
         SettingsVehiclePauschalzone2RateChf = settings.VehiclePauschalzone2RateChf.ToString("0.##");
         SettingsVehicleRegiezone1RateChf = settings.VehicleRegiezone1RateChf.ToString("0.##");

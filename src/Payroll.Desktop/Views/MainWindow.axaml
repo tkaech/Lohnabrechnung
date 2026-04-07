@@ -148,6 +148,31 @@
           <Grid RowDefinitions="Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
             <TabControl>
+              <TabItem Header="System / DB">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                  <TextBlock FontWeight="SemiBold" Text="Aktive Datenbank" />
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                      <TextBlock Classes="section-caption" Text="Environment" />
+                      <TextBox Text="{Binding EnvironmentNameDisplay}" IsReadOnly="True" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                      <TextBlock Classes="section-caption" Text="Aktiver DB-Pfad" />
+                      <TextBox Text="{Binding DatabasePathDisplay}" IsReadOnly="True" />
+                    </StackPanel>
+                  </Grid>
+
+                  <TextBlock FontWeight="SemiBold" Text="Startparameter" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Der DB-Pfad wird beim Start geladen. Ueberschreibungen erfolgen nicht in den Fach-Settings, sondern ueber appsettings, ENV oder Startparameter." TextWrapping="Wrap" />
+                  <StackPanel Spacing="4">
+                    <TextBlock Classes="section-caption" Text="Moegliche Startparameter" />
+                    <TextBox Text="{Binding StartupArgumentsHelp}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Courier New, DejaVu Sans Mono, Consolas" />
+                  </StackPanel>
+                  <TextBlock Foreground="#FF5F6B7A" Text="ENV-Override: `PAYROLLAPP_DATABASE_PATH=/voller/pfad/zur/datei.db`" TextWrapping="Wrap" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Appsettings: `src/Payroll.Desktop/appsettings.json` und `appsettings.Development.json`." TextWrapping="Wrap" />
+                </StackPanel>
+              </TabItem>
+
               <TabItem Header="Layout">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="App allgemein" />
@@ -264,7 +289,7 @@
 
                   <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden in der Lohnberechnung zentral auf den lohnrelevanten Bruttobetrag angewendet." TextWrapping="Wrap" />
-                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
                     <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
                       <TextBlock Classes="section-caption" Text="AHV/IV/EO" />
                       <TextBox Text="{Binding SettingsAhvIvEoRate, Mode=TwoWay}" Watermark="0.053" />
@@ -284,6 +309,10 @@
                     <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
                       <TextBlock Classes="section-caption" Text="Ferienentschaedigung" />
                       <TextBox Text="{Binding SettingsVacationCompensationRate, Mode=TwoWay}" Watermark="0.1064" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                      <TextBlock Classes="section-caption" Text="Ferienentschaedigung ab 50 Jahren" />
+                      <TextBox Text="{Binding SettingsVacationCompensationRateAge50Plus, Mode=TwoWay}" Watermark="0.1064" />
                     </StackPanel>
                   </Grid>
 
@@ -880,7 +909,7 @@
                 <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Foreground="#FF5F6B7A" Text="{Binding PayrollPreviewSummary}" TextWrapping="Wrap" />
               </Grid>
 
-                <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10">
+                <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10" IsVisible="{Binding HasPayrollPreviewLines}">
                   <StackPanel Spacing="8">
                     <Grid ColumnDefinitions="2.2*,1.1*,1.2*,1.1*">
                       <TextBlock FontWeight="SemiBold" Text="Position" />

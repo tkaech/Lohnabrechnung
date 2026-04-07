@@ -60,6 +60,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
             sicknessAccidentInsuranceRate: 0.00821m,
             trainingAndHolidayRate: 0.00015m,
             vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
             vehiclePauschalzone1RateChf: 5.6m,
             vehiclePauschalzone2RateChf: 16.8m,
             vehicleRegiezone1RateChf: 0.32m));
@@ -86,6 +87,151 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.Equal(18.50m, details.Header.TotalExpensesChf);
         Assert.Equal(260m, details.Header.TotalVehicleCompensationChf);
         Assert.Equal(120m, details.TimeEntries.Single().VehiclePauschalzone1Chf);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_UsesStoredMonthlyPayrollParameterSnapshot_AfterGlobalSettingsChange()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, 120m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var currentSettings = await dbContext.PayrollSettings.SingleAsync();
+        currentSettings.UpdateWorkTimeSupplementSettings(new WorkTimeSupplementSettings(0.75m, 0.90m, 1.20m));
+        currentSettings.UpdateDeductionAndVehicleRates(
+            0.06m,
+            0.02m,
+            0.01m,
+            0.0003m,
+            0.12m,
+            0.14m,
+            99m,
+            88m,
+            77m);
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.AmountDisplay == "8.13 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "0.1064");
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_UsesStoredMonthlyContractSnapshot_AfterContractChange()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        var originalContract = new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m);
+        dbContext.EmploymentContracts.Add(originalContract);
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        dbContext.EmploymentContracts.Remove(originalContract);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 6, 1), null, 45m, 500m, 6m));
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24.00 CHF");
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_WithoutTimeEntries_ReturnsOnlyMonthNotRecordedHint()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveExpenseEntry(18.50m);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Empty(details!.PayrollPreview.Lines);
+        Assert.Single(details.PayrollPreview.Notes, note => note == "Monat noch nicht erfasst");
     }
 
     [Fact]

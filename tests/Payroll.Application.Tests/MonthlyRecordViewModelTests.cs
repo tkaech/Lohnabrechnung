@@ -72,7 +72,8 @@ public sealed class MonthlyRecordViewModelTests
 
         Assert.Equal("40.00", viewModel.ExpensesTotal);
         Assert.Contains("Spesen 40.00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
-        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "40.00 CHF");
+        Assert.False(viewModel.HasPayrollPreviewLines);
+        Assert.Single(viewModel.PayrollPreviewNotes, note => note == "Monat noch nicht erfasst");
     }
 
     [Fact]
@@ -185,7 +186,7 @@ public sealed class MonthlyRecordViewModelTests
         await WaitUntilAsync(() => viewModel.TimeEntryHistory.Count == 2);
 
         await viewModel.ActivateMonthFromTimeEntryAsync(viewModel.TimeEntryHistory[0]);
-        await WaitUntilAsync(() => viewModel.TimePayrollMonth == "04/2026");
+        await WaitUntilAsync(() => viewModel.TimePayrollMonth == "04/2026" && viewModel.SelectedTimeEntry is not null);
 
         Assert.Equal("04/2026", viewModel.TimePayrollMonth);
         Assert.Single(viewModel.TimeEntries);
@@ -218,7 +219,7 @@ public sealed class MonthlyRecordViewModelTests
         await WaitUntilAsync(() => viewModel.ExpenseEntryHistory.Count == 2);
 
         await viewModel.ActivateMonthFromExpenseEntryAsync(viewModel.ExpenseEntryHistory[0]);
-        await WaitUntilAsync(() => viewModel.ExpensePayrollMonth == "04/2026");
+        await WaitUntilAsync(() => viewModel.ExpensePayrollMonth == "04/2026" && viewModel.SelectedExpenseEntry is not null);
 
         Assert.Equal("04/2026", viewModel.ExpensePayrollMonth);
         Assert.Equal("18.50", viewModel.ExpensesTotal);
@@ -249,6 +250,21 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Basislohn" && line.AmountDisplay == "240.00 CHF");
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "AHV-pflichtiger Bruttolohn" && line.AmountDisplay == "240.00 CHF");
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Total Auszahlung");
+    }
+
+    [Fact]
+    public async Task PayrollPreview_WithoutTimeEntries_ShowsMonthNotRecordedHintOnly()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Nina NochNichtErfasst");
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        await viewModel.SetEmployeeAsync(employeeId, "Nina NochNichtErfasst");
+
+        Assert.False(viewModel.HasPayrollPreviewLines);
+        Assert.Equal("Monat noch nicht erfasst", viewModel.PayrollPreviewSummary);
+        Assert.Single(viewModel.PayrollPreviewNotes, note => note == "Monat noch nicht erfasst");
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
@@ -370,6 +386,11 @@ public sealed class MonthlyRecordViewModelTests
 
         private static MonthlyPayrollPreviewDto BuildPayrollPreview(EmployeeMonthlyRecord record)
         {
+            if (record.TimeEntries.Count == 0)
+            {
+                return new MonthlyPayrollPreviewDto([], ["Monat noch nicht erfasst"]);
+            }
+
             var baseAmount = record.TimeEntries.Sum(item => item.HoursWorked) * 30m;
             var expenses = record.ExpenseEntry?.ExpensesTotalChf ?? 0m;
 

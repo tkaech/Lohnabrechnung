@@ -3,6 +3,12 @@
 Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel-Analyse abgeleitet.
 
 ## Session Abschluss
+- DB-Startpfad aus hart codierter Bootstrapper-Logik geloest und ueber `appsettings.json` bzw. `appsettings.Development.json` konfigurierbar gemacht
+- zusaetzliche Ueberschreibung des DB-Pfads per `PAYROLLAPP_DATABASE_PATH` oder Startparameter `--db-path=...` ergänzt
+- Desktop-Startup von automatischer Reset-/Seed-Logik befreit; Datenbanken werden nicht mehr geloescht oder mit Demo-Daten befuellt
+- EF-Migrationspfad fuer SQLite eingefuehrt und Startup auf `Database.Migrate()` umgestellt
+- Baseline-Logik fuer bestehende Datenbanken ohne `__EFMigrationsHistory` ergänzt, damit vorhandene Daten beim Umstieg auf Migrationen erhalten bleiben
+- Windows-Testpfad ueber `appsettings.json` auf `{LocalAppData}/PayrollApp/payroll.test.db` vorbereitet; beim ersten Start werden nur Konfigurationsdaten initialisiert, bestehende DBs bleiben bei spaeteren Starts unveraendert
 - `Einstellungen` um einen eigenen Unterbereich `Backup / Restore` erweitert
 - Backup/Restore als gekapselten Application-/Infrastructure-Service eingefuehrt, mit klarer Trennung der Sicherungsarten `nur Konfiguration`, `nur Nutzdaten` und `beides`
 - JSON-basierte Sicherungsdatei mit Zeitstempel-Dateiname und Restore-Validierung fuer passende Sicherungsart ergänzt
@@ -22,7 +28,8 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - gezielte Domain-, Service-, ViewModel- und SQLite-Tests fuer den neuen Employee-/Settings-Schnitt ergänzt bzw. angepasst
 - Lohn-Voransicht fuer den aktuell gewaehlten Mitarbeitenden und Monat in der Monatserfassung ergänzt, fachlich an der Excel-Struktur aus dem Register `BleR` orientiert
 - Voransicht berechnet jetzt Basislohn, ableitbare Zeitzuschlaege, drei Fahrzeitentschaedigungen, AHV-pflichtigen Bruttolohn, zentrale Abzuege, optionales BVG, Spesen und `Total Auszahlung`
-- `Total Auszahlung` in der Voransicht analog Excel auf 5 Rappen gerundet; `Spezialzuschlag gemaess Vertrag` ist jetzt als CHF-Betrag pro Arbeitsstunde im Vertragsstand modelliert und `Ferienentschaedigung` wird ueber eine zentrale `FerienentschaedigungRate` aus den globalen Settings berechnet
+- `Total Auszahlung` in der Voransicht analog Excel auf 5 Rappen gerundet; `Spezialzuschlag gemaess Vertrag` ist jetzt als CHF-Betrag pro Arbeitsstunde im Vertragsstand modelliert und `Ferienentschaedigung` wird ueber zentrale altersabhaengige Settings-Saetze aus den globalen Settings berechnet
+- Monatserfassung um einen Snapshot der lohnrelevanten Berechnungsparameter pro `EmployeeMonthlyRecord` erweitert; Payroll-Vorschau und Berechnung verwenden fuer bestehende Monate jetzt die im Monat gespeicherten Parameter statt spaeter geaenderter globaler Settings
 - SQLite-Dateien werden nicht mehr relativ im Programmverzeichnis angelegt, sondern plattformtauglich in einem expliziten Benutzerdatenordner abgelegt; bestehende Datenbanken werden bei Schemaabweichungen nicht mehr still geloescht
 - globale Payroll-Settings um zentrale Abzugsparameter fuer `AHV/IV/EO`, `ALV`, `Krankentaggeld/UVG` und `Aus- und Weiterbildung inkl. Ferien` erweitert
 - zentrale CHF-Ansatzwerte fuer `Pauschalzone 1`, `Pauschalzone 2` und `Regiezone 1` in `PayrollSettings` ergänzt und im Settings-Tab pflegbar gemacht

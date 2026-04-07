@@ -10,6 +10,7 @@ public sealed class PayrollSettings : AuditableEntity
     public const decimal DefaultSicknessAccidentInsuranceRate = 0.00821m;
     public const decimal DefaultTrainingAndHolidayRate = 0.00015m;
     public const decimal DefaultVacationCompensationRate = 0.1064m;
+    public const decimal DefaultVacationCompensationRateAge50Plus = 0.1064m;
     public const string DefaultAppFontFamily = "Segoe UI, DejaVu Sans, Arial";
     public const decimal DefaultAppFontSize = 13m;
     public const string DefaultAppTextColorHex = "#FF1A2530";
@@ -50,6 +51,7 @@ public sealed class PayrollSettings : AuditableEntity
         SicknessAccidentInsuranceRate = DefaultSicknessAccidentInsuranceRate;
         TrainingAndHolidayRate = DefaultTrainingAndHolidayRate;
         VacationCompensationRate = DefaultVacationCompensationRate;
+        VacationCompensationRateAge50Plus = DefaultVacationCompensationRateAge50Plus;
     }
 
     public PayrollSettings(
@@ -60,6 +62,7 @@ public sealed class PayrollSettings : AuditableEntity
         decimal sicknessAccidentInsuranceRate = DefaultSicknessAccidentInsuranceRate,
         decimal trainingAndHolidayRate = DefaultTrainingAndHolidayRate,
         decimal vacationCompensationRate = DefaultVacationCompensationRate,
+        decimal vacationCompensationRateAge50Plus = DefaultVacationCompensationRateAge50Plus,
         decimal vehiclePauschalzone1RateChf = 0m,
         decimal vehiclePauschalzone2RateChf = 0m,
         decimal vehicleRegiezone1RateChf = 0m)
@@ -88,6 +91,7 @@ public sealed class PayrollSettings : AuditableEntity
             sicknessAccidentInsuranceRate,
             trainingAndHolidayRate,
             vacationCompensationRate,
+            vacationCompensationRateAge50Plus,
             vehiclePauschalzone1RateChf,
             vehiclePauschalzone2RateChf,
             vehicleRegiezone1RateChf);
@@ -116,6 +120,7 @@ public sealed class PayrollSettings : AuditableEntity
     public decimal SicknessAccidentInsuranceRate { get; private set; }
     public decimal TrainingAndHolidayRate { get; private set; }
     public decimal VacationCompensationRate { get; private set; }
+    public decimal VacationCompensationRateAge50Plus { get; private set; }
     public decimal VehiclePauschalzone1RateChf { get; private set; }
     public decimal VehiclePauschalzone2RateChf { get; private set; }
     public decimal VehicleRegiezone1RateChf { get; private set; }
@@ -175,6 +180,7 @@ public sealed class PayrollSettings : AuditableEntity
         decimal sicknessAccidentInsuranceRate,
         decimal trainingAndHolidayRate,
         decimal vacationCompensationRate,
+        decimal vacationCompensationRateAge50Plus,
         decimal vehiclePauschalzone1RateChf,
         decimal vehiclePauschalzone2RateChf,
         decimal vehicleRegiezone1RateChf)
@@ -184,10 +190,29 @@ public sealed class PayrollSettings : AuditableEntity
         SicknessAccidentInsuranceRate = Guard.AgainstNegative(sicknessAccidentInsuranceRate, nameof(sicknessAccidentInsuranceRate));
         TrainingAndHolidayRate = Guard.AgainstNegative(trainingAndHolidayRate, nameof(trainingAndHolidayRate));
         VacationCompensationRate = Guard.AgainstNegative(vacationCompensationRate, nameof(vacationCompensationRate));
+        VacationCompensationRateAge50Plus = Guard.AgainstNegative(vacationCompensationRateAge50Plus, nameof(vacationCompensationRateAge50Plus));
         VehiclePauschalzone1RateChf = Guard.AgainstNegative(vehiclePauschalzone1RateChf, nameof(vehiclePauschalzone1RateChf));
         VehiclePauschalzone2RateChf = Guard.AgainstNegative(vehiclePauschalzone2RateChf, nameof(vehiclePauschalzone2RateChf));
         VehicleRegiezone1RateChf = Guard.AgainstNegative(vehicleRegiezone1RateChf, nameof(vehicleRegiezone1RateChf));
         Touch();
+    }
+
+    public decimal GetVacationCompensationRate(DateOnly? birthDate, DateOnly payrollReferenceDate)
+    {
+        if (!birthDate.HasValue)
+        {
+            return VacationCompensationRate;
+        }
+
+        var age = payrollReferenceDate.Year - birthDate.Value.Year;
+        if (new DateOnly(payrollReferenceDate.Year, birthDate.Value.Month, birthDate.Value.Day) > payrollReferenceDate)
+        {
+            age--;
+        }
+
+        return age >= 50
+            ? VacationCompensationRateAge50Plus
+            : VacationCompensationRate;
     }
 
     public void UpdatePrintTemplate(string? printTemplate)

@@ -259,6 +259,7 @@ public sealed class BackupRestoreService : IBackupRestoreService
             settings.SicknessAccidentInsuranceRate,
             settings.TrainingAndHolidayRate,
             settings.VacationCompensationRate,
+            settings.VacationCompensationRateAge50Plus,
             settings.VehiclePauschalzone1RateChf,
             settings.VehiclePauschalzone2RateChf,
             settings.VehicleRegiezone1RateChf,

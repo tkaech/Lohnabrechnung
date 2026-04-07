@@ -113,6 +113,7 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(settings => settings.SicknessAccidentInsuranceRate).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.TrainingAndHolidayRate).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.VacationCompensationRate).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.VacationCompensationRateAge50Plus).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.VehiclePauschalzone1RateChf).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.VehiclePauschalzone2RateChf).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.VehicleRegiezone1RateChf).HasColumnType("TEXT").IsRequired();
@@ -172,6 +173,73 @@ public sealed class PayrollDbContext : DbContext
                 .WithOne()
                 .HasForeignKey<ExpenseEntry>(entry => entry.EmployeeMonthlyRecordId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.OwnsOne(record => record.PayrollParameterSnapshot, snapshotBuilder =>
+            {
+                snapshotBuilder.Property(item => item.IsInitialized)
+                    .HasColumnName("PayrollParameterSnapshot_IsInitialized")
+                    .IsRequired();
+                snapshotBuilder.Property(item => item.CapturedAtUtc)
+                    .HasColumnName("PayrollParameterSnapshot_CapturedAtUtc");
+                snapshotBuilder.Property(item => item.NightSupplementRate)
+                    .HasColumnName("PayrollParameterSnapshot_NightSupplementRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.SundaySupplementRate)
+                    .HasColumnName("PayrollParameterSnapshot_SundaySupplementRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.HolidaySupplementRate)
+                    .HasColumnName("PayrollParameterSnapshot_HolidaySupplementRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.AhvIvEoRate)
+                    .HasColumnName("PayrollParameterSnapshot_AhvIvEoRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.AlvRate)
+                    .HasColumnName("PayrollParameterSnapshot_AlvRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.SicknessAccidentInsuranceRate)
+                    .HasColumnName("PayrollParameterSnapshot_SicknessAccidentInsuranceRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.TrainingAndHolidayRate)
+                    .HasColumnName("PayrollParameterSnapshot_TrainingAndHolidayRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.VacationCompensationRate)
+                    .HasColumnName("PayrollParameterSnapshot_VacationCompensationRate")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.VacationCompensationRateAge50Plus)
+                    .HasColumnName("PayrollParameterSnapshot_VacationCompensationRateAge50Plus")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.VehiclePauschalzone1RateChf)
+                    .HasColumnName("PayrollParameterSnapshot_VehiclePauschalzone1RateChf")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.VehiclePauschalzone2RateChf)
+                    .HasColumnName("PayrollParameterSnapshot_VehiclePauschalzone2RateChf")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.VehicleRegiezone1RateChf)
+                    .HasColumnName("PayrollParameterSnapshot_VehicleRegiezone1RateChf")
+                    .HasColumnType("TEXT");
+            });
+
+            builder.OwnsOne(record => record.EmploymentContractSnapshot, snapshotBuilder =>
+            {
+                snapshotBuilder.Property(item => item.IsInitialized)
+                    .HasColumnName("EmploymentContractSnapshot_IsInitialized")
+                    .IsRequired();
+                snapshotBuilder.Property(item => item.CapturedAtUtc)
+                    .HasColumnName("EmploymentContractSnapshot_CapturedAtUtc");
+                snapshotBuilder.Property(item => item.ValidFrom)
+                    .HasColumnName("EmploymentContractSnapshot_ValidFrom");
+                snapshotBuilder.Property(item => item.ValidTo)
+                    .HasColumnName("EmploymentContractSnapshot_ValidTo");
+                snapshotBuilder.Property(item => item.HourlyRateChf)
+                    .HasColumnName("EmploymentContractSnapshot_HourlyRateChf")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.MonthlyBvgDeductionChf)
+                    .HasColumnName("EmploymentContractSnapshot_MonthlyBvgDeductionChf")
+                    .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.SpecialSupplementRateChf)
+                    .HasColumnName("EmploymentContractSnapshot_SpecialSupplementRateChf")
+                    .HasColumnType("TEXT");
+            });
         });
 
         modelBuilder.Entity<TimeEntry>(builder =>

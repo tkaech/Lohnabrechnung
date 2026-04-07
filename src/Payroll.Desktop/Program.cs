@@ -9,6 +9,7 @@ public static class Program
     {
         try
         {
+            global::Payroll.Desktop.Bootstrapping.StartupArguments.Set(args);
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception exception)

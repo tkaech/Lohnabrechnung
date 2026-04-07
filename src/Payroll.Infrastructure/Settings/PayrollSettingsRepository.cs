@@ -68,6 +68,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.SicknessAccidentInsuranceRate,
             command.TrainingAndHolidayRate,
             command.VacationCompensationRate,
+            command.VacationCompensationRateAge50Plus,
             command.VehiclePauschalzone1RateChf,
             command.VehiclePauschalzone2RateChf,
             command.VehicleRegiezone1RateChf);
@@ -161,6 +162,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             settings.SicknessAccidentInsuranceRate,
             settings.TrainingAndHolidayRate,
             settings.VacationCompensationRate,
+            settings.VacationCompensationRateAge50Plus,
             settings.VehiclePauschalzone1RateChf,
             settings.VehiclePauschalzone2RateChf,
             settings.VehicleRegiezone1RateChf,

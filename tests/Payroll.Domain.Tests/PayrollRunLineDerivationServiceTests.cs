@@ -47,6 +47,7 @@ public sealed class PayrollRunLineDerivationServiceTests
 
         var result = service.DeriveForEmployee(
             new DateOnly(2026, 3, 31),
+            null,
             contract,
             payrollSettings,
             workSummary,
@@ -90,6 +91,7 @@ public sealed class PayrollRunLineDerivationServiceTests
 
         var result = service.DeriveForEmployee(
             new DateOnly(2026, 3, 31),
+            null,
             contract,
             new PayrollSettings(
                 workTimeSupplementSettings: new WorkTimeSupplementSettings(null, 0.50m, null),
@@ -98,6 +100,7 @@ public sealed class PayrollRunLineDerivationServiceTests
                 sicknessAccidentInsuranceRate: 0.00821m,
                 trainingAndHolidayRate: 0.00015m,
                 vacationCompensationRate: 0.1064m,
+                vacationCompensationRateAge50Plus: 0.1264m,
                 vehiclePauschalzone1RateChf: 1m,
                 vehiclePauschalzone2RateChf: 1m,
                 vehicleRegiezone1RateChf: 1m),
@@ -152,6 +155,7 @@ public sealed class PayrollRunLineDerivationServiceTests
 
         var result = service.DeriveForEmployee(
             new DateOnly(2026, 3, 31),
+            null,
             contract,
             new PayrollSettings(
                 workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
@@ -160,6 +164,7 @@ public sealed class PayrollRunLineDerivationServiceTests
                 sicknessAccidentInsuranceRate: 0.00821m,
                 trainingAndHolidayRate: 0.00015m,
                 vacationCompensationRate: 0.1064m,
+                vacationCompensationRateAge50Plus: 0.1264m,
                 vehiclePauschalzone1RateChf: 1m,
                 vehiclePauschalzone2RateChf: 1m,
                 vehicleRegiezone1RateChf: 1m),
@@ -173,5 +178,49 @@ public sealed class PayrollRunLineDerivationServiceTests
         Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.HolidaySupplement);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.BaseHours);
         Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.BvgDeduction);
+    }
+
+    [Fact]
+    public void DeriveForEmployee_UsesAge50PlusVacationCompensationRate_WhenEmployeeIsAtLeast50()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(
+            employeeId,
+            new DateOnly(2026, 1, 1),
+            null,
+            30m,
+            0m,
+            3.00m);
+
+        var timeEntries = new[]
+        {
+            new TimeEntry(employeeId, new DateOnly(2026, 3, 6), 10m, 0m, 0m, 0m)
+        };
+        var workSummary = PayrollWorkSummary.FromTimeEntries(employeeId, timeEntries);
+        var payrollSettings = new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 1m,
+            vehiclePauschalzone2RateChf: 1m,
+            vehicleRegiezone1RateChf: 1m);
+
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            new DateOnly(1970, 3, 1),
+            contract,
+            payrollSettings,
+            workSummary,
+            [],
+            timeEntries);
+
+        var vacationCompensationLine = Assert.Single(result.Lines, line => line.LineType == PayrollLineType.VacationCompensation);
+        Assert.Equal(41.712m, vacationCompensationLine.AmountChf);
     }
 }
