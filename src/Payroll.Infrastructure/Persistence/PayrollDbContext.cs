@@ -18,6 +18,9 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<EmploymentContract> EmploymentContracts => Set<EmploymentContract>();
     public DbSet<EmployeeMonthlyRecord> EmployeeMonthlyRecords => Set<EmployeeMonthlyRecord>();
     public DbSet<PayrollSettings> PayrollSettings => Set<PayrollSettings>();
+    public DbSet<DepartmentOption> DepartmentOptions => Set<DepartmentOption>();
+    public DbSet<EmploymentCategoryOption> EmploymentCategoryOptions => Set<EmploymentCategoryOption>();
+    public DbSet<EmploymentLocationOption> EmploymentLocationOptions => Set<EmploymentLocationOption>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
 
@@ -42,6 +45,9 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(employee => employee.Iban).HasMaxLength(50);
             builder.Property(employee => employee.PhoneNumber).HasMaxLength(50);
             builder.Property(employee => employee.Email).HasMaxLength(200);
+            builder.Property(employee => employee.DepartmentOptionId);
+            builder.Property(employee => employee.EmploymentCategoryOptionId);
+            builder.Property(employee => employee.EmploymentLocationOptionId);
             builder.OwnsOne(employee => employee.Address, addressBuilder =>
             {
                 addressBuilder.Property(address => address.Street).HasColumnName("Street").HasMaxLength(150).IsRequired();
@@ -51,6 +57,18 @@ public sealed class PayrollDbContext : DbContext
                 addressBuilder.Property(address => address.City).HasColumnName("City").HasMaxLength(100).IsRequired();
                 addressBuilder.Property(address => address.Country).HasColumnName("Country").HasMaxLength(100).IsRequired();
             });
+            builder.HasOne<DepartmentOption>()
+                .WithMany()
+                .HasForeignKey(employee => employee.DepartmentOptionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne<EmploymentCategoryOption>()
+                .WithMany()
+                .HasForeignKey(employee => employee.EmploymentCategoryOptionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne<EmploymentLocationOption>()
+                .WithMany()
+                .HasForeignKey(employee => employee.EmploymentLocationOptionId)
+                .OnDelete(DeleteBehavior.Restrict);
             builder.HasIndex(employee => employee.PersonnelNumber).IsUnique();
         });
 
@@ -73,6 +91,23 @@ public sealed class PayrollDbContext : DbContext
         {
             builder.ToTable("PayrollSettings");
             builder.HasKey(settings => settings.Id);
+            builder.Property(settings => settings.CompanyAddress).HasMaxLength(2000).IsRequired();
+            builder.Property(settings => settings.AppFontFamily).HasMaxLength(500).IsRequired();
+            builder.Property(settings => settings.AppFontSize).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.AppTextColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.AppMutedTextColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.AppBackgroundColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.AppAccentColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.AppLogoText).HasMaxLength(200).IsRequired();
+            builder.Property(settings => settings.AppLogoPath).HasMaxLength(1000).IsRequired();
+            builder.Property(settings => settings.PrintFontFamily).HasMaxLength(500).IsRequired();
+            builder.Property(settings => settings.PrintFontSize).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.PrintTextColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.PrintMutedTextColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.PrintAccentColorHex).HasMaxLength(20).IsRequired();
+            builder.Property(settings => settings.PrintLogoText).HasMaxLength(200).IsRequired();
+            builder.Property(settings => settings.PrintLogoPath).HasMaxLength(1000).IsRequired();
+            builder.Property(settings => settings.PrintTemplate).HasMaxLength(20000).IsRequired();
             builder.Property(settings => settings.AhvIvEoRate).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.AlvRate).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.SicknessAccidentInsuranceRate).HasColumnType("TEXT").IsRequired();
@@ -87,6 +122,30 @@ public sealed class PayrollDbContext : DbContext
                 supplementBuilder.Property(item => item.SundaySupplementRate).HasColumnType("TEXT");
                 supplementBuilder.Property(item => item.HolidaySupplementRate).HasColumnType("TEXT");
             });
+        });
+
+        modelBuilder.Entity<DepartmentOption>(builder =>
+        {
+            builder.ToTable("DepartmentOptions");
+            builder.HasKey(option => option.Id);
+            builder.Property(option => option.Name).HasMaxLength(200).IsRequired();
+            builder.HasIndex(option => option.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<EmploymentCategoryOption>(builder =>
+        {
+            builder.ToTable("EmploymentCategoryOptions");
+            builder.HasKey(option => option.Id);
+            builder.Property(option => option.Name).HasMaxLength(200).IsRequired();
+            builder.HasIndex(option => option.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<EmploymentLocationOption>(builder =>
+        {
+            builder.ToTable("EmploymentLocationOptions");
+            builder.HasKey(option => option.Id);
+            builder.Property(option => option.Name).HasMaxLength(200).IsRequired();
+            builder.HasIndex(option => option.Name).IsUnique();
         });
 
         modelBuilder.Entity<EmployeeMonthlyRecord>(builder =>

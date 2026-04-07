@@ -32,6 +32,9 @@ public sealed class Employee : AuditableEntity
     public string? Iban { get; private set; }
     public string? PhoneNumber { get; private set; }
     public string? Email { get; private set; }
+    public Guid? DepartmentOptionId { get; private set; }
+    public Guid? EmploymentCategoryOptionId { get; private set; }
+    public Guid? EmploymentLocationOptionId { get; private set; }
 
     public Employee(
         string personnelNumber,
@@ -50,7 +53,10 @@ public sealed class Employee : AuditableEntity
         string? ahvNumber,
         string? iban,
         string? phoneNumber,
-        string? email)
+        string? email,
+        Guid? departmentOptionId,
+        Guid? employmentCategoryOptionId,
+        Guid? employmentLocationOptionId)
     {
         ApplyCoreData(
             personnelNumber,
@@ -69,7 +75,10 @@ public sealed class Employee : AuditableEntity
             ahvNumber,
             iban,
             phoneNumber,
-            email);
+            email,
+            departmentOptionId,
+            employmentCategoryOptionId,
+            employmentLocationOptionId);
     }
 
     public void Rename(string firstName, string lastName)
@@ -102,7 +111,10 @@ public sealed class Employee : AuditableEntity
         string? ahvNumber,
         string? iban,
         string? phoneNumber,
-        string? email)
+        string? email,
+        Guid? departmentOptionId,
+        Guid? employmentCategoryOptionId,
+        Guid? employmentLocationOptionId)
     {
         ApplyCoreData(
             personnelNumber,
@@ -121,7 +133,10 @@ public sealed class Employee : AuditableEntity
             ahvNumber,
             iban,
             phoneNumber,
-            email);
+            email,
+            departmentOptionId,
+            employmentCategoryOptionId,
+            employmentLocationOptionId);
         Touch();
     }
 
@@ -156,7 +171,10 @@ public sealed class Employee : AuditableEntity
         string? ahvNumber,
         string? iban,
         string? phoneNumber,
-        string? email)
+        string? email,
+        Guid? departmentOptionId,
+        Guid? employmentCategoryOptionId,
+        Guid? employmentLocationOptionId)
     {
         ArgumentNullException.ThrowIfNull(address);
         var normalizedExitDate = isActive ? null : exitDate;
@@ -179,6 +197,9 @@ public sealed class Employee : AuditableEntity
         Iban = NormalizeOptional(iban);
         PhoneNumber = NormalizeOptional(phoneNumber);
         Email = NormalizeOptional(email);
+        DepartmentOptionId = departmentOptionId;
+        EmploymentCategoryOptionId = employmentCategoryOptionId;
+        EmploymentLocationOptionId = employmentLocationOptionId;
     }
 
     private static void ValidateDates(DateOnly? birthDate, DateOnly entryDate, DateOnly? exitDate)

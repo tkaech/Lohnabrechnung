@@ -3,12 +3,53 @@
 ## Ziel
 Konsistentes Layout und Verhalten.
 
+## Zentrale Style-Bereiche
+
+- App allgemein
+  - Markenname
+  - optionale Logo-Konfiguration
+  - Grundschrift
+  - Standard-Schriftgroessen
+  - App-Hintergrund und Standard-Textfarbe
+- Navigation
+  - aktive Navigation
+  - inaktive Navigation
+  - Navigationsflaechen und Rahmen
+- Seitenueberschriften
+  - App-Titel
+  - Seitenkopf
+  - einleitende Beschreibungstexte
+- Bereichsueberschriften
+  - Card-/Section-Header
+  - kleinere Feld- und Gruppenbeschriftungen
+- Formulare / Eingabefelder
+  - Oberflaechenfarben
+  - Card-/Panel-Stile
+  - visuelle Gruppierung von Eingabebereichen
+- Tabellen / Listen
+  - ruhige Standardflaechen
+  - hervorgehobene Summen-/Statusbereiche
+- Status / Hinweise / Meldungen
+  - neutrale Hinweistexte
+  - Status-/Warnflaechen
+- Buttons / Aktionen
+  - primaere Aktionen
+  - destruktive Aktionen
+  - Platzhalter-/Sekundaeraktionen
+- Druck / Print
+  - eigene Print-Fontfamilie
+  - eigene Print-Schriftgroessen
+  - eigene Print-Farben
+  - eigenes Logo-/Branding-Token fuer Ausdrucke
+
 ## Regeln
 
 - einheitliche Abstände
 - einheitliche Typografie
 - einheitliche Farben
 - gleiche Komponenten überall
+- Bildschirm- und Druckstil werden getrennt vorbereitet und nicht hart gekoppelt
+- Logo, Brand-Text und spaetere Report-Stile werden zentral statt direkt in Views gepflegt
 
 ## Standard Controls
 
@@ -60,3 +101,10 @@ Konsistentes Layout und Verhalten.
 ## Prinzip
 
 Keine individuellen Lösungen wenn wiederverwendbare Komponenten möglich sind.
+
+## Aktueller technischer Schnitt
+
+- globale Screen-/App-Ressourcen liegen zentral in `src/Payroll.Desktop/Styles/DesignSystem.axaml`
+- Print-/Report-Ressourcen liegen zentral in `src/Payroll.Desktop/Styles/PrintDesignSystem.axaml`
+- `App.axaml` bindet diese Style-Dateien zentral ein
+- Views sollen bevorzugt mit semantischen Klassen und DynamicResources arbeiten statt mit verstreuten Einzelwerten

@@ -7,7 +7,15 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception exception)
+        {
+            var logPath = StartupErrorLogger.WriteStartupErrorLog(exception);
+            throw new InvalidOperationException($"{StartupErrorLogger.BuildStartupErrorMessage(exception)} | startup log: {logPath}", exception);
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()

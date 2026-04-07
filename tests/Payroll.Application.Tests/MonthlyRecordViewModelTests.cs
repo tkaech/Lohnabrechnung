@@ -133,6 +133,101 @@ public sealed class MonthlyRecordViewModelTests
     }
 
     [Fact]
+    public async Task HistoryLists_LoadEntriesFromPreviousMonthsChronologically()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Gina Verlauf");
+
+        var aprilRecord = await repository.GetOrCreateAsync(employeeId, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 12), 7m, 0m, 0m, 0m, 0m, 0m, 0m, "April");
+        aprilRecord.SaveExpenseEntry(18.50m);
+
+        var mayRecord = await repository.GetOrCreateAsync(employeeId, 2026, 5, CancellationToken.None);
+        mayRecord.SaveTimeEntry(null, new DateOnly(2026, 5, 3), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Mai");
+        mayRecord.SaveExpenseEntry(22m);
+
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository))
+        {
+            SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero)
+        };
+
+        await viewModel.SetEmployeeAsync(employeeId, "Gina Verlauf");
+        await WaitUntilAsync(() => viewModel.TimeEntryHistory.Count == 2 && viewModel.ExpenseEntryHistory.Count == 2);
+
+        Assert.Equal(2, viewModel.TimeEntryHistory.Count);
+        Assert.Equal(new DateOnly(2026, 4, 12), viewModel.TimeEntryHistory[0].WorkDate);
+        Assert.Equal(new DateOnly(2026, 5, 3), viewModel.TimeEntryHistory[1].WorkDate);
+        Assert.Equal(2, viewModel.ExpenseEntryHistory.Count);
+        Assert.Equal((2026, 4), (viewModel.ExpenseEntryHistory[0].Year, viewModel.ExpenseEntryHistory[0].Month));
+        Assert.Equal((2026, 5), (viewModel.ExpenseEntryHistory[1].Year, viewModel.ExpenseEntryHistory[1].Month));
+    }
+
+    [Fact]
+    public async Task ActivateMonthFromTimeEntryAsync_SwitchesSelectedMonthAndLoadsTargetMonth()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Hugo Historie");
+
+        var aprilRecord = await repository.GetOrCreateAsync(employeeId, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 8), 6m, 0m, 0m, 0m, 0m, 0m, 0m, "April");
+
+        var mayRecord = await repository.GetOrCreateAsync(employeeId, 2026, 5, CancellationToken.None);
+        mayRecord.SaveTimeEntry(null, new DateOnly(2026, 5, 3), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Mai");
+
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository))
+        {
+            SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero)
+        };
+
+        await viewModel.SetEmployeeAsync(employeeId, "Hugo Historie");
+        await WaitUntilAsync(() => viewModel.TimeEntryHistory.Count == 2);
+
+        await viewModel.ActivateMonthFromTimeEntryAsync(viewModel.TimeEntryHistory[0]);
+        await WaitUntilAsync(() => viewModel.TimePayrollMonth == "04/2026");
+
+        Assert.Equal("04/2026", viewModel.TimePayrollMonth);
+        Assert.Single(viewModel.TimeEntries);
+        Assert.Equal(new DateOnly(2026, 4, 8), viewModel.TimeEntries[0].WorkDate);
+        Assert.NotNull(viewModel.SelectedTimeEntry);
+        Assert.Equal("2026-04-08", viewModel.TimeDate);
+        Assert.Equal("6", viewModel.HoursWorked);
+        Assert.Contains("04/2026", viewModel.ContextDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ActivateMonthFromExpenseEntryAsync_SwitchesSelectedMonthAndLoadsTargetMonth()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Iris Historie");
+
+        var aprilRecord = await repository.GetOrCreateAsync(employeeId, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveExpenseEntry(18.50m);
+
+        var mayRecord = await repository.GetOrCreateAsync(employeeId, 2026, 5, CancellationToken.None);
+        mayRecord.SaveExpenseEntry(22m);
+
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository))
+        {
+            SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero)
+        };
+
+        await viewModel.SetEmployeeAsync(employeeId, "Iris Historie");
+        await WaitUntilAsync(() => viewModel.ExpenseEntryHistory.Count == 2);
+
+        await viewModel.ActivateMonthFromExpenseEntryAsync(viewModel.ExpenseEntryHistory[0]);
+        await WaitUntilAsync(() => viewModel.ExpensePayrollMonth == "04/2026");
+
+        Assert.Equal("04/2026", viewModel.ExpensePayrollMonth);
+        Assert.Equal("18.50", viewModel.ExpensesTotal);
+        Assert.NotNull(viewModel.SelectedExpenseEntry);
+        Assert.Equal((2026, 4), (viewModel.SelectedExpenseEntry!.Year, viewModel.SelectedExpenseEntry.Month));
+        Assert.Contains("04/2026", viewModel.ContextDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PayrollPreview_LoadsBaseTotalAndPayoutForCurrentMonth()
     {
         var employeeId = Guid.NewGuid();
@@ -231,11 +326,27 @@ public sealed class MonthlyRecordViewModelTests
                     .OrderBy(item => item.WorkDate)
                     .Select(item => new MonthlyTimeEntryDto(item.Id, item.WorkDate, item.HoursWorked, item.NightHours, item.SundayHours, item.HolidayHours, item.VehiclePauschalzone1Chf, item.VehiclePauschalzone2Chf, item.VehicleRegiezone1Chf, item.Note))
                     .ToArray(),
+                _records.Values
+                    .Where(item => item.EmployeeId == record.EmployeeId)
+                    .SelectMany(item => item.TimeEntries)
+                    .OrderBy(item => item.WorkDate)
+                    .Select(item => new MonthlyTimeEntryDto(item.Id, item.WorkDate, item.HoursWorked, item.NightHours, item.SundayHours, item.HolidayHours, item.VehiclePauschalzone1Chf, item.VehiclePauschalzone2Chf, item.VehicleRegiezone1Chf, item.Note))
+                    .ToArray(),
                 record.ExpenseEntry is null
                     ? null
                     : new MonthlyExpenseEntryDto(
                         record.ExpenseEntry.Id,
                         record.ExpenseEntry.ExpensesTotalChf),
+                _records.Values
+                    .Where(item => item.EmployeeId == record.EmployeeId && item.ExpenseEntry is not null)
+                    .OrderBy(item => item.Year)
+                    .ThenBy(item => item.Month)
+                    .Select(item => new HistoricalMonthlyExpenseEntryDto(
+                        item.ExpenseEntry!.Id,
+                        item.Year,
+                        item.Month,
+                        item.ExpenseEntry.ExpensesTotalChf))
+                    .ToArray(),
                 new MonthlyRecordPreviewDto(
                     BuildPreviewRows(_records.Values.Where(item => item.EmployeeId == record.EmployeeId)),
                     Array.Empty<string>()),
@@ -264,10 +375,10 @@ public sealed class MonthlyRecordViewModelTests
 
             return new MonthlyPayrollPreviewDto(
                 [
-                    new MonthlyPayrollPreviewLineDto("Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null),
-                    new MonthlyPayrollPreviewLineDto("AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null),
-                    new MonthlyPayrollPreviewLineDto("Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null),
-                    new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null)
+                    new MonthlyPayrollPreviewLineDto("Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null, false),
+                    new MonthlyPayrollPreviewLineDto("AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null, true),
+                    new MonthlyPayrollPreviewLineDto("Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null, false),
+                    new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null, true)
                 ],
                 ["Test-Lohnvorschau"]);
         }

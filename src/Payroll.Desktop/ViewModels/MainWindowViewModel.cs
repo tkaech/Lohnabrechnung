@@ -1,6 +1,10 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media.Imaging;
+using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
+using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
+using Payroll.Desktop.Styles;
 
 namespace Payroll.Desktop.ViewModels;
 
@@ -11,7 +15,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         TimeAndExpenses,
         PayrollRuns,
         Employees,
-        Settings
+        Settings,
+        Help
     }
 
     private const string ActivityFilterAll = "Alle";
@@ -20,9 +25,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string WithholdingTaxUnknown = "Ungeklaert";
     private const string WithholdingTaxYes = "Ja";
     private const string WithholdingTaxNo = "Nein";
+    private const string BackupTypeConfigurationLabel = "Nur Konfiguration";
+    private const string BackupTypeUserDataLabel = "Nur Nutzdaten";
+    private const string BackupTypeBothLabel = "Beides";
 
     private readonly EmployeeService _employeeService;
+    private readonly IBackupRestoreService _backupRestoreService;
     private readonly PayrollSettingsService _payrollSettingsService;
+    private readonly ReportingService _reportingService;
     private EmployeeListItemViewModel? _selectedEmployee;
     private Guid? _currentEmployeeId;
     private Guid? _pendingEmployeeId;
@@ -51,6 +61,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string? _iban;
     private string? _phoneNumber;
     private string? _email;
+    private EditableSettingOptionViewModel? _selectedDepartmentOption;
+    private EditableSettingOptionViewModel? _selectedEmploymentCategoryOption;
+    private EditableSettingOptionViewModel? _selectedEmploymentLocationOption;
+    private EditableSettingOptionViewModel? _selectedSettingsDepartment;
+    private EditableSettingOptionViewModel? _selectedSettingsEmploymentCategory;
+    private EditableSettingOptionViewModel? _selectedSettingsEmploymentLocation;
+    private string _newDepartmentName = string.Empty;
+    private string _newEmploymentCategoryName = string.Empty;
+    private string _newEmploymentLocationName = string.Empty;
     private DateTimeOffset? _contractValidFrom;
     private DateTimeOffset? _contractValidTo;
     private string _hourlyRateChf = string.Empty;
@@ -67,6 +86,30 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsVehiclePauschalzone1RateChf = string.Empty;
     private string _settingsVehiclePauschalzone2RateChf = string.Empty;
     private string _settingsVehicleRegiezone1RateChf = string.Empty;
+    private string _settingsCompanyAddress = string.Empty;
+    private string _settingsAppFontFamily = string.Empty;
+    private string _settingsAppFontSize = string.Empty;
+    private string _settingsAppTextColorHex = string.Empty;
+    private string _settingsAppMutedTextColorHex = string.Empty;
+    private string _settingsAppBackgroundColorHex = string.Empty;
+    private string _settingsAppAccentColorHex = string.Empty;
+    private string _settingsAppLogoText = string.Empty;
+    private string _settingsAppLogoPath = string.Empty;
+    private string _settingsPrintFontFamily = string.Empty;
+    private string _settingsPrintFontSize = string.Empty;
+    private string _settingsPrintTextColorHex = string.Empty;
+    private string _settingsPrintMutedTextColorHex = string.Empty;
+    private string _settingsPrintAccentColorHex = string.Empty;
+    private string _settingsPrintLogoText = string.Empty;
+    private string _settingsPrintLogoPath = string.Empty;
+    private string _settingsPrintTemplate = string.Empty;
+    private string _backupDirectoryPath = string.Empty;
+    private string _backupFileName = string.Empty;
+    private string _selectedBackupContentType = BackupTypeBothLabel;
+    private string _restoreFilePath = string.Empty;
+    private string _selectedRestoreContentType = BackupTypeBothLabel;
+    private string _appLogoText = ThemeTokens.BrandLogoText;
+    private Bitmap? _appLogoImage;
     private string _statusMessage = "Mitarbeitende koennen links ausgewaehlt werden.";
     private bool _isBusy;
     private bool _isEditing;
@@ -75,15 +118,21 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _employeeCountSummary = "Keine Mitarbeitenden geladen.";
     private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
 
-    public MainWindowViewModel(EmployeeService employeeService, PayrollSettingsService payrollSettingsService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel)
+    public MainWindowViewModel(EmployeeService employeeService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel)
     {
         _employeeService = employeeService;
+        _backupRestoreService = backupRestoreService;
         _payrollSettingsService = payrollSettingsService;
+        _reportingService = reportingService;
         MonthlyRecord = monthlyRecord;
         WorkspaceLabel = workspaceLabel;
         Employees = [];
+        DepartmentOptions = [];
+        EmploymentCategoryOptions = [];
+        EmploymentLocationOptions = [];
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
         WithholdingTaxOptions = [WithholdingTaxUnknown, WithholdingTaxYes, WithholdingTaxNo];
+        BackupContentTypeOptions = [BackupTypeConfigurationLabel, BackupTypeUserDataLabel, BackupTypeBothLabel];
         RefreshCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         SearchCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         NewEmployeeCommand = new DelegateCommand(BeginCreateEmployee, () => CanStartCreate);
@@ -98,7 +147,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         ShowPayrollRunsCommand = new DelegateCommand(SwitchToPayrollRunsWorkspace, () => !IsPayrollRunsWorkspace);
         ShowEmployeesCommand = new DelegateCommand(SwitchToEmployeesWorkspace, () => !IsEmployeeWorkspace);
         ShowSettingsCommand = new DelegateCommand(SwitchToSettingsWorkspace, () => !IsSettingsWorkspace);
+        ShowHelpCommand = new DelegateCommand(SwitchToHelpWorkspace, () => !IsHelpWorkspace);
         SaveSettingsCommand = new DelegateCommand(SaveSettingsAsync, () => CanSaveSettings);
+        CreateBackupCommand = new DelegateCommand(CreateBackupAsync, () => CanCreateBackup);
+        RestoreBackupCommand = new DelegateCommand(RestoreBackupAsync, () => CanRestoreBackup);
+        CreatePayrollPdfCommand = new DelegateCommand(CreatePayrollPdfAsync, () => CanCreatePayrollPdf);
+        AddDepartmentOptionCommand = new DelegateCommand(AddDepartmentOption, () => CanManageSettingsOptions);
+        RemoveDepartmentOptionCommand = new DelegateCommand(RemoveDepartmentOption, () => CanRemoveDepartmentOption);
+        AddEmploymentCategoryOptionCommand = new DelegateCommand(AddEmploymentCategoryOption, () => CanManageSettingsOptions);
+        RemoveEmploymentCategoryOptionCommand = new DelegateCommand(RemoveEmploymentCategoryOption, () => CanRemoveEmploymentCategoryOption);
+        AddEmploymentLocationOptionCommand = new DelegateCommand(AddEmploymentLocationOption, () => CanManageSettingsOptions);
+        RemoveEmploymentLocationOptionCommand = new DelegateCommand(RemoveEmploymentLocationOption, () => CanRemoveEmploymentLocationOption);
+        BackupDirectoryPath = _backupRestoreService.GetDefaultBackupDirectory();
+        BackupFileName = _backupRestoreService.CreateDefaultFileName(DateTimeOffset.Now);
 
         ClearFormForEmptyState();
     }
@@ -106,9 +167,32 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string Title => "PayrollApp - Monatserfassung";
     public string WorkspaceLabel { get; }
     public MonthlyRecordViewModel MonthlyRecord { get; }
+    public string AppLogoText
+    {
+        get => _appLogoText;
+        private set => SetProperty(ref _appLogoText, value);
+    }
+    public Bitmap? AppLogoImage
+    {
+        get => _appLogoImage;
+        private set
+        {
+            if (SetProperty(ref _appLogoImage, value))
+            {
+                RaisePropertyChanged(nameof(HasAppLogoImage));
+                RaisePropertyChanged(nameof(ShowAppLogoText));
+            }
+        }
+    }
+    public bool HasAppLogoImage => AppLogoImage is not null;
+    public bool ShowAppLogoText => !HasAppLogoImage;
     public ObservableCollection<EmployeeListItemViewModel> Employees { get; }
+    public ObservableCollection<EditableSettingOptionViewModel> DepartmentOptions { get; }
+    public ObservableCollection<EditableSettingOptionViewModel> EmploymentCategoryOptions { get; }
+    public ObservableCollection<EditableSettingOptionViewModel> EmploymentLocationOptions { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
+    public IReadOnlyList<string> BackupContentTypeOptions { get; }
     public DelegateCommand RefreshCommand { get; }
     public DelegateCommand SearchCommand { get; }
     public DelegateCommand NewEmployeeCommand { get; }
@@ -123,17 +207,29 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand ShowPayrollRunsCommand { get; }
     public DelegateCommand ShowEmployeesCommand { get; }
     public DelegateCommand ShowSettingsCommand { get; }
+    public DelegateCommand ShowHelpCommand { get; }
     public DelegateCommand SaveSettingsCommand { get; }
+    public DelegateCommand CreateBackupCommand { get; }
+    public DelegateCommand RestoreBackupCommand { get; }
+    public DelegateCommand CreatePayrollPdfCommand { get; }
+    public DelegateCommand AddDepartmentOptionCommand { get; }
+    public DelegateCommand RemoveDepartmentOptionCommand { get; }
+    public DelegateCommand AddEmploymentCategoryOptionCommand { get; }
+    public DelegateCommand RemoveEmploymentCategoryOptionCommand { get; }
+    public DelegateCommand AddEmploymentLocationOptionCommand { get; }
+    public DelegateCommand RemoveEmploymentLocationOptionCommand { get; }
     public bool IsTimeAndExpensesWorkspace => _currentSection == WorkspaceSection.TimeAndExpenses;
     public bool IsPayrollRunsWorkspace => _currentSection == WorkspaceSection.PayrollRuns;
     public bool IsEmployeeWorkspace => _currentSection == WorkspaceSection.Employees;
     public bool IsSettingsWorkspace => _currentSection == WorkspaceSection.Settings;
+    public bool IsHelpWorkspace => _currentSection == WorkspaceSection.Help;
     public bool ShowTimeAndExpensesWorkspace => IsTimeAndExpensesWorkspace;
     public bool ShowPayrollRunsWorkspace => IsPayrollRunsWorkspace;
     public bool ShowEmployeeWorkspace => IsEmployeeWorkspace;
     public bool ShowSettingsWorkspace => IsSettingsWorkspace;
-    public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace;
-    public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace;
+    public bool ShowHelpWorkspace => IsHelpWorkspace;
+    public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace && !IsHelpWorkspace;
+    public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace && !IsHelpWorkspace;
 
     public string FormTitle => _isCreatingNew
         ? "Neuer Mitarbeitender"
@@ -165,6 +261,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanDismissDelete => !IsBusy && _showDeleteConfirmation;
     public bool CanClearExitDate => CanEditFields && ExitDate.HasValue;
     public bool CanSaveSettings => !IsBusy && IsSettingsWorkspace;
+    public bool CanCreateBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(BackupDirectoryPath) && !string.IsNullOrWhiteSpace(BackupFileName);
+    public bool CanRestoreBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(RestoreFilePath);
+    public bool CanCreatePayrollPdf => !IsBusy && IsPayrollRunsWorkspace && _currentEmployeeId.HasValue && MonthlyRecord.SelectedMonth.HasValue;
+    public bool CanManageSettingsOptions => !IsBusy && IsSettingsWorkspace;
+    public bool CanRemoveDepartmentOption => CanManageSettingsOptions && SelectedSettingsDepartment is not null;
+    public bool CanRemoveEmploymentCategoryOption => CanManageSettingsOptions && SelectedSettingsEmploymentCategory is not null;
+    public bool CanRemoveEmploymentLocationOption => CanManageSettingsOptions && SelectedSettingsEmploymentLocation is not null;
     public bool ShowViewActions => !_isEditing;
     public bool ShowEditActions => _isEditing;
     public bool ShowDeleteConfirmation
@@ -371,6 +474,81 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _email, value);
     }
 
+    public EditableSettingOptionViewModel? SelectedDepartmentOption
+    {
+        get => _selectedDepartmentOption;
+        set => SetProperty(ref _selectedDepartmentOption, value);
+    }
+
+    public EditableSettingOptionViewModel? SelectedEmploymentCategoryOption
+    {
+        get => _selectedEmploymentCategoryOption;
+        set => SetProperty(ref _selectedEmploymentCategoryOption, value);
+    }
+
+    public EditableSettingOptionViewModel? SelectedEmploymentLocationOption
+    {
+        get => _selectedEmploymentLocationOption;
+        set => SetProperty(ref _selectedEmploymentLocationOption, value);
+    }
+
+    public EditableSettingOptionViewModel? SelectedSettingsDepartment
+    {
+        get => _selectedSettingsDepartment;
+        set
+        {
+            if (SetProperty(ref _selectedSettingsDepartment, value))
+            {
+                RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
+                RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public EditableSettingOptionViewModel? SelectedSettingsEmploymentCategory
+    {
+        get => _selectedSettingsEmploymentCategory;
+        set
+        {
+            if (SetProperty(ref _selectedSettingsEmploymentCategory, value))
+            {
+                RaisePropertyChanged(nameof(CanRemoveEmploymentCategoryOption));
+                RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public EditableSettingOptionViewModel? SelectedSettingsEmploymentLocation
+    {
+        get => _selectedSettingsEmploymentLocation;
+        set
+        {
+            if (SetProperty(ref _selectedSettingsEmploymentLocation, value))
+            {
+                RaisePropertyChanged(nameof(CanRemoveEmploymentLocationOption));
+                RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string NewDepartmentName
+    {
+        get => _newDepartmentName;
+        set => SetProperty(ref _newDepartmentName, value);
+    }
+
+    public string NewEmploymentCategoryName
+    {
+        get => _newEmploymentCategoryName;
+        set => SetProperty(ref _newEmploymentCategoryName, value);
+    }
+
+    public string NewEmploymentLocationName
+    {
+        get => _newEmploymentLocationName;
+        set => SetProperty(ref _newEmploymentLocationName, value);
+    }
+
     public DateTimeOffset? ContractValidFrom
     {
         get => _contractValidFrom;
@@ -467,6 +645,159 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _settingsVehicleRegiezone1RateChf, value);
     }
 
+    public string SettingsCompanyAddress
+    {
+        get => _settingsCompanyAddress;
+        set => SetProperty(ref _settingsCompanyAddress, value);
+    }
+
+    public string SettingsAppFontFamily
+    {
+        get => _settingsAppFontFamily;
+        set => SetProperty(ref _settingsAppFontFamily, value);
+    }
+
+    public string SettingsAppFontSize
+    {
+        get => _settingsAppFontSize;
+        set => SetProperty(ref _settingsAppFontSize, value);
+    }
+
+    public string SettingsAppTextColorHex
+    {
+        get => _settingsAppTextColorHex;
+        set => SetProperty(ref _settingsAppTextColorHex, value);
+    }
+
+    public string SettingsAppMutedTextColorHex
+    {
+        get => _settingsAppMutedTextColorHex;
+        set => SetProperty(ref _settingsAppMutedTextColorHex, value);
+    }
+
+    public string SettingsAppBackgroundColorHex
+    {
+        get => _settingsAppBackgroundColorHex;
+        set => SetProperty(ref _settingsAppBackgroundColorHex, value);
+    }
+
+    public string SettingsAppAccentColorHex
+    {
+        get => _settingsAppAccentColorHex;
+        set => SetProperty(ref _settingsAppAccentColorHex, value);
+    }
+
+    public string SettingsAppLogoText
+    {
+        get => _settingsAppLogoText;
+        set => SetProperty(ref _settingsAppLogoText, value);
+    }
+
+    public string SettingsAppLogoPath
+    {
+        get => _settingsAppLogoPath;
+        set => SetProperty(ref _settingsAppLogoPath, value);
+    }
+
+    public string SettingsPrintFontFamily
+    {
+        get => _settingsPrintFontFamily;
+        set => SetProperty(ref _settingsPrintFontFamily, value);
+    }
+
+    public string SettingsPrintFontSize
+    {
+        get => _settingsPrintFontSize;
+        set => SetProperty(ref _settingsPrintFontSize, value);
+    }
+
+    public string SettingsPrintTextColorHex
+    {
+        get => _settingsPrintTextColorHex;
+        set => SetProperty(ref _settingsPrintTextColorHex, value);
+    }
+
+    public string SettingsPrintMutedTextColorHex
+    {
+        get => _settingsPrintMutedTextColorHex;
+        set => SetProperty(ref _settingsPrintMutedTextColorHex, value);
+    }
+
+    public string SettingsPrintAccentColorHex
+    {
+        get => _settingsPrintAccentColorHex;
+        set => SetProperty(ref _settingsPrintAccentColorHex, value);
+    }
+
+    public string SettingsPrintLogoText
+    {
+        get => _settingsPrintLogoText;
+        set => SetProperty(ref _settingsPrintLogoText, value);
+    }
+
+    public string SettingsPrintLogoPath
+    {
+        get => _settingsPrintLogoPath;
+        set => SetProperty(ref _settingsPrintLogoPath, value);
+    }
+
+    public string SettingsPrintTemplate
+    {
+        get => _settingsPrintTemplate;
+        set => SetProperty(ref _settingsPrintTemplate, value);
+    }
+
+    public string BackupDirectoryPath
+    {
+        get => _backupDirectoryPath;
+        set
+        {
+            if (SetProperty(ref _backupDirectoryPath, value))
+            {
+                RaisePropertyChanged(nameof(CanCreateBackup));
+                CreateBackupCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string BackupFileName
+    {
+        get => _backupFileName;
+        set
+        {
+            if (SetProperty(ref _backupFileName, value))
+            {
+                RaisePropertyChanged(nameof(CanCreateBackup));
+                CreateBackupCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string SelectedBackupContentType
+    {
+        get => _selectedBackupContentType;
+        set => SetProperty(ref _selectedBackupContentType, value);
+    }
+
+    public string RestoreFilePath
+    {
+        get => _restoreFilePath;
+        set
+        {
+            if (SetProperty(ref _restoreFilePath, value))
+            {
+                RaisePropertyChanged(nameof(CanRestoreBackup));
+                RestoreBackupCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string SelectedRestoreContentType
+    {
+        get => _selectedRestoreContentType;
+        set => SetProperty(ref _selectedRestoreContentType, value);
+    }
+
     public string StatusMessage
     {
         get => _statusMessage;
@@ -491,6 +822,13 @@ public sealed class MainWindowViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanConfirmDelete));
                 RaisePropertyChanged(nameof(CanDismissDelete));
                 RaisePropertyChanged(nameof(CanSaveSettings));
+                RaisePropertyChanged(nameof(CanCreateBackup));
+                RaisePropertyChanged(nameof(CanRestoreBackup));
+                RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+                RaisePropertyChanged(nameof(CanManageSettingsOptions));
+                RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
+                RaisePropertyChanged(nameof(CanRemoveEmploymentCategoryOption));
+                RaisePropertyChanged(nameof(CanRemoveEmploymentLocationOption));
                 RaiseActionStateChanged();
             }
         }
@@ -598,6 +936,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 Iban,
                 PhoneNumber,
                 Email,
+                SelectedDepartmentOption?.OptionId,
+                SelectedEmploymentCategoryOption?.OptionId,
+                SelectedEmploymentLocationOption?.OptionId,
                 DateOnly.FromDateTime(ContractValidFrom.Value.Date),
                 ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null,
                 ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
@@ -664,6 +1005,48 @@ public sealed class MainWindowViewModel : ViewModelBase
         ExitDate = null;
     }
 
+    private void AddDepartmentOption()
+    {
+        AddSettingOption(DepartmentOptions, ref _selectedDepartmentOption, ref _selectedSettingsDepartment, nameof(SelectedDepartmentOption), nameof(SelectedSettingsDepartment), ref _newDepartmentName, nameof(NewDepartmentName));
+        RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
+        RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RemoveDepartmentOption()
+    {
+        RemoveSettingOption(DepartmentOptions, SelectedSettingsDepartment, ref _selectedSettingsDepartment, nameof(SelectedSettingsDepartment), ref _selectedDepartmentOption, nameof(SelectedDepartmentOption));
+        RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
+        RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void AddEmploymentCategoryOption()
+    {
+        AddSettingOption(EmploymentCategoryOptions, ref _selectedEmploymentCategoryOption, ref _selectedSettingsEmploymentCategory, nameof(SelectedEmploymentCategoryOption), nameof(SelectedSettingsEmploymentCategory), ref _newEmploymentCategoryName, nameof(NewEmploymentCategoryName));
+        RaisePropertyChanged(nameof(CanRemoveEmploymentCategoryOption));
+        RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RemoveEmploymentCategoryOption()
+    {
+        RemoveSettingOption(EmploymentCategoryOptions, SelectedSettingsEmploymentCategory, ref _selectedSettingsEmploymentCategory, nameof(SelectedSettingsEmploymentCategory), ref _selectedEmploymentCategoryOption, nameof(SelectedEmploymentCategoryOption));
+        RaisePropertyChanged(nameof(CanRemoveEmploymentCategoryOption));
+        RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void AddEmploymentLocationOption()
+    {
+        AddSettingOption(EmploymentLocationOptions, ref _selectedEmploymentLocationOption, ref _selectedSettingsEmploymentLocation, nameof(SelectedEmploymentLocationOption), nameof(SelectedSettingsEmploymentLocation), ref _newEmploymentLocationName, nameof(NewEmploymentLocationName));
+        RaisePropertyChanged(nameof(CanRemoveEmploymentLocationOption));
+        RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RemoveEmploymentLocationOption()
+    {
+        RemoveSettingOption(EmploymentLocationOptions, SelectedSettingsEmploymentLocation, ref _selectedSettingsEmploymentLocation, nameof(SelectedSettingsEmploymentLocation), ref _selectedEmploymentLocationOption, nameof(SelectedEmploymentLocationOption));
+        RaisePropertyChanged(nameof(CanRemoveEmploymentLocationOption));
+        RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+    }
+
     private async Task ConfirmDeleteAsync()
     {
         if (!_currentEmployeeId.HasValue)
@@ -687,6 +1070,23 @@ public sealed class MainWindowViewModel : ViewModelBase
         await ExecuteBusyAsync(async () =>
         {
             var saved = await _payrollSettingsService.SaveAsync(new SavePayrollSettingsCommand(
+                SettingsCompanyAddress,
+                SettingsAppFontFamily,
+                ParseRequiredDecimal(SettingsAppFontSize, nameof(SettingsAppFontSize)),
+                SettingsAppTextColorHex,
+                SettingsAppMutedTextColorHex,
+                SettingsAppBackgroundColorHex,
+                SettingsAppAccentColorHex,
+                SettingsAppLogoText,
+                SettingsAppLogoPath,
+                SettingsPrintFontFamily,
+                ParseRequiredDecimal(SettingsPrintFontSize, nameof(SettingsPrintFontSize)),
+                SettingsPrintTextColorHex,
+                SettingsPrintMutedTextColorHex,
+                SettingsPrintAccentColorHex,
+                SettingsPrintLogoText,
+                SettingsPrintLogoPath,
+                SettingsPrintTemplate,
                 ParseOptionalDecimal(SettingsNightSupplementRate),
                 ParseOptionalDecimal(SettingsSundaySupplementRate),
                 ParseOptionalDecimal(SettingsHolidaySupplementRate),
@@ -697,10 +1097,73 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ParseRequiredDecimal(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
                 ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf)),
                 ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf)),
-                ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf))));
+                ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf)),
+                BuildSettingOptionDtos(DepartmentOptions),
+                BuildSettingOptionDtos(EmploymentCategoryOptions),
+                BuildSettingOptionDtos(EmploymentLocationOptions)));
 
             ApplySettings(saved);
             StatusMessage = "Einstellungen gespeichert.";
+        });
+    }
+
+    private async Task CreatePayrollPdfAsync()
+    {
+        if (!_currentEmployeeId.HasValue || !MonthlyRecord.SelectedMonth.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var selectedMonth = MonthlyRecord.SelectedMonth.Value;
+            var exportPath = await _reportingService.CreatePayrollStatementPdfAsync(
+                _currentEmployeeId.Value,
+                selectedMonth.Year,
+                selectedMonth.Month);
+
+            StatusMessage = $"PDF erstellt: {exportPath}";
+        });
+    }
+
+    private async Task CreateBackupAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            var backup = await _backupRestoreService.CreateBackupAsync(
+                new CreateBackupCommand(
+                    BackupDirectoryPath,
+                    BackupFileName,
+                    ParseBackupContentType(SelectedBackupContentType)));
+
+            BackupFileName = _backupRestoreService.CreateDefaultFileName(DateTimeOffset.Now);
+            StatusMessage = $"Backup erstellt: {backup.FilePath}";
+        });
+    }
+
+    private async Task RestoreBackupAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            var restoreType = ParseBackupContentType(SelectedRestoreContentType);
+            var currentEmployeeId = _currentEmployeeId;
+            var result = await _backupRestoreService.RestoreBackupAsync(
+                new RestoreBackupCommand(
+                    RestoreFilePath,
+                    restoreType));
+
+            if (restoreType is BackupContentType.Configuration or BackupContentType.Both)
+            {
+                await LoadSettingsAsync();
+            }
+
+            if (restoreType is BackupContentType.UserData or BackupContentType.Both)
+            {
+                await ReloadEmployeesAsync();
+                await RestoreSelectionAfterReloadAsync(currentEmployeeId, selectFirstIfMissing: true);
+            }
+
+            StatusMessage = $"Restore abgeschlossen: {result.BackupFilePath}";
         });
     }
 
@@ -822,6 +1285,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         Iban = employee.Iban;
         PhoneNumber = employee.PhoneNumber;
         Email = employee.Email;
+        SelectedDepartmentOption = FindOptionById(DepartmentOptions, employee.DepartmentOptionId);
+        SelectedEmploymentCategoryOption = FindOptionById(EmploymentCategoryOptions, employee.EmploymentCategoryOptionId);
+        SelectedEmploymentLocationOption = FindOptionById(EmploymentLocationOptions, employee.EmploymentLocationOptionId);
         ContractValidFrom = employee.ContractValidFrom == default
             ? null
             : new DateTimeOffset(employee.ContractValidFrom.ToDateTime(TimeOnly.MinValue));
@@ -857,6 +1323,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         Iban = null;
         PhoneNumber = null;
         Email = null;
+        SelectedDepartmentOption = DepartmentOptions.FirstOrDefault();
+        SelectedEmploymentCategoryOption = EmploymentCategoryOptions.FirstOrDefault();
+        SelectedEmploymentLocationOption = EmploymentLocationOptions.FirstOrDefault();
         ContractValidFrom = new DateTimeOffset(DateTime.Today);
         ContractValidTo = null;
         HourlyRateChf = "0";
@@ -889,6 +1358,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         Iban = null;
         PhoneNumber = null;
         Email = null;
+        SelectedDepartmentOption = null;
+        SelectedEmploymentCategoryOption = null;
+        SelectedEmploymentLocationOption = null;
         ContractValidFrom = null;
         ContractValidTo = null;
         HourlyRateChf = string.Empty;
@@ -942,6 +1414,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         ShowEmployeesCommand.RaiseCanExecuteChanged();
         ShowSettingsCommand.RaiseCanExecuteChanged();
         SaveSettingsCommand.RaiseCanExecuteChanged();
+        CreateBackupCommand.RaiseCanExecuteChanged();
+        RestoreBackupCommand.RaiseCanExecuteChanged();
+        CreatePayrollPdfCommand.RaiseCanExecuteChanged();
+        AddDepartmentOptionCommand.RaiseCanExecuteChanged();
+        RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
+        AddEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
+        RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
+        AddEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+        RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
     }
 
     private async Task<bool> LoadEmployeeIntoViewAsync(Guid employeeId)
@@ -971,6 +1452,108 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(SelectedEmployee));
     }
 
+    private static IReadOnlyCollection<SettingOptionDto> BuildSettingOptionDtos(IEnumerable<EditableSettingOptionViewModel> options)
+    {
+        return options
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .Select(item => new SettingOptionDto(item.OptionId, item.Name.Trim()))
+            .ToArray();
+    }
+
+    private void ApplyOptions(
+        ObservableCollection<EditableSettingOptionViewModel> target,
+        IReadOnlyCollection<SettingOptionDto> source,
+        ref EditableSettingOptionViewModel? selectedEmployeeTarget,
+        string selectedEmployeePropertyName,
+        ref EditableSettingOptionViewModel? selectedSettingsTarget,
+        string selectedSettingsPropertyName)
+    {
+        var previousEmployeeSelectionId = selectedEmployeeTarget?.OptionId;
+
+        target.Clear();
+        foreach (var item in source.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            target.Add(new EditableSettingOptionViewModel
+            {
+                OptionId = item.OptionId,
+                Name = item.Name
+            });
+        }
+
+        selectedEmployeeTarget = FindOptionById(target, previousEmployeeSelectionId) ?? target.FirstOrDefault();
+        selectedSettingsTarget = null;
+        RaisePropertyChanged(selectedEmployeePropertyName);
+        RaisePropertyChanged(selectedSettingsPropertyName);
+    }
+
+    private static EditableSettingOptionViewModel? FindOptionById(
+        IEnumerable<EditableSettingOptionViewModel> options,
+        Guid? optionId)
+    {
+        return optionId.HasValue
+            ? options.FirstOrDefault(item => item.OptionId == optionId.Value)
+            : null;
+    }
+
+    private void AddSettingOption(
+        ObservableCollection<EditableSettingOptionViewModel> collection,
+        ref EditableSettingOptionViewModel? selectedEmployeeValue,
+        ref EditableSettingOptionViewModel? selectedSettingsValue,
+        string selectedEmployeePropertyName,
+        string selectedSettingsPropertyName,
+        ref string newValue,
+        string newValuePropertyName)
+    {
+        var trimmedValue = newValue.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedValue))
+        {
+            return;
+        }
+
+        if (collection.Any(item => string.Equals(item.Name, trimmedValue, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Eintrag existiert bereits.");
+        }
+
+        var option = new EditableSettingOptionViewModel
+        {
+            OptionId = Guid.NewGuid(),
+            Name = trimmedValue
+        };
+
+        collection.Add(option);
+        selectedEmployeeValue = option;
+        selectedSettingsValue = option;
+        newValue = string.Empty;
+        RaisePropertyChanged(selectedEmployeePropertyName);
+        RaisePropertyChanged(selectedSettingsPropertyName);
+        RaisePropertyChanged(newValuePropertyName);
+    }
+
+    private void RemoveSettingOption(
+        ObservableCollection<EditableSettingOptionViewModel> collection,
+        EditableSettingOptionViewModel? selectedSettingsValue,
+        ref EditableSettingOptionViewModel? selectedSettingsTarget,
+        string selectedSettingsPropertyName,
+        ref EditableSettingOptionViewModel? selectedEmployeeTarget,
+        string selectedEmployeePropertyName)
+    {
+        if (selectedSettingsValue is null)
+        {
+            return;
+        }
+
+        collection.Remove(selectedSettingsValue);
+        if (ReferenceEquals(selectedEmployeeTarget, selectedSettingsValue))
+        {
+            selectedEmployeeTarget = collection.FirstOrDefault();
+            RaisePropertyChanged(selectedEmployeePropertyName);
+        }
+
+        selectedSettingsTarget = null;
+        RaisePropertyChanged(selectedSettingsPropertyName);
+    }
+
     private static decimal ParseRequiredDecimal(string value, string fieldName)
     {
         if (!decimal.TryParse(value, out var parsedValue))
@@ -996,6 +1579,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         return parsedValue;
     }
 
+    private static BackupContentType ParseBackupContentType(string label)
+    {
+        return label switch
+        {
+            BackupTypeConfigurationLabel => BackupContentType.Configuration,
+            BackupTypeUserDataLabel => BackupContentType.UserData,
+            _ => BackupContentType.Both
+        };
+    }
+
     private async Task LoadSettingsAsync()
     {
         var settings = await _payrollSettingsService.GetAsync();
@@ -1004,6 +1597,23 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void ApplySettings(PayrollSettingsDto settings)
     {
+        SettingsCompanyAddress = settings.CompanyAddress;
+        SettingsAppFontFamily = settings.AppFontFamily;
+        SettingsAppFontSize = settings.AppFontSize.ToString("0.##");
+        SettingsAppTextColorHex = settings.AppTextColorHex;
+        SettingsAppMutedTextColorHex = settings.AppMutedTextColorHex;
+        SettingsAppBackgroundColorHex = settings.AppBackgroundColorHex;
+        SettingsAppAccentColorHex = settings.AppAccentColorHex;
+        SettingsAppLogoText = settings.AppLogoText;
+        SettingsAppLogoPath = settings.AppLogoPath;
+        SettingsPrintFontFamily = settings.PrintFontFamily;
+        SettingsPrintFontSize = settings.PrintFontSize.ToString("0.##");
+        SettingsPrintTextColorHex = settings.PrintTextColorHex;
+        SettingsPrintMutedTextColorHex = settings.PrintMutedTextColorHex;
+        SettingsPrintAccentColorHex = settings.PrintAccentColorHex;
+        SettingsPrintLogoText = settings.PrintLogoText;
+        SettingsPrintLogoPath = settings.PrintLogoPath;
+        SettingsPrintTemplate = settings.PrintTemplate;
         SettingsNightSupplementRate = settings.NightSupplementRate?.ToString("0.####");
         SettingsSundaySupplementRate = settings.SundaySupplementRate?.ToString("0.####");
         SettingsHolidaySupplementRate = settings.HolidaySupplementRate?.ToString("0.####");
@@ -1015,6 +1625,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsVehiclePauschalzone1RateChf = settings.VehiclePauschalzone1RateChf.ToString("0.##");
         SettingsVehiclePauschalzone2RateChf = settings.VehiclePauschalzone2RateChf.ToString("0.##");
         SettingsVehicleRegiezone1RateChf = settings.VehicleRegiezone1RateChf.ToString("0.##");
+        AppLogoText = settings.AppLogoText;
+        AppLogoImage = TryLoadLogo(settings.AppLogoPath);
+        ThemeSettingsApplier.Apply(settings);
+        ApplyOptions(DepartmentOptions, settings.Departments, ref _selectedDepartmentOption, nameof(SelectedDepartmentOption), ref _selectedSettingsDepartment, nameof(SelectedSettingsDepartment));
+        ApplyOptions(EmploymentCategoryOptions, settings.EmploymentCategories, ref _selectedEmploymentCategoryOption, nameof(SelectedEmploymentCategoryOption), ref _selectedSettingsEmploymentCategory, nameof(SelectedSettingsEmploymentCategory));
+        ApplyOptions(EmploymentLocationOptions, settings.EmploymentLocations, ref _selectedEmploymentLocationOption, nameof(SelectedEmploymentLocationOption), ref _selectedSettingsEmploymentLocation, nameof(SelectedSettingsEmploymentLocation));
+        RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
+        RaisePropertyChanged(nameof(CanRemoveEmploymentCategoryOption));
+        RaisePropertyChanged(nameof(CanRemoveEmploymentLocationOption));
+        RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
+        RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
+        RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private static Bitmap? TryLoadLogo(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var stream = File.OpenRead(path);
+            return new Bitmap(stream);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool? ParseOptionalBoolean(string option)
@@ -1074,6 +1714,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         SetWorkspaceSection(WorkspaceSection.Settings);
     }
 
+    private void SwitchToHelpWorkspace()
+    {
+        SetWorkspaceSection(WorkspaceSection.Help);
+    }
+
     private void SetWorkspaceSection(WorkspaceSection section)
     {
         if (_currentSection == section)
@@ -1086,13 +1731,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
         RaisePropertyChanged(nameof(IsEmployeeWorkspace));
         RaisePropertyChanged(nameof(IsSettingsWorkspace));
+        RaisePropertyChanged(nameof(IsHelpWorkspace));
         RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
         RaisePropertyChanged(nameof(ShowPayrollRunsWorkspace));
         RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
         RaisePropertyChanged(nameof(ShowSettingsWorkspace));
+        RaisePropertyChanged(nameof(ShowHelpWorkspace));
         RaisePropertyChanged(nameof(ShowEmployeeSelectionArea));
         RaisePropertyChanged(nameof(ShowPrimaryWorkspaceArea));
         RaisePropertyChanged(nameof(CanSaveSettings));
+        RaisePropertyChanged(nameof(CanCreatePayrollPdf));
         RaiseActionStateChanged();
     }
 }

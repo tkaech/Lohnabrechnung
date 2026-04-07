@@ -15,11 +15,19 @@ public sealed partial class App : global::Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var bootstrapper = new global::Payroll.Desktop.Bootstrapping.AppBootstrapper();
-            desktop.MainWindow = new Views.MainWindow
+            try
             {
-                DataContext = bootstrapper.CreateMainWindowViewModel()
-            };
+                var bootstrapper = new global::Payroll.Desktop.Bootstrapping.AppBootstrapper();
+                desktop.MainWindow = new Views.MainWindow
+                {
+                    DataContext = bootstrapper.CreateMainWindowViewModel()
+                };
+            }
+            catch (Exception exception)
+            {
+                var logPath = StartupErrorLogger.WriteStartupErrorLog(exception);
+                throw new InvalidOperationException($"{StartupErrorLogger.BuildStartupErrorMessage(exception)} | startup log: {logPath}", exception);
+            }
         }
 
         base.OnFrameworkInitializationCompleted();

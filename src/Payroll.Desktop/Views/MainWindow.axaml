@@ -3,39 +3,54 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="clr-namespace:Payroll.Desktop.Controls"
+    xmlns:styles="clr-namespace:Payroll.Desktop.Styles"
     Title="{Binding Title}"
     Width="1460"
     Height="920"
     MinWidth="1200"
     MinHeight="760"
-    Background="#FFF5F7FA">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20">
+    Background="{DynamicResource Theme.Color.AppBackground}">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20" PointerPressed="OnRootPointerPressed">
     <Border
         Grid.Row="0"
+        Classes="surface-panel"
         Padding="18"
-        Background="#FF14324A"
+        Background="{DynamicResource Theme.Color.Brand}"
         CornerRadius="14"
         Margin="0,0,0,16">
-      <StackPanel Spacing="6">
-        <TextBlock FontSize="24" FontWeight="Bold" Foreground="White" Text="PayrollApp" />
-        <TextBlock Foreground="#FFD1DCE7" Text="Monatszentrierte Arbeitsoberflaeche fuer Zeit- und Spesenerfassung mit separatem Mitarbeitendenbereich." />
-      </StackPanel>
+      <Grid ColumnDefinitions="Auto,*">
+        <Border Width="48" Height="48" Background="#33FFFFFF" CornerRadius="12" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,14,0">
+          <Grid>
+            <Image Source="{Binding AppLogoImage}" Stretch="Uniform" IsVisible="{Binding HasAppLogoImage}" />
+            <Viewbox Stretch="Uniform" IsVisible="{Binding ShowAppLogoText}">
+              <TextBlock Classes="app-title" Text="{Binding AppLogoText}" />
+            </Viewbox>
+          </Grid>
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="6">
+          <TextBlock Classes="app-title" Text="{x:Static styles:ThemeTokens.BrandAppName}" />
+          <TextBlock Classes="app-subtitle" Text="{x:Static styles:ThemeTokens.BrandAppSubtitle}" />
+        </StackPanel>
+      </Grid>
     </Border>
 
-    <Border Grid.Row="1" Background="#FFFFFFFF" BorderBrush="#FFD7DFEA" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,16">
+    <Border Grid.Row="1" Classes="surface-panel" Padding="12" Margin="0,0,0,16">
       <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button Classes="nav-active" Content="Zeit- und Spesenerfassung" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-        <Button Classes="nav-active" Content="Lohnlaeufe" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
         <Button Classes="nav-active" Content="Mitarbeitende" IsVisible="{Binding IsEmployeeWorkspace}" />
         <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
         <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
         <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+        <Button Classes="nav-active" Content="Zeit- und Spesenerfassung" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+        <Button Classes="nav-active" Content="Lohnlaeufe" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
         <Button Classes="nav-placeholder" Content="AHV / Abzuege" IsEnabled="False" />
         <Button Classes="nav-placeholder" Content="Quellensteuer" IsEnabled="False" />
         <Button Classes="nav-placeholder" Content="Reporting" IsEnabled="False" />
@@ -43,6 +58,12 @@
         <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
         <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
         <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+        <Button Classes="nav-active" Content="Hilfe" IsVisible="{Binding IsHelpWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
       </StackPanel>
     </Border>
 
@@ -53,7 +74,7 @@
             <StackPanel Spacing="8" DataContext="{Binding MonthlyRecord}">
               <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
               <TextBlock Foreground="#FF5F6B7A" Text="Monat waehlen. Der Monatskontext wird anschliessend beim Mitarbeitendenwechsel automatisch geladen." TextWrapping="Wrap" />
-              <DatePicker SelectedDate="{Binding SelectedMonth, Mode=TwoWay}" />
+              <DatePicker DayVisible="False" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
             </StackPanel>
           </Border>
 
@@ -61,7 +82,7 @@
             <StackPanel Spacing="8" DataContext="{Binding MonthlyRecord}">
               <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
               <TextBlock Foreground="#FF5F6B7A" Text="Monat waehlen und Mitarbeitenden selektieren, damit links die Lohn-Vorschau fuer genau diesen Monat geladen wird." TextWrapping="Wrap" />
-              <DatePicker SelectedDate="{Binding SelectedMonth, Mode=TwoWay}" />
+              <DatePicker DayVisible="False" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
             </StackPanel>
           </Border>
 
@@ -123,90 +144,412 @@
       </controls:AppSectionCard>
 
       <controls:AppSectionCard Grid.Column="0" Grid.ColumnSpan="2" Header="Einstellungen" Margin="8,0,0,0" IsVisible="{Binding ShowSettingsWorkspace}">
-        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" MinHeight="0">
-          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12">
-            <StackPanel Spacing="4">
-              <TextBlock FontSize="18" FontWeight="SemiBold" Text="Einstellungen" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Zentrale Pflege lohnrelevanter Zuschlaege, Abzuege und Fahrzeugansaetze. Diese Werte gelten systemweit identisch fuer alle Mitarbeitenden." TextWrapping="Wrap" />
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Row="1" Margin="0,12,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="16">
-            <StackPanel Spacing="12">
-              <TextBlock FontWeight="SemiBold" Text="Arbeitszeitzuschlaege" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Prozentsaetze als Dezimalwerte pflegen, zum Beispiel `0.25` fuer 25 Prozent." TextWrapping="Wrap" />
-              <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
-                <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
-                  <TextBlock Classes="section-caption" Text="Nachtzuschlag" />
-                  <TextBox Text="{Binding SettingsNightSupplementRate, Mode=TwoWay}" Watermark="z. B. 0.25" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
-                  <TextBlock Classes="section-caption" Text="Sonntagszuschlag" />
-                  <TextBox Text="{Binding SettingsSundaySupplementRate, Mode=TwoWay}" Watermark="z. B. 0.50" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Spacing="4">
-                  <TextBlock Classes="section-caption" Text="Feiertagszuschlag" />
-                  <TextBox Text="{Binding SettingsHolidaySupplementRate, Mode=TwoWay}" Watermark="z. B. 1.00" />
-                </StackPanel>
-              </Grid>
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Row="2" Margin="0,12,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="16">
-            <StackPanel Spacing="12">
-              <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden in der Lohnberechnung zentral auf den lohnrelevanten Bruttobetrag angewendet." TextWrapping="Wrap" />
-              <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+        <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <Grid RowDefinitions="Auto,Auto" MinHeight="0">
+          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+            <TabControl>
+              <TabItem Header="Layout">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                  <TextBlock FontWeight="SemiBold" Text="App allgemein" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Zentrale Screen-Werte fuer Schrift, Farben und Logo. Diese Werte steuern das laufende Programm." TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
                 <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
-                  <TextBlock Classes="section-caption" Text="AHV/IV/EO" />
-                  <TextBox Text="{Binding SettingsAhvIvEoRate, Mode=TwoWay}" Watermark="0.053" />
+                  <TextBlock Classes="section-caption" Text="Schriftart" />
+                  <TextBox Text="{Binding SettingsAppFontFamily, Mode=TwoWay}" />
                 </StackPanel>
                 <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
-                  <TextBlock Classes="section-caption" Text="ALV" />
-                  <TextBox Text="{Binding SettingsAlvRate, Mode=TwoWay}" Watermark="0.011" />
+                  <TextBlock Classes="section-caption" Text="Schriftgroesse" />
+                  <TextBox Text="{Binding SettingsAppFontSize, Mode=TwoWay}" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
-                  <TextBlock Classes="section-caption" Text="Krankentaggeld/UVG" />
-                  <TextBox Text="{Binding SettingsSicknessAccidentInsuranceRate, Mode=TwoWay}" Watermark="0.00821" />
+                  <TextBlock Classes="section-caption" Text="Schriftfarbe" />
+                  <TextBox Text="{Binding SettingsAppTextColorHex, Mode=TwoWay}" Watermark="#FF1A2530" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
-                  <TextBlock Classes="section-caption" Text="Aus- und Weiterbildung inkl. Ferien" />
-                  <TextBox Text="{Binding SettingsTrainingAndHolidayRate, Mode=TwoWay}" Watermark="0.00015" />
+                  <TextBlock Classes="section-caption" Text="Hinweisfarbe" />
+                  <TextBox Text="{Binding SettingsAppMutedTextColorHex, Mode=TwoWay}" Watermark="#FF5F6B7A" />
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
-                  <TextBlock Classes="section-caption" Text="Ferienentschaedigung" />
-                  <TextBox Text="{Binding SettingsVacationCompensationRate, Mode=TwoWay}" Watermark="0.1064" />
+                  <TextBlock Classes="section-caption" Text="Hintergrundfarbe" />
+                  <TextBox Text="{Binding SettingsAppBackgroundColorHex, Mode=TwoWay}" Watermark="#FFF5F7FA" />
                 </StackPanel>
-              </Grid>
-            </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                  <TextBlock Classes="section-caption" Text="Akzentfarbe" />
+                  <TextBox Text="{Binding SettingsAppAccentColorHex, Mode=TwoWay}" Watermark="#FF14324A" />
+                </StackPanel>
+                <StackPanel Grid.Row="3" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                  <TextBlock Classes="section-caption" Text="Logo-Text" />
+                  <TextBox Text="{Binding SettingsAppLogoText, Mode=TwoWay}" />
+                </StackPanel>
+                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                  <TextBlock Classes="section-caption" Text="Logo-Pfad" />
+                  <TextBox Text="{Binding SettingsAppLogoPath, Mode=TwoWay}" />
+                </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </TabItem>
+
+              <TabItem Header="Listen">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                  <TextBlock FontWeight="SemiBold" Text="Mitarbeitenden-Listen" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Abteilungen, Anstellungskategorien und Anstellungsorte werden zentral gepflegt und im Mitarbeitendenformular als Auswahl verwendet." TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                    <StackPanel Grid.Column="0" Spacing="8" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Abteilungen" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding NewDepartmentName, Mode=TwoWay}" Watermark="Neue Abteilung" />
+                        <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding AddDepartmentOptionCommand}" Content="Hinzufuegen" />
+                      </Grid>
+                      <ListBox ItemsSource="{Binding DepartmentOptions}" SelectedItem="{Binding SelectedSettingsDepartment, Mode=TwoWay}" MinHeight="120">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBox Text="{Binding Name, Mode=TwoWay}" />
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                      <Button Command="{Binding RemoveDepartmentOptionCommand}" Content="Ausgewaehlte Abteilung entfernen" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="8" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Anstellungskategorien" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding NewEmploymentCategoryName, Mode=TwoWay}" Watermark="Neue Kategorie" />
+                        <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding AddEmploymentCategoryOptionCommand}" Content="Hinzufuegen" />
+                      </Grid>
+                      <ListBox ItemsSource="{Binding EmploymentCategoryOptions}" SelectedItem="{Binding SelectedSettingsEmploymentCategory, Mode=TwoWay}" MinHeight="120">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBox Text="{Binding Name, Mode=TwoWay}" />
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                      <Button Command="{Binding RemoveEmploymentCategoryOptionCommand}" Content="Ausgewaehlte Kategorie entfernen" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="8">
+                      <TextBlock Classes="section-caption" Text="Anstellungsorte" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Text="{Binding NewEmploymentLocationName, Mode=TwoWay}" Watermark="Neuer Ort" />
+                        <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding AddEmploymentLocationOptionCommand}" Content="Hinzufuegen" />
+                      </Grid>
+                      <ListBox ItemsSource="{Binding EmploymentLocationOptions}" SelectedItem="{Binding SelectedSettingsEmploymentLocation, Mode=TwoWay}" MinHeight="120">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBox Text="{Binding Name, Mode=TwoWay}" />
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                      <Button Command="{Binding RemoveEmploymentLocationOptionCommand}" Content="Ausgewaehlten Ort entfernen" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </TabItem>
+
+              <TabItem Header="Berechnung">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                  <TextBlock FontWeight="SemiBold" Text="Arbeitszeitzuschlaege" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Prozentsaetze als Dezimalwerte pflegen, zum Beispiel `0.25` fuer 25 Prozent." TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Nachtzuschlag" />
+                      <TextBox Text="{Binding SettingsNightSupplementRate, Mode=TwoWay}" Watermark="z. B. 0.25" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Sonntagszuschlag" />
+                      <TextBox Text="{Binding SettingsSundaySupplementRate, Mode=TwoWay}" Watermark="z. B. 0.50" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                      <TextBlock Classes="section-caption" Text="Feiertagszuschlag" />
+                      <TextBox Text="{Binding SettingsHolidaySupplementRate, Mode=TwoWay}" Watermark="z. B. 1.00" />
+                    </StackPanel>
+                  </Grid>
+
+                  <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden in der Lohnberechnung zentral auf den lohnrelevanten Bruttobetrag angewendet." TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                      <TextBlock Classes="section-caption" Text="AHV/IV/EO" />
+                      <TextBox Text="{Binding SettingsAhvIvEoRate, Mode=TwoWay}" Watermark="0.053" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                      <TextBlock Classes="section-caption" Text="ALV" />
+                      <TextBox Text="{Binding SettingsAlvRate, Mode=TwoWay}" Watermark="0.011" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                      <TextBlock Classes="section-caption" Text="Krankentaggeld/UVG" />
+                      <TextBox Text="{Binding SettingsSicknessAccidentInsuranceRate, Mode=TwoWay}" Watermark="0.00821" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                      <TextBlock Classes="section-caption" Text="Aus- und Weiterbildung inkl. Ferien" />
+                      <TextBox Text="{Binding SettingsTrainingAndHolidayRate, Mode=TwoWay}" Watermark="0.00015" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                      <TextBlock Classes="section-caption" Text="Ferienentschaedigung" />
+                      <TextBox Text="{Binding SettingsVacationCompensationRate, Mode=TwoWay}" Watermark="0.1064" />
+                    </StackPanel>
+                  </Grid>
+
+                  <TextBlock FontWeight="SemiBold" Text="Fahrzeugansaetze" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Die CHF-Werte werden mit den in der Monatserfassung erfassten Mengen multipliziert." TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Pauschalzone 1" />
+                      <TextBox Text="{Binding SettingsVehiclePauschalzone1RateChf, Mode=TwoWay}" Watermark="CHF-Wert" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Pauschalzone 2" />
+                      <TextBox Text="{Binding SettingsVehiclePauschalzone2RateChf, Mode=TwoWay}" Watermark="CHF-Wert" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                      <TextBlock Classes="section-caption" Text="Regiezone 1" />
+                      <TextBox Text="{Binding SettingsVehicleRegiezone1RateChf, Mode=TwoWay}" Watermark="CHF-Wert" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </TabItem>
+
+              <TabItem Header="Druck / PDF">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                  <TextBlock FontWeight="SemiBold" Text="Druck / Print" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Getrennte Werte fuer Ausdrucke und den PDF-Export. Das Druck-Template kann hier direkt angepasst werden." TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                  <TextBlock Classes="section-caption" Text="Print-Schriftart" />
+                  <TextBox Text="{Binding SettingsPrintFontFamily, Mode=TwoWay}" />
+                </StackPanel>
+                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                  <TextBlock Classes="section-caption" Text="Print-Schriftgroesse" />
+                  <TextBox Text="{Binding SettingsPrintFontSize, Mode=TwoWay}" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                  <TextBlock Classes="section-caption" Text="Print-Schriftfarbe" />
+                  <TextBox Text="{Binding SettingsPrintTextColorHex, Mode=TwoWay}" Watermark="#FF000000" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                  <TextBlock Classes="section-caption" Text="Print-Hinweisfarbe" />
+                  <TextBox Text="{Binding SettingsPrintMutedTextColorHex, Mode=TwoWay}" Watermark="#FF4B5563" />
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                  <TextBlock Classes="section-caption" Text="Print-Akzentfarbe" />
+                  <TextBox Text="{Binding SettingsPrintAccentColorHex, Mode=TwoWay}" Watermark="#FFFFFF00" />
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                  <TextBlock Classes="section-caption" Text="Print-Logo-Text" />
+                  <TextBox Text="{Binding SettingsPrintLogoText, Mode=TwoWay}" />
+                </StackPanel>
+                <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Spacing="4" Margin="0,6,0,0">
+                  <TextBlock Classes="section-caption" Text="Print-Logo-Pfad" />
+                  <TextBox Text="{Binding SettingsPrintLogoPath, Mode=TwoWay}" />
+                </StackPanel>
+                  </Grid>
+
+                  <TextBlock FontWeight="SemiBold" Text="PDF-Kopfbereich" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="Die Firmenadresse wird fuer die Lohnabrechnung oben links verwendet und mehrzeilig gepflegt." TextWrapping="Wrap" />
+                  <StackPanel Spacing="4">
+                    <TextBlock Classes="section-caption" Text="Firmenadresse" />
+                    <TextBox Text="{Binding SettingsCompanyAddress, Mode=TwoWay}" AcceptsReturn="True" Height="120" TextWrapping="Wrap" Watermark="Firmenname&#x0a;Strasse oder Postfach&#x0a;PLZ Ort&#x0a;Webseite&#x0a;E-Mail" />
+                  </StackPanel>
+
+                  <TextBlock FontWeight="SemiBold" Text="Druck-Template" />
+                  <TextBlock Foreground="#FF5F6B7A" Text="{}Das Template wird mit Platzhaltern gespeichert und beim PDF-Export mit Lohndaten gefuellt. Beispiel-Platzhalter: {{Firmenadresse}}, {{MitarbeiterName}}, {{Basislohn}}, {{TotalAuszahlung}}." TextWrapping="Wrap" />
+                  <StackPanel Spacing="4">
+                    <TextBlock Classes="section-caption" Text="Template-Inhalt" />
+                    <TextBox Text="{Binding SettingsPrintTemplate, Mode=TwoWay}" AcceptsReturn="True" Height="320" TextWrapping="Wrap" FontFamily="Courier New, DejaVu Sans Mono, Consolas" />
+                  </StackPanel>
+                </StackPanel>
+              </TabItem>
+
+              <TabItem Header="Backup / Restore">
+                <StackPanel Spacing="16" Margin="0,12,0,0">
+                  <StackPanel Spacing="8">
+                    <TextBlock FontWeight="SemiBold" Text="Backup erstellen" />
+                    <TextBlock Foreground="#FF5F6B7A" Text="Konfiguration, Nutzdaten oder beides als Sicherungsdatei exportieren. Zielpfad und Dateiname koennen frei angepasst werden." TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                      <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                        <TextBlock Classes="section-caption" Text="Backup-Typ" />
+                        <ComboBox ItemsSource="{Binding BackupContentTypeOptions}" SelectedItem="{Binding SelectedBackupContentType, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                        <TextBlock Classes="section-caption" Text="Dateiname" />
+                        <TextBox Text="{Binding BackupFileName, Mode=TwoWay}" Watermark="backup_2026-04-07_14-35" />
+                      </StackPanel>
+                      <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="4" Margin="0,6,0,0">
+                        <TextBlock Classes="section-caption" Text="Zielpfad" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBox Text="{Binding BackupDirectoryPath, Mode=TwoWay}" />
+                          <Button Grid.Column="1" Margin="8,0,0,0" Content="Ordner waehlen" Click="OnBrowseBackupDirectoryClick" />
+                        </Grid>
+                      </StackPanel>
+                      <Button Grid.Row="2" Grid.Column="1" HorizontalAlignment="Right" Margin="8,10,0,0" Classes="primary-action" Command="{Binding CreateBackupCommand}" Content="Backup erstellen" />
+                    </Grid>
+                  </StackPanel>
+
+                  <StackPanel Spacing="8">
+                    <TextBlock FontWeight="SemiBold" Text="Restore einspielen" />
+                    <TextBlock Foreground="#FF5F6B7A" Text="Eine vorhandene Sicherungsdatei einspielen. Der Restore-Typ muss zur enthaltenen Sicherungsart passen." TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
+                      <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                        <TextBlock Classes="section-caption" Text="Restore-Typ" />
+                        <ComboBox ItemsSource="{Binding BackupContentTypeOptions}" SelectedItem="{Binding SelectedRestoreContentType, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="4" Margin="0,6,0,0">
+                        <TextBlock Classes="section-caption" Text="Backup-Datei" />
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBox Text="{Binding RestoreFilePath, Mode=TwoWay}" Watermark="/pfad/zur/backup.payrollbackup.json" />
+                          <Button Grid.Column="1" Margin="8,0,0,0" Content="Datei waehlen" Click="OnBrowseRestoreFileClick" />
+                        </Grid>
+                      </StackPanel>
+                      <Button Grid.Row="2" Grid.Column="1" HorizontalAlignment="Right" Margin="8,10,0,0" Command="{Binding RestoreBackupCommand}" Content="Restore starten" />
+                    </Grid>
+                  </StackPanel>
+                </StackPanel>
+              </TabItem>
+            </TabControl>
           </Border>
 
-          <Border Grid.Row="3" Margin="0,12,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="16">
-            <StackPanel Spacing="12">
-              <TextBlock FontWeight="SemiBold" Text="Fahrzeugansaetze" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Die CHF-Werte werden mit den in der Monatserfassung erfassten Mengen multipliziert." TextWrapping="Wrap" />
-              <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
-                <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
-                  <TextBlock Classes="section-caption" Text="Pauschalzone 1" />
-                  <TextBox Text="{Binding SettingsVehiclePauschalzone1RateChf, Mode=TwoWay}" Watermark="CHF-Wert" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
-                  <TextBlock Classes="section-caption" Text="Pauschalzone 2" />
-                  <TextBox Text="{Binding SettingsVehiclePauschalzone2RateChf, Mode=TwoWay}" Watermark="CHF-Wert" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Spacing="4">
-                  <TextBlock Classes="section-caption" Text="Regiezone 1" />
-                  <TextBox Text="{Binding SettingsVehicleRegiezone1RateChf, Mode=TwoWay}" Watermark="CHF-Wert" />
-                </StackPanel>
-              </Grid>
-            </StackPanel>
-          </Border>
-
-          <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
             <TextBlock Foreground="#FF5F6B7A" VerticalAlignment="Center" Text="Die Werte gelten zentral fuer die spaetere Lohnberechnung und werden nicht mehr in Berechnungen hart codiert." TextWrapping="Wrap" />
             <Button Grid.Column="1" Classes="primary-action" Command="{Binding SaveSettingsCommand}" Content="Einstellungen speichern" />
           </Grid>
-        </Grid>
+          </Grid>
+        </ScrollViewer>
+      </controls:AppSectionCard>
+
+      <controls:AppSectionCard Grid.Column="0" Grid.ColumnSpan="2" Header="Hilfe" Margin="8,0,0,0" IsVisible="{Binding ShowHelpWorkspace}">
+        <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12">
+            <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12">
+              <StackPanel Spacing="4">
+                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Hilfe" />
+                <TextBlock Foreground="#FF5F6B7A" Text="Hier findest du Erklaerungen zum Druck-Template, zu Platzhaltern und zu den wichtigsten Druck-/Print-Parametern." TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <TabControl>
+              <TabItem Header="Template-Hilfe">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="Einstellungen im Ueberblick" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Die Seite `Einstellungen` dient nur der Konfiguration. Erklaerungen und Dokumentation sind bewusst in `Hilfe` ausgelagert." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Die Bereiche in `Einstellungen` sind: `Layout`, `Listen`, `Berechnung` und `Druck / PDF`." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Alle dort gepflegten Werte gelten zentral fuer das System und nicht nur fuer eine einzelne Person oder einen einzelnen Lohnlauf." TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="Wichtige Informationen" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Aenderungen in `Berechnung` wirken sich direkt auf die Lohn-Vorschau und den PDF-Export aus." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Aenderungen im Bereich `Listen` beeinflussen Auswahlwerte im Mitarbeitendenformular und sollten nur mit fachlich abgestimmten Begriffen gepflegt werden." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Das Druck-Template in `Druck / PDF` ist technisch frei anpassbar. Falsch geschriebene Platzhalter fuehren aber dazu, dass Inhalte im PDF leer bleiben." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Aenderungen an Layout- oder Print-Farben beeinflussen nur die Darstellung, nicht die Berechnungslogik." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Wenn ein Template stark angepasst wird, sollte die PDF-Ausgabe danach immer einmal mit echten Lohndaten kontrolliert werden." TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="Wie das Template funktioniert" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="{}Das Druck-Template besteht aus Zeilen mit einem Tag am Anfang. Nach dem Tag folgen Parameter, getrennt durch `|`. Platzhalter wie `{{Monat}}` oder `{{Basislohn}}` werden beim PDF-Export automatisch ersetzt." TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="10">
+                      <TextBlock FontWeight="SemiBold" Text="Template-Tags" />
+                      <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold" Text="LOGO" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Foreground="#FF5F6B7A" Text="{}Zeigt das Logo oder den Logo-Text im Kopf links oben. Beispiel: `LOGO|{{Logo}}`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold" Text="COMPANY_BLOCK" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Foreground="#FF5F6B7A" Text="{}Mehrzeiliger Firmenblock links oben. Beispiel: `COMPANY_BLOCK|{{Firmenadresse}}`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="SemiBold" Text="EMPLOYEE_BLOCK" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Foreground="#FF5F6B7A" Text="{}Mehrzeiliger Mitarbeiterblock rechts oben. Beispiel: `EMPLOYEE_BLOCK|{{MitarbeiterBlock}}`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" FontWeight="SemiBold" Text="AHV_LINE" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Foreground="#FF5F6B7A" Text="{}Freie Kopfzeile fuer AHV-Nummer oder andere Kennungen. Beispiel: `AHV_LINE|AHV Nr. {{AhvNummer}}`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" FontWeight="SemiBold" Text="BANNER" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Foreground="#FF5F6B7A" Text="Gelber Titelbalken mit Titel und Monat. Parameter: Titel | Monat." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" FontWeight="SemiBold" Text="META_ROW" />
+                        <TextBlock Grid.Row="5" Grid.Column="1" Foreground="#FF5F6B7A" Text="Metadatenzeile mit linker und rechter Bezeichnung/Wert-Kombination. Parameter: links Label | links Wert | rechts Label | rechts Wert." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" FontWeight="SemiBold" Text="TABLE_HEADER" />
+                        <TextBlock Grid.Row="6" Grid.Column="1" Foreground="#FF5F6B7A" Text="Tabellenkopf fuer die Payroll-Zeilen. Parameter: Bezeichnung | Einheit | Ansatz | Betrag." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="7" Grid.Column="0" FontWeight="SemiBold" Text="PAYROLL_LINE" />
+                        <TextBlock Grid.Row="7" Grid.Column="1" Foreground="#FF5F6B7A" Text="Normale oder hervorgehobene Lohnzeile. Parameter: Stil (`regular` oder `emphasis`) | Label | Menge | Ansatz | Betrag | Detail." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="8" Grid.Column="0" FontWeight="SemiBold" Text="SPACER" />
+                        <TextBlock Grid.Row="8" Grid.Column="1" Foreground="#FF5F6B7A" Text="Fuegt vertikalen Abstand ein. Parameter: Hoehe in Punkten. Beispiel: `SPACER|12`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="9" Grid.Column="0" FontWeight="SemiBold" Text="NOTES_BLOCK / CLOSING" />
+                        <TextBlock Grid.Row="9" Grid.Column="1" Foreground="#FF5F6B7A" Text="`NOTES_BLOCK` zeigt Hinweise unterhalb der Tabelle. `CLOSING` erzeugt Schlusszeilen wie Grussformel oder Firmenname." TextWrapping="Wrap" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="10">
+                      <TextBlock FontWeight="SemiBold" Text="Beispiele fuer Leerzeilen" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="{}1. Standard-Leerzeile: `SPACER|12` fuegt einen normalen Abstand zwischen zwei Template-Zeilen ein." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="{}2. Groesserer Abstand vor einem Zwischentotal: `SPACER|20`." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="{}3. Kleine Trennung zwischen `Spesen gemaess Nachweis` und `Total Auszahlung`: `SPACER|8`." TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="10">
+                      <TextBlock FontWeight="SemiBold" Text="Wichtige Platzhalter" />
+                      <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Firmenname}}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Foreground="#FF5F6B7A" Text="Erste nicht-leere Zeile der Firmenadresse." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Firmenadresse}}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Foreground="#FF5F6B7A" Text="Mehrzeilige Firmenadresse aus Einstellungen." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Logo}}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Foreground="#FF5F6B7A" Text="Print-Logo-Text aus Einstellungen; dient aktuell als einfacher Logo-Platzhalter." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" FontWeight="SemiBold" Text="{}{{MitarbeiterName}}" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Foreground="#FF5F6B7A" Text="Vor- und Nachname des gewaelten Mitarbeitenden." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" FontWeight="SemiBold" Text="{}{{MitarbeiterBlock}}" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Foreground="#FF5F6B7A" Text="Mehrzeilige Kombination aus Name und Adresse des Mitarbeitenden." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Monat}}" />
+                        <TextBlock Grid.Row="5" Grid.Column="1" Foreground="#FF5F6B7A" Text="Abrechnungsmonat fuer den aktuellen Lohnlauf." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Abteilung}} / {{Anstellungsort}}" />
+                        <TextBlock Grid.Row="6" Grid.Column="1" Foreground="#FF5F6B7A" Text="Stammdaten des Mitarbeitenden fuer den Kopfbereich." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="7" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Basislohn}} / {{Zeitzuschlag}}" />
+                        <TextBlock Grid.Row="7" Grid.Column="1" Foreground="#FF5F6B7A" Text="Betragsfelder aus der bestehenden Payroll-Vorschau. Fuer fast jede Zeile gibt es zusaetzlich `...Menge`, `...Ansatz` und `...Detail`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="8" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Pauschalzone1}} / {{Regiezone1}}" />
+                        <TextBlock Grid.Row="8" Grid.Column="1" Foreground="#FF5F6B7A" Text="Fahrzeitentschaedigungen aus Monatsdaten und zentralen Settings." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="9" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Ferienentschaedigung}}" />
+                        <TextBlock Grid.Row="9" Grid.Column="1" Foreground="#FF5F6B7A" Text="Berechnete Ferienentschaedigung gemaess zentraler Rate." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="10" Grid.Column="0" FontWeight="SemiBold" Text="{}{{AhvIveo}}, {{Alv}}, {{Bvg}}" />
+                        <TextBlock Grid.Row="10" Grid.Column="1" Foreground="#FF5F6B7A" Text="Abzugspositionen aus der Lohn-Vorschau." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="11" Grid.Column="0" FontWeight="SemiBold" Text="{}{{Spesen}} / {{TotalAuszahlung}}" />
+                        <TextBlock Grid.Row="11" Grid.Column="1" Foreground="#FF5F6B7A" Text="Spesen gemaess Nachweis und finale Auszahlung." TextWrapping="Wrap" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="10">
+                      <TextBlock FontWeight="SemiBold" Text="Druck- und Print-Parameter" />
+                      <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" FontWeight="SemiBold" Text="Print-Schriftart" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Foreground="#FF5F6B7A" Text="Steuert die verwendete PDF-Schriftfamilie, z. B. Helvetica, Times oder Courier." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" FontWeight="SemiBold" Text="Print-Schriftgroesse" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Foreground="#FF5F6B7A" Text="Basis-Schriftgroesse des PDF. Titel und Hinweistext werden davon abgeleitet." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" FontWeight="SemiBold" Text="Print-Schriftfarbe" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Foreground="#FF5F6B7A" Text="Primäre Textfarbe im PDF, als Hex-Wert wie `#FF000000`." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" FontWeight="SemiBold" Text="Print-Hinweisfarbe" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Foreground="#FF5F6B7A" Text="Gedämpfte Farbe für Hinweise und Detailtexte." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" FontWeight="SemiBold" Text="Print-Akzentfarbe" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Foreground="#FF5F6B7A" Text="Akzentfarbe für Banner oder hervorgehobene Flächen." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" FontWeight="SemiBold" Text="Print-Logo-Text" />
+                        <TextBlock Grid.Row="5" Grid.Column="1" Foreground="#FF5F6B7A" Text="Textbasierter Logo-Ersatz, der aktuell direkt im PDF-Kopf verwendet wird." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" FontWeight="SemiBold" Text="Print-Logo-Pfad" />
+                        <TextBlock Grid.Row="6" Grid.Column="1" Foreground="#FF5F6B7A" Text="Vorbereiteter Pfad für ein späteres Bildlogo im Druck." TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="7" Grid.Column="0" FontWeight="SemiBold" Text="Template-Inhalt" />
+                        <TextBlock Grid.Row="7" Grid.Column="1" Foreground="#FF5F6B7A" Text="Das eigentliche Druck-Template mit Tags und Platzhaltern. Dieses Feld kannst du direkt in `Einstellungen > Druck / PDF` bearbeiten." TextWrapping="Wrap" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </TabItem>
+            </TabControl>
+          </StackPanel>
+        </ScrollViewer>
       </controls:AppSectionCard>
 
       <controls:AppSectionCard Grid.Column="1" Header="Arbeitsbereich" Margin="8,0,0,0" IsVisible="{Binding ShowPrimaryWorkspaceArea}">
@@ -215,15 +558,12 @@
             <Grid>
               <StackPanel Spacing="4" IsVisible="{Binding ShowTimeAndExpensesWorkspace}">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="Zeit- und Spesenerfassung" />
-                <TextBlock Foreground="#FF5F6B7A" Text="Monat zuerst waehlen, danach Mitarbeitenden in der Liste selektieren und rechts Zeiten oder Spesen erfassen. Personendaten stoeren diesen Arbeitsfluss nicht mehr." TextWrapping="Wrap" />
               </StackPanel>
               <StackPanel Spacing="4" IsVisible="{Binding ShowPayrollRunsWorkspace}">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="Lohnlaeufe" />
-                <TextBlock Foreground="#FF5F6B7A" Text="Monat und Mitarbeitenden waehlen, dann die Lohn-Vorschau getrennt von der Erfassung pruefen." TextWrapping="Wrap" />
               </StackPanel>
               <StackPanel Spacing="4" IsVisible="{Binding ShowEmployeeWorkspace}">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding FormTitle}" />
-                <TextBlock Foreground="#FF5F6B7A" Text="{Binding FormDescription}" TextWrapping="Wrap" />
               </StackPanel>
             </Grid>
           </Border>
@@ -245,44 +585,76 @@
                 <TabItem Header="Zeiten">
                   <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12" Margin="0,10,0,0">
-                      <Grid ColumnDefinitions="*,*,*,*,*,*,*,*,*" RowDefinitions="Auto,Auto">
-                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto" HorizontalAlignment="Left">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,10">
                           <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
-                          <TextBox Text="{Binding TimePayrollMonth}" IsReadOnly="True" />
+                          <Grid x:Name="TimeMonthFieldHost">
+                            <TextBox x:Name="TimeMonthInput"
+                                     Width="118"
+                                     Text="{Binding SelectedMonthText, Mode=TwoWay}"
+                                     Watermark="MM/YYYY"
+                                     GotFocus="OnTimeMonthInputGotFocus"
+                                     PointerPressed="OnTimeMonthInputPointerPressed" />
+                            <Popup x:Name="TimeMonthPopup"
+                                   IsOpen="{Binding IsTimeMonthPickerOpen, Mode=TwoWay}"
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding #TimeMonthInput}">
+                              <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10">
+                                <DatePicker DayVisible="False"
+                                            SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
+                              </Border>
+                            </Popup>
+                          </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,10">
                           <TextBlock Classes="section-caption" Text="Datum" />
-                          <TextBox Text="{Binding TimeDate, Mode=TwoWay}" Watermark="YYYY-MM-DD" />
+                          <Grid x:Name="TimeDateFieldHost">
+                            <TextBox x:Name="TimeDateInput"
+                                     Width="124"
+                                     Text="{Binding TimeDate, Mode=TwoWay}"
+                                     Watermark="YYYY-MM-DD"
+                                     GotFocus="OnTimeDateInputGotFocus"
+                                     PointerPressed="OnTimeDateInputPointerPressed" />
+                            <Popup x:Name="TimeDatePopup"
+                                   IsOpen="{Binding IsTimeDatePickerOpen, Mode=TwoWay}"
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding #TimeDateInput}">
+                              <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10">
+                                <DatePicker SelectedDate="{Binding TimeDatePicker, Mode=TwoWay}" />
+                              </Border>
+                            </Popup>
+                          </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,8,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Arbeitsstunden" />
                           <TextBox Text="{Binding HoursWorked, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="3" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="3" Spacing="4" Margin="0,0,8,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Nachtstunden" />
                           <TextBox Text="{Binding NightHours, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="4" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="4" Spacing="4" Margin="0,0,8,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Sonntagsstunden" />
                           <TextBox Text="{Binding SundayHours, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="5" Spacing="4">
+                        <StackPanel Grid.Column="5" Spacing="4" Margin="0,0,8,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Feiertagsstunden" />
                           <TextBox Text="{Binding HolidayHours, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="6" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="6" Spacing="4" Margin="0,0,8,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Pauschalzone 1" />
                           <TextBox Text="{Binding VehiclePauschalzone1, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="7" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="7" Spacing="4" Margin="0,0,8,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Pauschalzone 2" />
                           <TextBox Text="{Binding VehiclePauschalzone2, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="8" Spacing="4">
+                        <StackPanel Grid.Column="8" Spacing="4" Margin="0,0,0,10" Width="92">
                           <TextBlock Classes="section-caption" Text="Regiezone 1" />
                           <TextBox Text="{Binding VehicleRegiezone1, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.ColumnSpan="9" Spacing="4" Margin="0,10,0,0">
+
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="9" Spacing="4">
                           <TextBlock Classes="section-caption" Text="Bemerkung" />
                           <TextBox Text="{Binding TimeNote, Mode=TwoWay}" />
                         </StackPanel>
@@ -295,18 +667,103 @@
                       </StackPanel>
 
                       <TextBlock Classes="section-caption" Text="Tagesliste" />
-                      <ListBox ItemsSource="{Binding TimeEntries}" SelectedItem="{Binding SelectedTimeEntry, Mode=TwoWay}" MinHeight="240">
-                        <ListBox.ItemTemplate>
-                          <DataTemplate>
-                            <Border Padding="10" Margin="0,0,0,8" Background="#FFF8FAFC" CornerRadius="8">
-                              <StackPanel Spacing="3">
-                                <TextBlock FontWeight="SemiBold" Text="{Binding Summary}" />
-                                <TextBlock Classes="section-caption" Text="{Binding Note}" TextWrapping="Wrap" />
-                              </StackPanel>
+                      <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                        <StackPanel Spacing="0">
+                          <Grid ColumnDefinitions="100,90,72,72,72,72,78,78,78" Background="#FFF8FAFC">
+                            <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Datum" />
                             </Border>
-                          </DataTemplate>
-                        </ListBox.ItemTemplate>
-                      </ListBox>
+                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Monat" />
+                            </Border>
+                            <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Arbeit" />
+                            </Border>
+                            <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Nacht" />
+                            </Border>
+                            <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Sonntag" />
+                            </Border>
+                            <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Feiertag" />
+                            </Border>
+                            <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="P1" />
+                            </Border>
+                            <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="P2" />
+                            </Border>
+                            <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="R1" />
+                            </Border>
+                          </Grid>
+                          <ListBox ItemsSource="{Binding TimeEntryHistory}"
+                                   SelectedItem="{Binding SelectedTimeEntry, Mode=TwoWay}"
+                                   SelectionChanged="OnTimeEntryHistorySelectionChanged"
+                                   MinHeight="240"
+                                   BorderThickness="0">
+                            <ListBox.Styles>
+                              <Style Selector="ListBoxItem">
+                                <Setter Property="Background" Value="#FFFFFFFF" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                              </Style>
+                              <Style Selector="ListBoxItem:selected">
+                                <Setter Property="Background" Value="#FFEAF3F9" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                              </Style>
+                              <Style Selector="ListBoxItem:pointerover">
+                                <Setter Property="Background" Value="#FFF4F8FB" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                              </Style>
+                            </ListBox.Styles>
+                            <ListBox.ItemTemplate>
+                              <DataTemplate>
+                                <Border Padding="0" Background="Transparent" Tapped="OnTimeEntryHistoryTapped" DoubleTapped="OnTimeEntryHistoryDoubleTapped">
+                                  <StackPanel Spacing="0">
+                                    <Grid ColumnDefinitions="100,90,72,72,72,72,78,78,78">
+                                      <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding WorkDate, StringFormat='{}{0:dd.MM.yyyy}'}" />
+                                      </Border>
+                                      <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding WorkDate, StringFormat='{}{0:MM.yyyy}'}" />
+                                      </Border>
+                                      <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding HoursWorked, StringFormat='{}{0:0.##} h'}" />
+                                      </Border>
+                                      <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding NightHours, StringFormat='{}{0:0.##}'}" />
+                                      </Border>
+                                      <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding SundayHours, StringFormat='{}{0:0.##}'}" />
+                                      </Border>
+                                      <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding HolidayHours, StringFormat='{}{0:0.##}'}" />
+                                      </Border>
+                                      <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding VehiclePauschalzone1Chf, StringFormat='{}{0:0.00}'}" />
+                                      </Border>
+                                      <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding VehiclePauschalzone2Chf, StringFormat='{}{0:0.00}'}" />
+                                      </Border>
+                                      <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding VehicleRegiezone1Chf, StringFormat='{}{0:0.00}'}" />
+                                      </Border>
+                                    </Grid>
+                                    <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,4" IsVisible="{Binding Note}">
+                                      <TextBlock Classes="section-caption" Text="{Binding Note}" TextWrapping="Wrap" />
+                                    </Border>
+                                  </StackPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ListBox.ItemTemplate>
+                          </ListBox>
+                        </StackPanel>
+                      </Border>
                     </StackPanel>
                   </ScrollViewer>
                 </TabItem>
@@ -315,12 +772,28 @@
                   <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12" Margin="0,10,0,0">
                       <TextBlock Foreground="#FF5F6B7A" Text="Pro Mitarbeitendem und Monat wird im Spesenbereich nur noch das Total fuer Diverse Spesen gepflegt." TextWrapping="Wrap" />
-                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
+                      <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto" HorizontalAlignment="Left">
                         <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
                           <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
-                          <TextBox Text="{Binding ExpensePayrollMonth}" IsReadOnly="True" />
+                          <Grid x:Name="ExpenseMonthFieldHost">
+                            <TextBox x:Name="ExpenseMonthInput"
+                                     Width="118"
+                                     Text="{Binding SelectedMonthText, Mode=TwoWay}"
+                                     Watermark="MM/YYYY"
+                                     GotFocus="OnExpenseMonthInputGotFocus"
+                                     PointerPressed="OnExpenseMonthInputPointerPressed" />
+                            <Popup x:Name="ExpenseMonthPopup"
+                                   IsOpen="{Binding IsExpenseMonthPickerOpen, Mode=TwoWay}"
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding #ExpenseMonthInput}">
+                              <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10">
+                                <DatePicker DayVisible="False"
+                                            SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
+                              </Border>
+                            </Popup>
+                          </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                        <StackPanel Grid.Column="1" Spacing="4" Width="120">
                           <TextBlock Classes="section-caption" Text="Spesen" />
                           <TextBox Text="{Binding ExpensesTotal, Mode=TwoWay}" />
                         </StackPanel>
@@ -330,6 +803,66 @@
                         <Button Command="{Binding ResetExpenseValuesCommand}" Content="Zuruecksetzen" />
                         <Button Command="{Binding SaveExpenseEntryCommand}" Content="Spesen speichern" />
                       </StackPanel>
+
+                      <TextBlock Classes="section-caption" Text="Spesenliste" />
+                      <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                        <StackPanel Spacing="0">
+                          <Grid ColumnDefinitions="110,140" Background="#FFF8FAFC">
+                            <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Monat" />
+                            </Border>
+                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6">
+                              <TextBlock FontWeight="SemiBold" Text="Spesen" />
+                            </Border>
+                          </Grid>
+                          <ListBox ItemsSource="{Binding ExpenseEntryHistory}"
+                                   SelectedItem="{Binding SelectedExpenseEntry, Mode=TwoWay}"
+                                   SelectionChanged="OnExpenseEntryHistorySelectionChanged"
+                                   MinHeight="180"
+                                   BorderThickness="0">
+                            <ListBox.Styles>
+                              <Style Selector="ListBoxItem">
+                                <Setter Property="Background" Value="#FFFFFFFF" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                              </Style>
+                              <Style Selector="ListBoxItem:selected">
+                                <Setter Property="Background" Value="#FFEAF3F9" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                              </Style>
+                              <Style Selector="ListBoxItem:pointerover">
+                                <Setter Property="Background" Value="#FFF4F8FB" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                              </Style>
+                            </ListBox.Styles>
+                            <ListBox.ItemTemplate>
+                              <DataTemplate>
+                                <Border Padding="0" Background="Transparent" Tapped="OnExpenseEntryHistoryTapped" DoubleTapped="OnExpenseEntryHistoryDoubleTapped">
+                                  <Grid ColumnDefinitions="110,140">
+                                    <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                      <TextBlock FontWeight="SemiBold" Text="{Binding Month, StringFormat='{}{0:00}' }">
+                                        <TextBlock.Text>
+                                          <MultiBinding StringFormat="{}{0:00}.{1}">
+                                            <Binding Path="Month" />
+                                            <Binding Path="Year" />
+                                          </MultiBinding>
+                                        </TextBlock.Text>
+                                      </TextBlock>
+                                    </Border>
+                                    <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6">
+                                      <TextBlock FontWeight="SemiBold"
+                                                 Text="{Binding ExpensesTotalChf, StringFormat='{}{0:0.00} CHF'}" />
+                                    </Border>
+                                  </Grid>
+                                </Border>
+                              </DataTemplate>
+                            </ListBox.ItemTemplate>
+                          </ListBox>
+                        </StackPanel>
+                      </Border>
                     </StackPanel>
                   </ScrollViewer>
                 </TabItem>
@@ -341,10 +874,11 @@
           <ScrollViewer Grid.Row="1" Margin="0,12,0,0" MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowPayrollRunsWorkspace}">
             <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12">
               <StackPanel Spacing="10" DataContext="{Binding MonthlyRecord}">
-                <StackPanel Spacing="4">
-                  <TextBlock FontSize="16" FontWeight="SemiBold" Text="Lohn-Voransicht" />
-                  <TextBlock Foreground="#FF5F6B7A" Text="{Binding PayrollPreviewSummary}" TextWrapping="Wrap" />
-                </StackPanel>
+              <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Lohn-Voransicht" />
+                <Button Grid.Column="1" Classes="primary-action" Command="{Binding DataContext.CreatePayrollPdfCommand, RelativeSource={RelativeSource AncestorType=Window}}" Content="PDF erstellen" />
+                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Foreground="#FF5F6B7A" Text="{Binding PayrollPreviewSummary}" TextWrapping="Wrap" />
+              </Grid>
 
                 <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10">
                   <StackPanel Spacing="8">
@@ -352,23 +886,37 @@
                       <TextBlock FontWeight="SemiBold" Text="Position" />
                       <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="Einheit / Menge" />
                       <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="Ansatz / Regel" />
-                      <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="Betrag" />
+                      <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="Betrag" TextAlignment="Right" HorizontalAlignment="Stretch" />
                     </Grid>
 
                     <ItemsControl ItemsSource="{Binding PayrollPreviewLines}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                          <Border Padding="0,8" BorderBrush="#FFE2E8F0" BorderThickness="0,0,0,1">
-                            <StackPanel Spacing="3">
-                              <Grid ColumnDefinitions="2.2*,1.1*,1.2*,1.1*">
-                                <TextBlock FontWeight="SemiBold" Text="{Binding Label}" />
-                                <TextBlock Grid.Column="1" Text="{Binding QuantityDisplay}" />
-                                <TextBlock Grid.Column="2" Text="{Binding RateDisplay}" />
-                                <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="{Binding AmountDisplay}" />
-                              </Grid>
-                              <TextBlock Classes="section-caption" Text="{Binding Detail}" TextWrapping="Wrap" />
-                            </StackPanel>
-                          </Border>
+                          <StackPanel Spacing="0">
+                            <Border Padding="0,8" BorderBrush="#FFE2E8F0" BorderThickness="0,0,0,1" IsVisible="{Binding IsRegular}">
+                              <StackPanel Spacing="3">
+                                <Grid ColumnDefinitions="2.2*,1.1*,1.2*,1.1*">
+                                  <TextBlock FontWeight="SemiBold" Text="{Binding Label}" />
+                                  <TextBlock Grid.Column="1" Text="{Binding QuantityDisplay}" />
+                                  <TextBlock Grid.Column="2" Text="{Binding RateDisplay}" />
+                                  <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="{Binding AmountDisplay}" TextAlignment="Right" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <TextBlock Classes="section-caption" Text="{Binding Detail}" TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Border>
+
+                            <Border Padding="8" Margin="0,4,0,4" Background="#FFEFF4F8" CornerRadius="6" BorderBrush="#FFE2E8F0" BorderThickness="0,0,0,1" IsVisible="{Binding IsEmphasized}">
+                              <StackPanel Spacing="3">
+                                <Grid ColumnDefinitions="2.2*,1.1*,1.2*,1.1*">
+                                  <TextBlock FontWeight="Bold" Text="{Binding Label}" />
+                                  <TextBlock Grid.Column="1" Text="{Binding QuantityDisplay}" />
+                                  <TextBlock Grid.Column="2" Text="{Binding RateDisplay}" />
+                                  <TextBlock Grid.Column="3" FontWeight="Bold" Text="{Binding AmountDisplay}" TextAlignment="Right" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <TextBlock Classes="section-caption" Text="{Binding Detail}" TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -389,7 +937,7 @@
           </ScrollViewer>
 
           <ScrollViewer Grid.Row="1" Margin="0,12,0,0" MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowEmployeeWorkspace}">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,*">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,*">
               <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Classes="section-caption" Text="Stammdaten" />
 
               <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
@@ -425,105 +973,139 @@
                 <CheckBox IsChecked="{Binding IsActiveEmployee, Mode=TwoWay}" IsEnabled="{Binding CanEditFields}" Content="Aktiv" />
               </StackPanel>
 
-              <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Adresse und Kontakt" />
+              <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Zuordnung" />
 
               <StackPanel Grid.Row="6" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Abteilung" />
+                <ComboBox IsEnabled="{Binding CanEditFields}" ItemsSource="{Binding DepartmentOptions}" SelectedItem="{Binding SelectedDepartmentOption, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Row="6" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Anstellungskategorie" />
+                <ComboBox IsEnabled="{Binding CanEditFields}" ItemsSource="{Binding EmploymentCategoryOptions}" SelectedItem="{Binding SelectedEmploymentCategoryOption, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+
+              <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Spacing="4" Margin="0,10,0,0">
+                <TextBlock Classes="section-caption" Text="Anstellungsort" />
+                <ComboBox IsEnabled="{Binding CanEditFields}" ItemsSource="{Binding EmploymentLocationOptions}" SelectedItem="{Binding SelectedEmploymentLocationOption, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+
+              <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Adresse und Kontakt" />
+
+              <StackPanel Grid.Row="9" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Strasse" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Street, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="6" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="9" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Hausnummer" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding HouseNumber, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="7" Grid.ColumnSpan="2" Spacing="4" Margin="0,10,0,0">
+              <StackPanel Grid.Row="10" Grid.ColumnSpan="2" Spacing="4" Margin="0,10,0,0">
                 <TextBlock Classes="section-caption" Text="Adresszusatz" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding AddressLine2, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="8" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="11" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Postleitzahl" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PostalCode, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="8" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="11" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Ort" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding City, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="9" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="12" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Land" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Country, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="9" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="12" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Wohnsitzland" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding ResidenceCountry, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="10" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="13" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Telefon" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PhoneNumber, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="10" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="13" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="E-Mail" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Email, Mode=TwoWay}" />
               </StackPanel>
 
-              <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Payroll-relevante Stammdaten" />
+              <TextBlock Grid.Row="14" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Payroll-relevante Stammdaten" />
 
-              <StackPanel Grid.Row="12" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="15" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Nationalitaet" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Nationality, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="12" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="15" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Bewilligung" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding PermitCode, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="13" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="16" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Steuerstatus" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding TaxStatus, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="13" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="16" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Quellensteuerpflicht" />
                 <ComboBox IsEnabled="{Binding CanEditFields}" ItemsSource="{Binding WithholdingTaxOptions}" SelectedItem="{Binding SelectedWithholdingTaxOption, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="14" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="17" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="AHV-Nummer" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding AhvNumber, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="14" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="17" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="IBAN" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding Iban, Mode=TwoWay}" />
               </StackPanel>
 
-              <TextBlock Grid.Row="15" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Vertragsdaten" />
+              <TextBlock Grid.Row="18" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Vertragsdaten" />
 
-              <StackPanel Grid.Row="16" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="19" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Gueltig ab" />
                 <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding ContractValidFrom, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="16" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="19" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Gueltig bis" />
                 <DatePicker IsEnabled="{Binding CanEditFields}" SelectedDate="{Binding ContractValidTo, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="17" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="20" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Stundenlohn CHF" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding HourlyRateChf, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Grid.Row="17" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+              <StackPanel Grid.Row="20" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="BVG pro Monat CHF" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding MonthlyBvgDeductionChf, Mode=TwoWay}" />
               </StackPanel>
 
-              <StackPanel Grid.Row="18" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="21" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Spezialzuschlag gemaess Vertrag CHF" />
                 <TextBox IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding SpecialSupplementRateChf, Mode=TwoWay}" />
               </StackPanel>
 
-              <TextBlock Grid.Row="19" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Zuschlagssaetze" />
-              <Border Grid.Row="20" Grid.ColumnSpan="2" Margin="0,10,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="12">
+              <TextBlock Grid.Row="22" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Zuschlagssaetze" />
+              <Border Grid.Row="23" Grid.ColumnSpan="2" Margin="0,10,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="12">
                 <TextBlock Foreground="#FF5F6B7A" Text="Nacht-, Sonntags- und Feiertagszuschlaege werden zentral im Bereich Einstellungen gepflegt und nicht mehr pro Mitarbeitendem." TextWrapping="Wrap" />
               </Border>
             </Grid>

@@ -11,9 +11,38 @@ public sealed class PayrollSettingsServiceTests
         var repository = new InMemoryPayrollSettingsRepository();
         var service = new PayrollSettingsService(repository);
 
-        var saved = await service.SaveAsync(new SavePayrollSettingsCommand(0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 1.10m, 2.20m, 3.30m));
+        var saved = await service.SaveAsync(new SavePayrollSettingsCommand(
+            "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri",
+            "Aptos",
+            14m,
+            "#FF101820",
+            "#FF667788",
+            "#FFF6F8FB",
+            "#FF224466",
+            "BSD",
+            "/tmp/app-logo.png",
+            "Helvetica",
+            10m,
+            "#FF000000",
+            "#FF556677",
+            "#FFFFFF00",
+            "BSD",
+            "/tmp/print-logo.png",
+            "BANNER|Lohnblatt|{{Monat}}",
+            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 1.10m, 2.20m, 3.30m,
+            [new SettingOptionDto(Guid.NewGuid(), "Sicherheit")],
+            [new SettingOptionDto(Guid.NewGuid(), "A")],
+            [new SettingOptionDto(Guid.NewGuid(), "Schachenstr. 7, Emmenbruecke")]));
         var loadedSettings = await service.GetWorkTimeSupplementSettingsAsync();
 
+        Assert.Contains("Blesinger Sicherheits Dienste", saved.CompanyAddress, StringComparison.Ordinal);
+        Assert.Equal("Aptos", saved.AppFontFamily);
+        Assert.Equal(14m, saved.AppFontSize);
+        Assert.Equal("#FF224466", saved.AppAccentColorHex);
+        Assert.Equal("Helvetica", saved.PrintFontFamily);
+        Assert.Equal(10m, saved.PrintFontSize);
+        Assert.Equal("BSD", saved.PrintLogoText);
+        Assert.Equal("BANNER|Lohnblatt|{{Monat}}", saved.PrintTemplate);
         Assert.Equal(0.25m, saved.NightSupplementRate);
         Assert.Equal(0.50m, saved.SundaySupplementRate);
         Assert.Equal(1.00m, saved.HolidaySupplementRate);
@@ -25,6 +54,9 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal(1.10m, saved.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, saved.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, saved.VehicleRegiezone1RateChf);
+        Assert.Single(saved.Departments);
+        Assert.Single(saved.EmploymentCategories);
+        Assert.Single(saved.EmploymentLocations);
         Assert.Equal(0.25m, loadedSettings.NightSupplementRate);
         Assert.Equal(0.50m, loadedSettings.SundaySupplementRate);
         Assert.Equal(1.00m, loadedSettings.HolidaySupplementRate);
@@ -32,7 +64,25 @@ public sealed class PayrollSettingsServiceTests
 
     private sealed class InMemoryPayrollSettingsRepository : IPayrollSettingsRepository
     {
-        private PayrollSettingsDto _settings = new(null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0m, 0m, 0m);
+        private PayrollSettingsDto _settings = new(
+            string.Empty,
+            "Segoe UI",
+            13m,
+            "#FF1A2530",
+            "#FF5F6B7A",
+            "#FFF5F7FA",
+            "#FF14324A",
+            "PA",
+            string.Empty,
+            "Helvetica",
+            9m,
+            "#FF000000",
+            "#FF4B5563",
+            "#FFFFFF00",
+            "PA",
+            string.Empty,
+            string.Empty,
+            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0m, 0m, 0m, [], [], []);
 
         public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
         {
@@ -50,6 +100,23 @@ public sealed class PayrollSettingsServiceTests
         public Task<PayrollSettingsDto> SaveAsync(SavePayrollSettingsCommand command, CancellationToken cancellationToken)
         {
             _settings = new PayrollSettingsDto(
+                command.CompanyAddress,
+                command.AppFontFamily,
+                command.AppFontSize,
+                command.AppTextColorHex,
+                command.AppMutedTextColorHex,
+                command.AppBackgroundColorHex,
+                command.AppAccentColorHex,
+                command.AppLogoText,
+                command.AppLogoPath,
+                command.PrintFontFamily,
+                command.PrintFontSize,
+                command.PrintTextColorHex,
+                command.PrintMutedTextColorHex,
+                command.PrintAccentColorHex,
+                command.PrintLogoText,
+                command.PrintLogoPath,
+                command.PrintTemplate,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,
@@ -60,7 +127,10 @@ public sealed class PayrollSettingsServiceTests
                 command.VacationCompensationRate,
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
-                command.VehicleRegiezone1RateChf);
+                command.VehicleRegiezone1RateChf,
+                command.Departments,
+                command.EmploymentCategories,
+                command.EmploymentLocations);
             return Task.FromResult(_settings);
         }
     }

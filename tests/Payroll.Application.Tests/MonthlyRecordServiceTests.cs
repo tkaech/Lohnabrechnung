@@ -137,18 +137,36 @@ public sealed class MonthlyRecordServiceTests
                     entry.VehiclePauschalzone2Chf,
                     entry.VehicleRegiezone1Chf,
                     entry.Note)).ToArray(),
+                record.TimeEntries.Select(entry => new MonthlyTimeEntryDto(
+                    entry.Id,
+                    entry.WorkDate,
+                    entry.HoursWorked,
+                    entry.NightHours,
+                    entry.SundayHours,
+                    entry.HolidayHours,
+                    entry.VehiclePauschalzone1Chf,
+                    entry.VehiclePauschalzone2Chf,
+                    entry.VehicleRegiezone1Chf,
+                    entry.Note)).ToArray(),
                 record.ExpenseEntry is null
                     ? null
                     : new MonthlyExpenseEntryDto(
                         record.ExpenseEntry.Id,
                         record.ExpenseEntry.ExpensesTotalChf),
+                record.ExpenseEntry is null
+                    ? Array.Empty<HistoricalMonthlyExpenseEntryDto>()
+                    : [new HistoricalMonthlyExpenseEntryDto(
+                        record.ExpenseEntry.Id,
+                        record.Year,
+                        record.Month,
+                        record.ExpenseEntry.ExpensesTotalChf)],
                 new MonthlyRecordPreviewDto(
                     Array.Empty<MonthlyPreviewRowDto>(),
                     ["Testvorschau"]),
                 new MonthlyPayrollPreviewDto(
                     [
-                        new MonthlyPayrollPreviewLineDto("Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null),
-                        new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null)
+                        new MonthlyPayrollPreviewLineDto("Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null, false),
+                        new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null, true)
                     ],
                     ["Test-Lohnvorschau"]));
 

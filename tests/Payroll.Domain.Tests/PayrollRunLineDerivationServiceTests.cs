@@ -33,15 +33,15 @@ public sealed class PayrollRunLineDerivationServiceTests
         };
 
         var payrollSettings = new PayrollSettings(
-            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
-            0.053m,
-            0.011m,
-            0.00821m,
-            0.00015m,
-            0.1064m,
-            1.5m,
-            2.0m,
-            3.0m);
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vehiclePauschalzone1RateChf: 1.5m,
+            vehiclePauschalzone2RateChf: 2.0m,
+            vehicleRegiezone1RateChf: 3.0m);
 
         var service = new PayrollRunLineDerivationService();
 
@@ -92,15 +92,15 @@ public sealed class PayrollRunLineDerivationServiceTests
             new DateOnly(2026, 3, 31),
             contract,
             new PayrollSettings(
-                new WorkTimeSupplementSettings(null, 0.50m, null),
-                0.053m,
-                0.011m,
-                0.00821m,
-                0.00015m,
-                0.1064m,
-                1m,
-                1m,
-                1m),
+                workTimeSupplementSettings: new WorkTimeSupplementSettings(null, 0.50m, null),
+                ahvIvEoRate: 0.053m,
+                alvRate: 0.011m,
+                sicknessAccidentInsuranceRate: 0.00821m,
+                trainingAndHolidayRate: 0.00015m,
+                vacationCompensationRate: 0.1064m,
+                vehiclePauschalzone1RateChf: 1m,
+                vehiclePauschalzone2RateChf: 1m,
+                vehicleRegiezone1RateChf: 1m),
             workSummary,
             [],
             []);
@@ -154,15 +154,15 @@ public sealed class PayrollRunLineDerivationServiceTests
             new DateOnly(2026, 3, 31),
             contract,
             new PayrollSettings(
-                new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
-                0.053m,
-                0.011m,
-                0.00821m,
-                0.00015m,
-                0.1064m,
-                1m,
-                1m,
-                1m),
+                workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+                ahvIvEoRate: 0.053m,
+                alvRate: 0.011m,
+                sicknessAccidentInsuranceRate: 0.00821m,
+                trainingAndHolidayRate: 0.00015m,
+                vacationCompensationRate: 0.1064m,
+                vehiclePauschalzone1RateChf: 1m,
+                vehiclePauschalzone2RateChf: 1m,
+                vehicleRegiezone1RateChf: 1m),
             workSummary,
             [],
             []);

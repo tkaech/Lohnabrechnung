@@ -8,4 +8,8 @@
   <ItemGroup>
     <ProjectReference Include="../Payroll.Domain/Payroll.Domain.csproj" SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Reporting/Templates/PayrollStatementTemplate.txt" />
+  </ItemGroup>
 </Project>

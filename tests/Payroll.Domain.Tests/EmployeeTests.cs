@@ -61,7 +61,10 @@ public sealed class EmployeeTests
             "756.1111.2222.33",
             "CH9300762011623852957",
             "+41 79 555 00 11",
-            "mia@example.ch");
+            "mia@example.ch",
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid());
 
         Assert.Equal("1001", employee.PersonnelNumber);
         Assert.Equal("Mia Muster", employee.FullName);
@@ -87,6 +90,9 @@ public sealed class EmployeeTests
             null,
             true,
             new EmployeeAddress("Musterstrasse", "10a", null, "8000", "Zuerich", "Schweiz"),
+            null,
+            null,
+            null,
             null,
             null,
             null,
@@ -133,7 +139,10 @@ public sealed class EmployeeTests
             null,
             null,
             "+41 79 123 45 67",
-            "max@example.ch");
+            "max@example.ch",
+            null,
+            null,
+            null);
 
         Assert.True(employee.IsActive);
         Assert.Null(employee.ExitDate);
@@ -163,6 +172,9 @@ public sealed class EmployeeTests
             null,
             null,
             "+41 79 123 45 67",
-            email);
+            email,
+            null,
+            null,
+            null);
     }
 }

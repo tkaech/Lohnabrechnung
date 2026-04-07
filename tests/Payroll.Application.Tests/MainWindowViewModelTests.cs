@@ -1,5 +1,7 @@
+using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.Employees;
@@ -189,7 +191,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsAndEmployees()
+    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsEmployeesSettingsAndHelp()
     {
         var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
         var repository = new TestEmployeeRepository(employee);
@@ -218,6 +220,18 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsTimeAndExpensesWorkspace);
         Assert.False(viewModel.IsPayrollRunsWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
+
+        viewModel.ShowSettingsCommand.Execute(null);
+
+        Assert.True(viewModel.IsSettingsWorkspace);
+        Assert.False(viewModel.ShowEmployeeSelectionArea);
+        Assert.False(viewModel.ShowPrimaryWorkspaceArea);
+
+        viewModel.ShowHelpCommand.Execute(null);
+
+        Assert.True(viewModel.IsHelpWorkspace);
+        Assert.False(viewModel.ShowEmployeeSelectionArea);
+        Assert.False(viewModel.ShowPrimaryWorkspaceArea);
     }
 
     [Fact]
@@ -227,7 +241,13 @@ public sealed class MainWindowViewModelTests
         var settingsRepository = new InMemoryPayrollSettingsRepository();
         var viewModel = new MainWindowViewModel(
             new EmployeeService(employeeRepository),
+            new InMemoryBackupRestoreService(),
             new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
             new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
             "Test");
 
@@ -246,6 +266,23 @@ public sealed class MainWindowViewModelTests
         viewModel.SettingsVehiclePauschalzone1RateChf = "1.5";
         viewModel.SettingsVehiclePauschalzone2RateChf = "2.5";
         viewModel.SettingsVehicleRegiezone1RateChf = "3.5";
+        viewModel.SettingsCompanyAddress = "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri";
+        viewModel.SettingsAppFontFamily = "Aptos";
+        viewModel.SettingsAppFontSize = "14";
+        viewModel.SettingsAppTextColorHex = "#FF101820";
+        viewModel.SettingsAppMutedTextColorHex = "#FF667788";
+        viewModel.SettingsAppBackgroundColorHex = "#FFF6F8FB";
+        viewModel.SettingsAppAccentColorHex = "#FF224466";
+        viewModel.SettingsAppLogoText = "BSD";
+        viewModel.SettingsPrintFontFamily = "Helvetica";
+        viewModel.SettingsPrintFontSize = "10";
+        viewModel.SettingsPrintTextColorHex = "#FF000000";
+        viewModel.SettingsPrintMutedTextColorHex = "#FF556677";
+        viewModel.SettingsPrintAccentColorHex = "#FFFFFF00";
+        viewModel.SettingsPrintLogoText = "BSD";
+        viewModel.SettingsPrintTemplate = "BANNER|Lohnblatt|{{Monat}}";
+        viewModel.NewDepartmentName = "Werkhof";
+        viewModel.AddDepartmentOptionCommand.Execute(null);
         viewModel.SaveSettingsCommand.Execute(null);
 
         await WaitUntilAsync(() => viewModel.StatusMessage == "Einstellungen gespeichert.");
@@ -265,14 +302,72 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(1.5m, settingsRepository.Current.VehiclePauschalzone1RateChf);
         Assert.Equal(2.5m, settingsRepository.Current.VehiclePauschalzone2RateChf);
         Assert.Equal(3.5m, settingsRepository.Current.VehicleRegiezone1RateChf);
+        Assert.Contains("Blesinger Sicherheits Dienste", settingsRepository.Current.CompanyAddress, StringComparison.Ordinal);
+        Assert.Equal("Aptos", settingsRepository.Current.AppFontFamily);
+        Assert.Equal(14m, settingsRepository.Current.AppFontSize);
+        Assert.Equal("#FF224466", settingsRepository.Current.AppAccentColorHex);
+        Assert.Equal("Helvetica", settingsRepository.Current.PrintFontFamily);
+        Assert.Equal(10m, settingsRepository.Current.PrintFontSize);
+        Assert.Equal("BANNER|Lohnblatt|{{Monat}}", settingsRepository.Current.PrintTemplate);
+        Assert.Equal("BSD", settingsRepository.Current.AppLogoText);
+        Assert.Contains(settingsRepository.Current.Departments, item => item.Name == "Werkhof");
+    }
+
+    [Fact]
+    public async Task SettingsWorkspace_CreatesBackupAndUsesRestorePath()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var backupRestoreService = new InMemoryBackupRestoreService();
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            backupRestoreService,
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.BackupDirectoryPath = "/tmp/backups";
+        viewModel.BackupFileName = "backup_2026-04-07_14-35";
+        viewModel.SelectedBackupContentType = "Nur Konfiguration";
+
+        viewModel.CreateBackupCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage.Contains("Backup erstellt:", StringComparison.Ordinal));
+
+        Assert.Equal("/tmp/backups", backupRestoreService.LastCreateCommand?.TargetDirectoryPath);
+        Assert.Equal("backup_2026-04-07_14-35", backupRestoreService.LastCreateCommand?.FileName);
+        Assert.Equal(BackupContentType.Configuration, backupRestoreService.LastCreateCommand?.ContentType);
+
+        viewModel.RestoreFilePath = "/tmp/backups/restore.payrollbackup.json";
+        viewModel.SelectedRestoreContentType = "Nur Konfiguration";
+        viewModel.RestoreBackupCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage.Contains("Restore abgeschlossen:", StringComparison.Ordinal));
+
+        Assert.Equal("/tmp/backups/restore.payrollbackup.json", backupRestoreService.LastRestoreCommand?.BackupFilePath);
+        Assert.Equal(BackupContentType.Configuration, backupRestoreService.LastRestoreCommand?.ContentType);
     }
 
     private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository)
     {
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+
         return new MainWindowViewModel(
             new EmployeeService(repository),
-            new PayrollSettingsService(new InMemoryPayrollSettingsRepository()),
-            new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(repository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            new MonthlyRecordViewModel(monthlyRecordService),
             "Test");
     }
 
@@ -395,6 +490,12 @@ public sealed class MainWindowViewModelTests
                 command.Iban?.Trim(),
                 command.PhoneNumber?.Trim(),
                 command.Email?.Trim(),
+                command.DepartmentOptionId,
+                command.DepartmentOptionId.HasValue ? "Sicherheit" : null,
+                command.EmploymentCategoryOptionId,
+                command.EmploymentCategoryOptionId.HasValue ? "A" : null,
+                command.EmploymentLocationOptionId,
+                command.EmploymentLocationOptionId.HasValue ? "Schachenstr. 7, Emmenbruecke" : null,
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
@@ -431,6 +532,12 @@ public sealed class MainWindowViewModelTests
                 "CH9300762011623852957",
                 "+41 79 000 00 00",
                 $"{firstName.ToLowerInvariant()}.{lastName.ToLowerInvariant()}@example.ch",
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                "Sicherheit",
+                Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                "A",
+                Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                "Schachenstr. 7, Emmenbruecke",
                 new DateOnly(2025, 1, 1),
                 null,
                 32.5m,
@@ -464,6 +571,12 @@ public sealed class MainWindowViewModelTests
                 "CH9300762011623852957",
                 "+41 79 000 00 00",
                 $"{firstName.ToLowerInvariant()}.{lastName.ToLowerInvariant()}@example.ch",
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                "Sicherheit",
+                Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                "A",
+                Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                "Schachenstr. 7, Emmenbruecke",
                 new DateOnly(2025, 1, 1),
                 null,
                 32.5m,
@@ -481,6 +594,9 @@ public sealed class MainWindowViewModelTests
                 employee.City,
                 employee.Country,
                 employee.Email,
+                employee.DepartmentName,
+                employee.EmploymentCategoryName,
+                employee.EmploymentLocationName,
                 employee.HourlyRateChf,
                 employee.MonthlyBvgDeductionChf,
                 employee.ContractValidFrom,
@@ -519,9 +635,61 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    private sealed class InMemoryBackupRestoreService : IBackupRestoreService
+    {
+        public CreateBackupCommand? LastCreateCommand { get; private set; }
+        public RestoreBackupCommand? LastRestoreCommand { get; private set; }
+
+        public string GetDefaultBackupDirectory()
+        {
+            return "/tmp/payroll-backups";
+        }
+
+        public string CreateDefaultFileName(DateTimeOffset localTimestamp)
+        {
+            return $"backup_{localTimestamp:yyyy-MM-dd_HH-mm}";
+        }
+
+        public Task<BackupFileInfoDto> CreateBackupAsync(CreateBackupCommand command, CancellationToken cancellationToken = default)
+        {
+            LastCreateCommand = command;
+            return Task.FromResult(new BackupFileInfoDto(
+                Path.Combine(command.TargetDirectoryPath, command.FileName + ".payrollbackup.json"),
+                command.ContentType,
+                DateTimeOffset.UtcNow));
+        }
+
+        public Task<RestoreResultDto> RestoreBackupAsync(RestoreBackupCommand command, CancellationToken cancellationToken = default)
+        {
+            LastRestoreCommand = command;
+            return Task.FromResult(new RestoreResultDto(command.BackupFilePath, command.ContentType, DateTimeOffset.UtcNow));
+        }
+    }
+
     private sealed class InMemoryPayrollSettingsRepository : IPayrollSettingsRepository
     {
-        private PayrollSettingsDto _settings = new(0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0m, 0m, 0m);
+        private PayrollSettingsDto _settings = new(
+            "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri",
+            "Segoe UI",
+            13m,
+            "#FF1A2530",
+            "#FF5F6B7A",
+            "#FFF5F7FA",
+            "#FF14324A",
+            "PA",
+            string.Empty,
+            "Helvetica",
+            9m,
+            "#FF000000",
+            "#FF4B5563",
+            "#FFFFFF00",
+            "PA",
+            string.Empty,
+            "BANNER|Lohnblatt|{{Monat}}",
+            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0m, 0m, 0m,
+            [new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111111"), "Sicherheit"), new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111112"), "Buero")],
+            [new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "A"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222223"), "B"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222224"), "C")],
+            [new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333333"), "Schachenstr. 7, Emmenbruecke"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333334"), "Weinbergstrasse 8, Baar"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333335"), "Rainstrasse 37, Unteraegeri")]);
 
         public PayrollSettingsDto Current => _settings;
 
@@ -541,6 +709,23 @@ public sealed class MainWindowViewModelTests
         public Task<PayrollSettingsDto> SaveAsync(SavePayrollSettingsCommand command, CancellationToken cancellationToken)
         {
             _settings = new PayrollSettingsDto(
+                command.CompanyAddress,
+                command.AppFontFamily,
+                command.AppFontSize,
+                command.AppTextColorHex,
+                command.AppMutedTextColorHex,
+                command.AppBackgroundColorHex,
+                command.AppAccentColorHex,
+                command.AppLogoText,
+                command.AppLogoPath,
+                command.PrintFontFamily,
+                command.PrintFontSize,
+                command.PrintTextColorHex,
+                command.PrintMutedTextColorHex,
+                command.PrintAccentColorHex,
+                command.PrintLogoText,
+                command.PrintLogoPath,
+                command.PrintTemplate,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,
@@ -551,8 +736,19 @@ public sealed class MainWindowViewModelTests
                 command.VacationCompensationRate,
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
-                command.VehicleRegiezone1RateChf);
+                command.VehicleRegiezone1RateChf,
+                command.Departments,
+                command.EmploymentCategories,
+                command.EmploymentLocations);
             return Task.FromResult(_settings);
+        }
+    }
+
+    private sealed class TestPdfExportService : IPdfExportService
+    {
+        public Task<string> ExportPayrollStatementAsync(PayrollStatementPdfDocument document, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult("/tmp/Lohnblatt_Test.pdf");
         }
     }
 }

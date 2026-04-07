@@ -47,11 +47,23 @@ public sealed class EmployeeRepository : IEmployeeRepository
             .ToArray();
 
         var contractsByEmployeeId = await LoadLatestContractsByEmployeeIdAsync(employeeIds, cancellationToken);
+        var departmentsById = await _dbContext.DepartmentOptions.AsNoTracking().ToDictionaryAsync(item => item.Id, cancellationToken);
+        var categoriesById = await _dbContext.EmploymentCategoryOptions.AsNoTracking().ToDictionaryAsync(item => item.Id, cancellationToken);
+        var locationsById = await _dbContext.EmploymentLocationOptions.AsNoTracking().ToDictionaryAsync(item => item.Id, cancellationToken);
 
         return employees
             .Select(employee =>
             {
                 contractsByEmployeeId.TryGetValue(employee.Id, out var currentContract);
+                var departmentName = employee.DepartmentOptionId.HasValue && departmentsById.TryGetValue(employee.DepartmentOptionId.Value, out var department)
+                    ? department.Name
+                    : null;
+                var categoryName = employee.EmploymentCategoryOptionId.HasValue && categoriesById.TryGetValue(employee.EmploymentCategoryOptionId.Value, out var category)
+                    ? category.Name
+                    : null;
+                var locationName = employee.EmploymentLocationOptionId.HasValue && locationsById.TryGetValue(employee.EmploymentLocationOptionId.Value, out var location)
+                    ? location.Name
+                    : null;
 
                 return new EmployeeListItemDto(
                     employee.Id,
@@ -61,6 +73,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     employee.Address.City,
                     employee.Address.Country,
                     employee.Email,
+                    departmentName,
+                    categoryName,
+                    locationName,
                     currentContract?.HourlyRateChf ?? 0m,
                     currentContract?.MonthlyBvgDeductionChf ?? 0m,
                     currentContract?.ValidFrom ?? default,
@@ -81,6 +96,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
         }
 
         var contract = await LoadLatestContractAsync(employeeId, asNoTracking: true, cancellationToken);
+        var departmentName = await LoadOptionNameAsync(_dbContext.DepartmentOptions, employee.DepartmentOptionId, cancellationToken);
+        var categoryName = await LoadOptionNameAsync(_dbContext.EmploymentCategoryOptions, employee.EmploymentCategoryOptionId, cancellationToken);
+        var locationName = await LoadOptionNameAsync(_dbContext.EmploymentLocationOptions, employee.EmploymentLocationOptionId, cancellationToken);
 
         return new EmployeeDetailsDto(
             employee.Id,
@@ -106,6 +124,12 @@ public sealed class EmployeeRepository : IEmployeeRepository
             employee.Iban,
             employee.PhoneNumber,
             employee.Email,
+            employee.DepartmentOptionId,
+            departmentName,
+            employee.EmploymentCategoryOptionId,
+            categoryName,
+            employee.EmploymentLocationOptionId,
+            locationName,
             contract?.ValidFrom ?? default,
             contract?.ValidTo,
             contract?.HourlyRateChf ?? 0m,
@@ -155,7 +179,10 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.AhvNumber,
                 command.Iban,
                 command.PhoneNumber,
-                command.Email);
+                command.Email,
+                command.DepartmentOptionId,
+                command.EmploymentCategoryOptionId,
+                command.EmploymentLocationOptionId);
 
             contract = await LoadLatestContractAsync(employee.Id, asNoTracking: false, cancellationToken)
                 ?? new EmploymentContract(
@@ -199,7 +226,10 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.AhvNumber,
                 command.Iban,
                 command.PhoneNumber,
-                command.Email);
+                command.Email,
+                command.DepartmentOptionId,
+                command.EmploymentCategoryOptionId,
+                command.EmploymentLocationOptionId);
             contract = new EmploymentContract(
                 employee.Id,
                 command.ContractValidFrom,
@@ -269,5 +299,23 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 group => group
                     .OrderByDescending(contract => contract.ValidFrom)
                     .First());
+    }
+
+    private static async Task<string?> LoadOptionNameAsync<TOption>(
+        IQueryable<TOption> query,
+        Guid? optionId,
+        CancellationToken cancellationToken)
+        where TOption : class
+    {
+        if (!optionId.HasValue)
+        {
+            return null;
+        }
+
+        return await query
+            .AsNoTracking()
+            .Where(item => EF.Property<Guid>(item, "Id") == optionId.Value)
+            .Select(item => EF.Property<string>(item, "Name"))
+            .SingleOrDefaultAsync(cancellationToken);
     }
 }

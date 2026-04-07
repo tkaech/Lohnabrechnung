@@ -54,15 +54,15 @@ public sealed class MonthlyRecordRepositorySqliteTests
         dbContext.Employees.Add(employee);
         dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
         dbContext.PayrollSettings.Add(new PayrollSettings(
-            new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
-            0.053m,
-            0.011m,
-            0.00821m,
-            0.00015m,
-            0.1064m,
-            5.6m,
-            16.8m,
-            0.32m));
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
         await dbContext.SaveChangesAsync();
 
         var repository = new EmployeeMonthlyRecordRepository(dbContext);
@@ -86,6 +86,44 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.Equal(18.50m, details.Header.TotalExpensesChf);
         Assert.Equal(260m, details.Header.TotalVehicleCompensationChf);
         Assert.Equal(120m, details.TimeEntries.Single().VehiclePauschalzone1Chf);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_LoadsTimeAndExpenseHistoryAcrossMonthsChronologically()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var aprilRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 10), 7m, 0m, 0m, 0m, 0m, 0m, 0m, "April");
+        aprilRecord.SaveExpenseEntry(18.50m);
+
+        var mayRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 5, CancellationToken.None);
+        mayRecord.SaveTimeEntry(null, new DateOnly(2026, 5, 3), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Mai");
+        mayRecord.SaveExpenseEntry(22m);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(mayRecord.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Equal(2, details!.TimeEntryHistory.Count);
+        Assert.Equal(new DateOnly(2026, 4, 10), details.TimeEntryHistory.First().WorkDate);
+        Assert.Equal(new DateOnly(2026, 5, 3), details.TimeEntryHistory.Last().WorkDate);
+        Assert.Equal(2, details.ExpenseEntryHistory.Count);
+        Assert.Equal((2026, 4), (details.ExpenseEntryHistory.First().Year, details.ExpenseEntryHistory.First().Month));
+        Assert.Equal((2026, 5), (details.ExpenseEntryHistory.Last().Year, details.ExpenseEntryHistory.Last().Month));
     }
 
     [Fact]
@@ -192,6 +230,9 @@ public sealed class MonthlyRecordRepositorySqliteTests
             "756.1234.5678.90",
             "CH9300762011623852957",
             "+41 79 123 45 67",
-            "anna.aktiv@example.ch");
+            "anna.aktiv@example.ch",
+            null,
+            null,
+            null);
     }
 }

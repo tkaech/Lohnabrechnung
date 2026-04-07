@@ -10,9 +10,40 @@ public sealed class PayrollSettings : AuditableEntity
     public const decimal DefaultSicknessAccidentInsuranceRate = 0.00821m;
     public const decimal DefaultTrainingAndHolidayRate = 0.00015m;
     public const decimal DefaultVacationCompensationRate = 0.1064m;
+    public const string DefaultAppFontFamily = "Segoe UI, DejaVu Sans, Arial";
+    public const decimal DefaultAppFontSize = 13m;
+    public const string DefaultAppTextColorHex = "#FF1A2530";
+    public const string DefaultAppMutedTextColorHex = "#FF5F6B7A";
+    public const string DefaultAppBackgroundColorHex = "#FFF5F7FA";
+    public const string DefaultAppAccentColorHex = "#FF14324A";
+    public const string DefaultAppLogoText = "PA";
+    public const string DefaultPrintFontFamily = "Helvetica";
+    public const decimal DefaultPrintFontSize = 9m;
+    public const string DefaultPrintTextColorHex = "#FF000000";
+    public const string DefaultPrintMutedTextColorHex = "#FF4B5563";
+    public const string DefaultPrintAccentColorHex = "#FFFFFF00";
+    public const string DefaultPrintLogoText = "PA";
+    public const string DefaultPrintTemplate = "";
 
     private PayrollSettings()
     {
+        CompanyAddress = string.Empty;
+        AppFontFamily = DefaultAppFontFamily;
+        AppFontSize = DefaultAppFontSize;
+        AppTextColorHex = DefaultAppTextColorHex;
+        AppMutedTextColorHex = DefaultAppMutedTextColorHex;
+        AppBackgroundColorHex = DefaultAppBackgroundColorHex;
+        AppAccentColorHex = DefaultAppAccentColorHex;
+        AppLogoText = DefaultAppLogoText;
+        AppLogoPath = string.Empty;
+        PrintFontFamily = DefaultPrintFontFamily;
+        PrintFontSize = DefaultPrintFontSize;
+        PrintTextColorHex = DefaultPrintTextColorHex;
+        PrintMutedTextColorHex = DefaultPrintMutedTextColorHex;
+        PrintAccentColorHex = DefaultPrintAccentColorHex;
+        PrintLogoText = DefaultPrintLogoText;
+        PrintLogoPath = string.Empty;
+        PrintTemplate = DefaultPrintTemplate;
         WorkTimeSupplementSettings = WorkTimeSupplementSettings.Empty;
         AhvIvEoRate = DefaultAhvIvEoRate;
         AlvRate = DefaultAlvRate;
@@ -22,6 +53,7 @@ public sealed class PayrollSettings : AuditableEntity
     }
 
     public PayrollSettings(
+        string? companyAddress = null,
         WorkTimeSupplementSettings? workTimeSupplementSettings = null,
         decimal ahvIvEoRate = DefaultAhvIvEoRate,
         decimal alvRate = DefaultAlvRate,
@@ -32,6 +64,23 @@ public sealed class PayrollSettings : AuditableEntity
         decimal vehiclePauschalzone2RateChf = 0m,
         decimal vehicleRegiezone1RateChf = 0m)
     {
+        CompanyAddress = NormalizeCompanyAddress(companyAddress);
+        UpdateVisualSettings(
+            DefaultAppFontFamily,
+            DefaultAppFontSize,
+            DefaultAppTextColorHex,
+            DefaultAppMutedTextColorHex,
+            DefaultAppBackgroundColorHex,
+            DefaultAppAccentColorHex,
+            DefaultAppLogoText,
+            string.Empty,
+            DefaultPrintFontFamily,
+            DefaultPrintFontSize,
+            DefaultPrintTextColorHex,
+            DefaultPrintMutedTextColorHex,
+            DefaultPrintAccentColorHex,
+            DefaultPrintLogoText,
+            string.Empty);
         WorkTimeSupplementSettings = workTimeSupplementSettings ?? WorkTimeSupplementSettings.Empty;
         UpdateDeductionAndVehicleRates(
             ahvIvEoRate,
@@ -45,6 +94,23 @@ public sealed class PayrollSettings : AuditableEntity
     }
 
     public WorkTimeSupplementSettings WorkTimeSupplementSettings { get; private set; }
+    public string CompanyAddress { get; private set; }
+    public string AppFontFamily { get; private set; } = string.Empty;
+    public decimal AppFontSize { get; private set; }
+    public string AppTextColorHex { get; private set; } = string.Empty;
+    public string AppMutedTextColorHex { get; private set; } = string.Empty;
+    public string AppBackgroundColorHex { get; private set; } = string.Empty;
+    public string AppAccentColorHex { get; private set; } = string.Empty;
+    public string AppLogoText { get; private set; } = string.Empty;
+    public string AppLogoPath { get; private set; } = string.Empty;
+    public string PrintFontFamily { get; private set; } = string.Empty;
+    public decimal PrintFontSize { get; private set; }
+    public string PrintTextColorHex { get; private set; } = string.Empty;
+    public string PrintMutedTextColorHex { get; private set; } = string.Empty;
+    public string PrintAccentColorHex { get; private set; } = string.Empty;
+    public string PrintLogoText { get; private set; } = string.Empty;
+    public string PrintLogoPath { get; private set; } = string.Empty;
+    public string PrintTemplate { get; private set; } = string.Empty;
     public decimal AhvIvEoRate { get; private set; }
     public decimal AlvRate { get; private set; }
     public decimal SicknessAccidentInsuranceRate { get; private set; }
@@ -59,6 +125,47 @@ public sealed class PayrollSettings : AuditableEntity
         ArgumentNullException.ThrowIfNull(workTimeSupplementSettings);
 
         WorkTimeSupplementSettings = workTimeSupplementSettings;
+        Touch();
+    }
+
+    public void UpdateCompanyAddress(string? companyAddress)
+    {
+        CompanyAddress = NormalizeCompanyAddress(companyAddress);
+        Touch();
+    }
+
+    public void UpdateVisualSettings(
+        string? appFontFamily,
+        decimal appFontSize,
+        string? appTextColorHex,
+        string? appMutedTextColorHex,
+        string? appBackgroundColorHex,
+        string? appAccentColorHex,
+        string? appLogoText,
+        string? appLogoPath,
+        string? printFontFamily,
+        decimal printFontSize,
+        string? printTextColorHex,
+        string? printMutedTextColorHex,
+        string? printAccentColorHex,
+        string? printLogoText,
+        string? printLogoPath)
+    {
+        AppFontFamily = NormalizeStringOrDefault(appFontFamily, DefaultAppFontFamily);
+        AppFontSize = Guard.AgainstNegative(appFontSize, nameof(appFontSize)) == 0m ? DefaultAppFontSize : appFontSize;
+        AppTextColorHex = NormalizeStringOrDefault(appTextColorHex, DefaultAppTextColorHex);
+        AppMutedTextColorHex = NormalizeStringOrDefault(appMutedTextColorHex, DefaultAppMutedTextColorHex);
+        AppBackgroundColorHex = NormalizeStringOrDefault(appBackgroundColorHex, DefaultAppBackgroundColorHex);
+        AppAccentColorHex = NormalizeStringOrDefault(appAccentColorHex, DefaultAppAccentColorHex);
+        AppLogoText = NormalizeStringOrDefault(appLogoText, DefaultAppLogoText);
+        AppLogoPath = NormalizeOptional(appLogoPath) ?? string.Empty;
+        PrintFontFamily = NormalizeStringOrDefault(printFontFamily, DefaultPrintFontFamily);
+        PrintFontSize = Guard.AgainstNegative(printFontSize, nameof(printFontSize)) == 0m ? DefaultPrintFontSize : printFontSize;
+        PrintTextColorHex = NormalizeStringOrDefault(printTextColorHex, DefaultPrintTextColorHex);
+        PrintMutedTextColorHex = NormalizeStringOrDefault(printMutedTextColorHex, DefaultPrintMutedTextColorHex);
+        PrintAccentColorHex = NormalizeStringOrDefault(printAccentColorHex, DefaultPrintAccentColorHex);
+        PrintLogoText = NormalizeStringOrDefault(printLogoText, DefaultPrintLogoText);
+        PrintLogoPath = NormalizeOptional(printLogoPath) ?? string.Empty;
         Touch();
     }
 
@@ -81,5 +188,47 @@ public sealed class PayrollSettings : AuditableEntity
         VehiclePauschalzone2RateChf = Guard.AgainstNegative(vehiclePauschalzone2RateChf, nameof(vehiclePauschalzone2RateChf));
         VehicleRegiezone1RateChf = Guard.AgainstNegative(vehicleRegiezone1RateChf, nameof(vehicleRegiezone1RateChf));
         Touch();
+    }
+
+    public void UpdatePrintTemplate(string? printTemplate)
+    {
+        PrintTemplate = NormalizeMultilinePreservingSpacing(printTemplate);
+        Touch();
+    }
+
+    private static string NormalizeCompanyAddress(string? companyAddress)
+    {
+        if (string.IsNullOrWhiteSpace(companyAddress))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            companyAddress
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Split('\n', StringSplitOptions.TrimEntries)
+                .Where(line => !string.IsNullOrWhiteSpace(line)));
+    }
+
+    private static string NormalizeStringOrDefault(string? value, string defaultValue)
+    {
+        return string.IsNullOrWhiteSpace(value) ? defaultValue : value.Trim();
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string NormalizeMultilinePreservingSpacing(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Trim();
     }
 }

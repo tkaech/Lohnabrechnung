@@ -39,6 +39,12 @@ public sealed record MonthlyExpenseEntryDto(
     Guid ExpenseEntryId,
     decimal ExpensesTotalChf);
 
+public sealed record HistoricalMonthlyExpenseEntryDto(
+    Guid ExpenseEntryId,
+    int Year,
+    int Month,
+    decimal ExpensesTotalChf);
+
 public sealed record MonthlyPreviewRowDto(
     int Year,
     int Month,
@@ -56,7 +62,11 @@ public sealed record MonthlyPayrollPreviewLineDto(
     string QuantityDisplay,
     string RateDisplay,
     string AmountDisplay,
-    string? Detail);
+    string? Detail,
+    bool IsEmphasized)
+{
+    public bool IsRegular => !IsEmphasized;
+}
 
 public sealed record MonthlyPayrollPreviewDto(
     IReadOnlyCollection<MonthlyPayrollPreviewLineDto> Lines,
@@ -65,7 +75,9 @@ public sealed record MonthlyPayrollPreviewDto(
 public sealed record MonthlyRecordDetailsDto(
     MonthlyRecordHeaderDto Header,
     IReadOnlyCollection<MonthlyTimeEntryDto> TimeEntries,
+    IReadOnlyCollection<MonthlyTimeEntryDto> TimeEntryHistory,
     MonthlyExpenseEntryDto? ExpenseEntry,
+    IReadOnlyCollection<HistoricalMonthlyExpenseEntryDto> ExpenseEntryHistory,
     MonthlyRecordPreviewDto Preview,
     MonthlyPayrollPreviewDto PayrollPreview);
 

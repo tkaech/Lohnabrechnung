@@ -21,6 +21,14 @@ public sealed class EmployeeRepositorySqliteTests
         await using var dbContext = new PayrollDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
 
+        var department = new global::Payroll.Domain.Settings.DepartmentOption("Sicherheit");
+        var category = new global::Payroll.Domain.Settings.EmploymentCategoryOption("A");
+        var location = new global::Payroll.Domain.Settings.EmploymentLocationOption("Schachenstr. 7, Emmenbruecke");
+        dbContext.DepartmentOptions.Add(department);
+        dbContext.EmploymentCategoryOptions.Add(category);
+        dbContext.EmploymentLocationOptions.Add(location);
+        await dbContext.SaveChangesAsync();
+
         var repository = new EmployeeRepository(dbContext);
         var saved = await repository.SaveAsync(
             new SaveEmployeeCommand(
@@ -47,6 +55,9 @@ public sealed class EmployeeRepositorySqliteTests
                 "CH4431999123000889020",
                 "+41 79 200 20 20",
                 "demo.person@demo-payroll.local",
+                department.Id,
+                category.Id,
+                location.Id,
                 new DateOnly(2026, 1, 1),
                 null,
                 32.5m,
@@ -63,6 +74,9 @@ public sealed class EmployeeRepositorySqliteTests
         Assert.Equal("2000", listedEmployee.PersonnelNumber);
         Assert.Equal(32.5m, listedEmployee.HourlyRateChf);
         Assert.Equal(280m, listedEmployee.MonthlyBvgDeductionChf);
+        Assert.Equal("Sicherheit", saved.DepartmentName);
+        Assert.Equal("A", saved.EmploymentCategoryName);
+        Assert.Equal("Schachenstr. 7, Emmenbruecke", saved.EmploymentLocationName);
         Assert.Equal(3.00m, saved.SpecialSupplementRateChf);
     }
 }

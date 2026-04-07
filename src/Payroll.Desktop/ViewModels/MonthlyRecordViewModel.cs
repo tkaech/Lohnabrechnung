@@ -12,6 +12,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private bool _isBusy;
     private bool _isLocked;
     private DateTimeOffset? _selectedMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero);
+    private string _selectedMonthText = DateTime.Today.ToString("MM/yyyy");
     private string _contextTitle = "Keine Monatserfassung geladen.";
     private string _contextDescription = "Zuerst eine Person auswaehlen, dann den Monat laden.";
     private string _statusSummary = "Kein Monatskontext aktiv.";
@@ -28,16 +29,24 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _vehicleRegiezone1 = "0";
     private string? _timeNote;
     private MonthlyTimeEntryItemViewModel? _selectedTimeEntry;
+    private Guid? _pendingTimeEntrySelectionId;
     private string _expensesTotal = "0";
+    private MonthlyExpenseEntryItemViewModel? _selectedExpenseEntry;
+    private Guid? _pendingExpenseEntrySelectionId;
     private string _previewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
     private string _previewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
     private string _previewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
     private string _payrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
+    private bool _isTimeMonthPickerOpen;
+    private bool _isExpenseMonthPickerOpen;
+    private bool _isTimeDatePickerOpen;
 
     public MonthlyRecordViewModel(MonthlyRecordService monthlyRecordService)
     {
         _monthlyRecordService = monthlyRecordService;
         TimeEntries = [];
+        TimeEntryHistory = [];
+        ExpenseEntryHistory = [];
         PreviewRows = [];
         PreviewNotes = [];
         PayrollPreviewLines = [];
@@ -51,6 +60,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     }
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
+    public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntryHistory { get; }
+    public ObservableCollection<MonthlyExpenseEntryItemViewModel> ExpenseEntryHistory { get; }
     public ObservableCollection<MonthlyPreviewRowViewModel> PreviewRows { get; }
     public ObservableCollection<string> PreviewNotes { get; }
     public ObservableCollection<MonthlyPayrollPreviewLineDto> PayrollPreviewLines { get; }
@@ -96,7 +107,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     public bool CanManageRecord => !IsBusy && !IsLocked && _currentEmployeeId.HasValue;
     public bool CanSaveTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
-    public bool CanDeleteTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedTimeEntry is not null;
+    public bool CanDeleteTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedTimeEntry is { IsCurrentMonth: true };
     public bool CanSaveExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
 
     public DateTimeOffset? SelectedMonth
@@ -110,18 +121,38 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             }
 
             var normalizedMonth = new DateTimeOffset(value.Value.Year, value.Value.Month, 1, 0, 0, 0, value.Value.Offset);
-            if (SetProperty(ref _selectedMonth, normalizedMonth))
-            {
-                RaisePropertyChanged(nameof(ExpensePayrollMonth));
-                PrepareNewTimeEntry();
-                PrepareNewExpenseEntry();
-                ResetLoadedRecordState();
+            _ = ApplySelectedMonthAsync(normalizedMonth, forceReload: false);
+        }
+    }
 
-                if (_currentEmployeeId.HasValue)
-                {
-                    _ = LoadAsync();
-                }
+    public string SelectedMonthText
+    {
+        get => _selectedMonthText;
+        set
+        {
+            if (!SetProperty(ref _selectedMonthText, value))
+            {
+                return;
             }
+
+            if (TryParseMonth(value, out var normalizedMonth))
+            {
+                _ = ApplySelectedMonthAsync(normalizedMonth, forceReload: false);
+            }
+        }
+    }
+
+    public DateTimeOffset? SelectedMonthPickerDate
+    {
+        get => SelectedMonth;
+        set
+        {
+            if (!value.HasValue)
+            {
+                return;
+            }
+
+            SelectedMonth = value;
         }
     }
 
@@ -130,6 +161,62 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         : "-";
 
     public string TimePayrollMonth => ExpensePayrollMonth;
+
+    public bool IsTimeMonthPickerOpen
+    {
+        get => _isTimeMonthPickerOpen;
+        set => SetProperty(ref _isTimeMonthPickerOpen, value);
+    }
+
+    public bool IsExpenseMonthPickerOpen
+    {
+        get => _isExpenseMonthPickerOpen;
+        set => SetProperty(ref _isExpenseMonthPickerOpen, value);
+    }
+
+    public bool IsTimeDatePickerOpen
+    {
+        get => _isTimeDatePickerOpen;
+        set => SetProperty(ref _isTimeDatePickerOpen, value);
+    }
+
+    public DateTimeOffset? TimeDatePicker
+    {
+        get
+        {
+            if (!TryParseDate(TimeDate, out var parsedDate))
+            {
+                return null;
+            }
+
+            return new DateTimeOffset(parsedDate.Year, parsedDate.Month, parsedDate.Day, 0, 0, 0, TimeSpan.Zero);
+        }
+        set
+        {
+            if (!value.HasValue)
+            {
+                return;
+            }
+
+            TimeDate = DateOnly.FromDateTime(value.Value.Date).ToString("yyyy-MM-dd");
+            IsTimeDatePickerOpen = false;
+            RaisePropertyChanged(nameof(TimeDatePicker));
+        }
+    }
+
+    public void ToggleTimeMonthPicker() => SetPickerStates(!IsTimeMonthPickerOpen, false, false);
+
+    public void ToggleExpenseMonthPicker() => SetPickerStates(false, !IsExpenseMonthPickerOpen, false);
+
+    public void ToggleTimeDatePicker() => SetPickerStates(false, false, !IsTimeDatePickerOpen);
+
+    public void EnsureTimeMonthPickerOpen() => SetPickerStates(true, false, false);
+
+    public void EnsureExpenseMonthPickerOpen() => SetPickerStates(false, true, false);
+
+    public void EnsureTimeDatePickerOpen() => SetPickerStates(false, false, true);
+
+    public void CloseAllPickers() => SetPickerStates(false, false, false);
 
     public string ContextTitle
     {
@@ -194,7 +281,13 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public string TimeDate
     {
         get => _timeDate;
-        set => SetProperty(ref _timeDate, value);
+        set
+        {
+            if (SetProperty(ref _timeDate, value))
+            {
+                RaisePropertyChanged(nameof(TimeDatePicker));
+            }
+        }
     }
 
     public string HoursWorked
@@ -263,10 +356,59 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
     }
 
+    public MonthlyExpenseEntryItemViewModel? SelectedExpenseEntry
+    {
+        get => _selectedExpenseEntry;
+        set
+        {
+            if (SetProperty(ref _selectedExpenseEntry, value) && value is not null)
+            {
+                ExpensesTotal = value.ExpensesTotalChf.ToString("0.00");
+            }
+        }
+    }
+
     public string ExpensesTotal
     {
         get => _expensesTotal;
         set => SetProperty(ref _expensesTotal, value);
+    }
+
+    public Task ActivateMonthFromTimeEntryAsync(MonthlyTimeEntryItemViewModel? entry)
+    {
+        if (entry is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        PopulateTimeEntryForm(entry);
+
+        if (SelectedMonth?.Year == entry.Year && SelectedMonth?.Month == entry.Month)
+        {
+            SelectedTimeEntry = entry;
+            return Task.CompletedTask;
+        }
+
+        _pendingTimeEntrySelectionId = entry.TimeEntryId;
+        return ActivateMonthAsync(entry.Year, entry.Month);
+    }
+
+    public Task ActivateMonthFromExpenseEntryAsync(MonthlyExpenseEntryItemViewModel? entry)
+    {
+        if (entry is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        SelectedExpenseEntry = entry;
+
+        if (SelectedMonth?.Year == entry.Year && SelectedMonth?.Month == entry.Month)
+        {
+            return Task.CompletedTask;
+        }
+
+        _pendingExpenseEntrySelectionId = entry.ExpenseEntryId;
+        return ActivateMonthAsync(entry.Year, entry.Month);
     }
 
     public async Task SetEmployeeAsync(Guid? employeeId, string? employeeName)
@@ -302,6 +444,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
         PayrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
         TimeEntries.Clear();
+        TimeEntryHistory.Clear();
+        ExpenseEntryHistory.Clear();
+        SelectedTimeEntry = null;
+        SelectedExpenseEntry = null;
+        _pendingTimeEntrySelectionId = null;
+        _pendingExpenseEntrySelectionId = null;
         PreviewRows.Clear();
         PreviewNotes.Clear();
         PayrollPreviewLines.Clear();
@@ -318,6 +466,35 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
 
         await ExecuteBusyAsync(LoadCurrentRecordAsync);
+    }
+
+    private async Task ActivateMonthAsync(int year, int month)
+    {
+        var offset = SelectedMonth?.Offset ?? TimeSpan.Zero;
+        var normalizedMonth = new DateTimeOffset(year, month, 1, 0, 0, 0, offset);
+        await ApplySelectedMonthAsync(normalizedMonth, forceReload: true);
+    }
+
+    private async Task ApplySelectedMonthAsync(DateTimeOffset normalizedMonth, bool forceReload)
+    {
+        var changed = SetProperty(ref _selectedMonth, normalizedMonth);
+        if (changed)
+        {
+            SyncSelectedMonthText(normalizedMonth);
+            IsTimeMonthPickerOpen = false;
+            IsExpenseMonthPickerOpen = false;
+            RaisePropertyChanged(nameof(ExpensePayrollMonth));
+            RaisePropertyChanged(nameof(TimePayrollMonth));
+            RaisePropertyChanged(nameof(SelectedMonthPickerDate));
+            PrepareNewTimeEntry();
+            PrepareNewExpenseEntry();
+            ResetLoadedRecordState();
+        }
+
+        if ((changed || forceReload) && _currentEmployeeId.HasValue)
+        {
+            await LoadAsync();
+        }
     }
 
     private void PrepareNewTimeEntry()
@@ -435,6 +612,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             TimeEntries.Add(new MonthlyTimeEntryItemViewModel
             {
                 TimeEntryId = entry.TimeEntryId,
+                Year = entry.WorkDate.Year,
+                Month = entry.WorkDate.Month,
                 WorkDate = entry.WorkDate,
                 HoursWorked = entry.HoursWorked,
                 NightHours = entry.NightHours,
@@ -443,12 +622,72 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 VehiclePauschalzone1Chf = entry.VehiclePauschalzone1Chf,
                 VehiclePauschalzone2Chf = entry.VehiclePauschalzone2Chf,
                 VehicleRegiezone1Chf = entry.VehicleRegiezone1Chf,
+                IsCurrentMonth = true,
                 Note = entry.Note,
                 Summary = $"{entry.WorkDate:dd.MM.yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
             });
         }
 
         ExpensesTotal = details.ExpenseEntry?.ExpensesTotalChf.ToString("0.00") ?? "0";
+
+        TimeEntryHistory.Clear();
+        foreach (var entry in details.TimeEntryHistory)
+        {
+            var isCurrentMonth = entry.WorkDate.Year == details.Header.Year
+                && entry.WorkDate.Month == details.Header.Month;
+
+            TimeEntryHistory.Add(new MonthlyTimeEntryItemViewModel
+            {
+                TimeEntryId = entry.TimeEntryId,
+                Year = entry.WorkDate.Year,
+                Month = entry.WorkDate.Month,
+                WorkDate = entry.WorkDate,
+                HoursWorked = entry.HoursWorked,
+                NightHours = entry.NightHours,
+                SundayHours = entry.SundayHours,
+                HolidayHours = entry.HolidayHours,
+                VehiclePauschalzone1Chf = entry.VehiclePauschalzone1Chf,
+                VehiclePauschalzone2Chf = entry.VehiclePauschalzone2Chf,
+                VehicleRegiezone1Chf = entry.VehicleRegiezone1Chf,
+                IsCurrentMonth = isCurrentMonth,
+                Note = entry.Note,
+                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Monat {entry.WorkDate:MM/yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
+            });
+        }
+
+        ExpenseEntryHistory.Clear();
+        foreach (var entry in details.ExpenseEntryHistory)
+        {
+            ExpenseEntryHistory.Add(new MonthlyExpenseEntryItemViewModel
+            {
+                ExpenseEntryId = entry.ExpenseEntryId,
+                Year = entry.Year,
+                Month = entry.Month,
+                ExpensesTotalChf = entry.ExpensesTotalChf,
+                Summary = $"{entry.Month:00}/{entry.Year} | Diverse Spesen {entry.ExpensesTotalChf:0.00} CHF"
+            });
+        }
+
+        if (_pendingTimeEntrySelectionId.HasValue)
+        {
+            var selectedTimeEntry = TimeEntries.FirstOrDefault(entry => entry.TimeEntryId == _pendingTimeEntrySelectionId.Value)
+                ?? TimeEntryHistory.FirstOrDefault(entry => entry.TimeEntryId == _pendingTimeEntrySelectionId.Value);
+            _pendingTimeEntrySelectionId = null;
+            if (selectedTimeEntry is not null)
+            {
+                SelectedTimeEntry = selectedTimeEntry;
+            }
+        }
+
+        if (_pendingExpenseEntrySelectionId.HasValue)
+        {
+            var selectedExpenseEntry = ExpenseEntryHistory.FirstOrDefault(entry => entry.ExpenseEntryId == _pendingExpenseEntrySelectionId.Value);
+            _pendingExpenseEntrySelectionId = null;
+            if (selectedExpenseEntry is not null)
+            {
+                SelectedExpenseEntry = selectedExpenseEntry;
+            }
+        }
 
         PreviewRows.Clear();
         foreach (var row in BuildPreviewRows(details.Preview.Rows))
@@ -548,6 +787,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
         PayrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
         TimeEntries.Clear();
+        TimeEntryHistory.Clear();
+        ExpenseEntryHistory.Clear();
+        SelectedTimeEntry = null;
+        SelectedExpenseEntry = null;
+        _pendingTimeEntrySelectionId = null;
+        _pendingExpenseEntrySelectionId = null;
         PreviewRows.Clear();
         PreviewNotes.Clear();
         PayrollPreviewLines.Clear();
@@ -571,17 +816,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     private static DateOnly ParseRequiredDate(string value, string fieldName)
     {
-        var supportedFormats = new[]
-        {
-            "yyyy-MM-dd",
-            "dd.MM.yyyy",
-            "d.M.yyyy",
-            "dd/MM/yyyy",
-            "d/M/yyyy"
-        };
-
-        if (!DateOnly.TryParseExact(value, supportedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate)
-            && !DateOnly.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDate))
+        if (!TryParseDate(value, out var parsedDate))
         {
             throw new InvalidOperationException($"{fieldName} muss ein gueltiges Datum sein.");
         }
@@ -632,6 +867,68 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
         var normalized = value.Replace(',', '.');
         return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out parsedValue);
+    }
+
+    private static bool TryParseDate(string value, out DateOnly parsedDate)
+    {
+        var supportedFormats = new[]
+        {
+            "yyyy-MM-dd",
+            "dd.MM.yyyy",
+            "d.M.yyyy",
+            "dd/MM/yyyy",
+            "d/M/yyyy"
+        };
+
+        return DateOnly.TryParseExact(value, supportedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedDate)
+            || DateOnly.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDate);
+    }
+
+    private static bool TryParseMonth(string value, out DateTimeOffset normalizedMonth)
+    {
+        normalizedMonth = default;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var supportedFormats = new[]
+        {
+            "MM/yyyy",
+            "M/yyyy",
+            "MM.yyyy",
+            "M.yyyy",
+            "yyyy-MM",
+            "yyyy/M",
+            "yyyy/MM"
+        };
+
+        if (DateTime.TryParseExact(value, supportedFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedMonth)
+            || DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedMonth))
+        {
+            normalizedMonth = new DateTimeOffset(parsedMonth.Year, parsedMonth.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void SyncSelectedMonthText(DateTimeOffset normalizedMonth)
+    {
+        var formattedMonth = normalizedMonth.ToString("MM/yyyy");
+        if (_selectedMonthText != formattedMonth)
+        {
+            _selectedMonthText = formattedMonth;
+            RaisePropertyChanged(nameof(SelectedMonthText));
+        }
+    }
+
+    private void SetPickerStates(bool timeMonthOpen, bool expenseMonthOpen, bool timeDateOpen)
+    {
+        IsTimeMonthPickerOpen = timeMonthOpen;
+        IsExpenseMonthPickerOpen = expenseMonthOpen;
+        IsTimeDatePickerOpen = timeDateOpen;
     }
 
     private static IReadOnlyCollection<MonthlyPreviewRowViewModel> BuildPreviewRows(IReadOnlyCollection<MonthlyPreviewRowDto> rows)

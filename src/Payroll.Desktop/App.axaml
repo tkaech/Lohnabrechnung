@@ -2,63 +2,10 @@
     x:Class="Payroll.Desktop.App"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="clr-namespace:Payroll.Desktop.Controls"
     RequestedThemeVariant="Light">
   <Application.Styles>
     <FluentTheme />
-
-    <Style Selector="controls|AppSectionCard">
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border
-              Background="#FFFFFFFF"
-              BorderBrush="#FFD7DFEA"
-              BorderThickness="1"
-              CornerRadius="10"
-              Padding="16">
-            <Grid RowDefinitions="Auto,*">
-              <TextBlock
-                  FontSize="16"
-                  FontWeight="SemiBold"
-                  Text="{TemplateBinding Header}" />
-              <ContentPresenter
-                  Grid.Row="1"
-                  Margin="0,12,0,0"
-                  Content="{TemplateBinding Content}" />
-            </Grid>
-          </Border>
-        </ControlTemplate>
-      </Setter>
-    </Style>
-
-    <Style Selector="TextBlock.section-caption">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="#FF5F6B7A" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-
-    <Style Selector="Button.nav-active">
-      <Setter Property="Background" Value="#FF14324A" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="BorderBrush" Value="#FF14324A" />
-    </Style>
-
-    <Style Selector="Button.nav-placeholder">
-      <Setter Property="Background" Value="#FFF8FAFC" />
-      <Setter Property="Foreground" Value="#FF586575" />
-      <Setter Property="BorderBrush" Value="#FFD7DFEA" />
-    </Style>
-
-    <Style Selector="Button.primary-action">
-      <Setter Property="Background" Value="#FF14324A" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="BorderBrush" Value="#FF14324A" />
-    </Style>
-
-    <Style Selector="Button.danger-action">
-      <Setter Property="Background" Value="#FFC95F36" />
-      <Setter Property="Foreground" Value="White" />
-      <Setter Property="BorderBrush" Value="#FFC95F36" />
-    </Style>
+    <StyleInclude Source="avares://Payroll.Desktop/Styles/DesignSystem.axaml" />
+    <StyleInclude Source="avares://Payroll.Desktop/Styles/PrintDesignSystem.axaml" />
   </Application.Styles>
 </Application>

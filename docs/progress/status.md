@@ -3,9 +3,27 @@
 Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel-Analyse abgeleitet.
 
 ## Session Abschluss
+- `Einstellungen` um einen eigenen Unterbereich `Backup / Restore` erweitert
+- Backup/Restore als gekapselten Application-/Infrastructure-Service eingefuehrt, mit klarer Trennung der Sicherungsarten `nur Konfiguration`, `nur Nutzdaten` und `beides`
+- JSON-basierte Sicherungsdatei mit Zeitstempel-Dateiname und Restore-Validierung fuer passende Sicherungsart ergänzt
+- Restore so angebunden, dass Konfiguration zentral neu geladen und Nutzdaten anschliessend wieder in Mitarbeitenden- und Monatskontext synchronisiert werden
+- gezielte ViewModel- und SQLite-Tests fuer den neuen Backup-/Restore-Pfad ergänzt
+- `Employee` um referenzielle Felder `Abteilung`, `Anstellungskategorie` und `Anstellungsort` erweitert
+- globales UI-Design-System fuer Bildschirm und spaeteren Print logisch in zentrale Style-Bereiche gegliedert
+- zentrale Theme-Dateien fuer App-/Screen-Stile und getrennte Print-/Report-Stile eingefuehrt; Schrift, Farben, Brand-Text und spaetere Logo-Nutzung sind damit an einer Stelle steuerbar
+- `App.axaml` auf zentrale Style-Includes umgestellt und den Shell-Kopf auf zentrale Branding-/Theme-Ressourcen angebunden
+- `PayrollSettings` um eine zentrale mehrzeilige `Firmenadresse` fuer den PDF-Kopf erweitert; Wert ist im Settings-Tab pflegbar und wird nicht hart codiert
+- eigener PDF-Export fuer `Lohnlaeufe` ergänzt: Button `PDF erstellen` erzeugt fuer den gewaelten Mitarbeitenden und Monat ein Lohnblatt mit Titel, Kopfbereich, Metadaten, Payroll-Tabelle, Abzuegen, Total, Spesen und `Total Auszahlung`
+- PDF-Generierung in einen separaten Reporting-/Export-Service gekapselt und fachlich auf Basis der bestehenden Lohn-Voransicht, Mitarbeitendenstammdaten und zentralen Settings angebunden
+- PDF-Lohnblatt auf ein einfaches Template-System mit Platzhaltern umgestellt; Template wird geladen, mit Lohndaten/Settings befuellt und erst dann generisch gerendert statt die Blattinhalte direkt im Layoutcode zu verdrahten
+- Settings-Bereich in getrennte Unterbereiche fuer `Layout`, `Listen`, `Berechnung` und `Druck/PDF` gegliedert; das Druck-Template ist jetzt als zentraler Settings-Wert direkt in der UI pflegbar
+- zentrale Lookup-Listen fuer diese drei Werte in `Settings` mit CRUD-Pflege und Standardwerten eingefuehrt
+- Mitarbeitendenformular auf Auswahlfelder statt Freitext umgestellt; referentielle Integritaet wird ueber echte FK-Beziehungen in der Persistenz gesichert
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests fuer den neuen Employee-/Settings-Schnitt ergänzt bzw. angepasst
 - Lohn-Voransicht fuer den aktuell gewaehlten Mitarbeitenden und Monat in der Monatserfassung ergänzt, fachlich an der Excel-Struktur aus dem Register `BleR` orientiert
 - Voransicht berechnet jetzt Basislohn, ableitbare Zeitzuschlaege, drei Fahrzeitentschaedigungen, AHV-pflichtigen Bruttolohn, zentrale Abzuege, optionales BVG, Spesen und `Total Auszahlung`
 - `Total Auszahlung` in der Voransicht analog Excel auf 5 Rappen gerundet; `Spezialzuschlag gemaess Vertrag` ist jetzt als CHF-Betrag pro Arbeitsstunde im Vertragsstand modelliert und `Ferienentschaedigung` wird ueber eine zentrale `FerienentschaedigungRate` aus den globalen Settings berechnet
+- SQLite-Dateien werden nicht mehr relativ im Programmverzeichnis angelegt, sondern plattformtauglich in einem expliziten Benutzerdatenordner abgelegt; bestehende Datenbanken werden bei Schemaabweichungen nicht mehr still geloescht
 - globale Payroll-Settings um zentrale Abzugsparameter fuer `AHV/IV/EO`, `ALV`, `Krankentaggeld/UVG` und `Aus- und Weiterbildung inkl. Ferien` erweitert
 - zentrale CHF-Ansatzwerte fuer `Pauschalzone 1`, `Pauschalzone 2` und `Regiezone 1` in `PayrollSettings` ergänzt und im Settings-Tab pflegbar gemacht
 - Payroll-Ableitung so angepasst, dass Fahrzeugentschaedigungen aus Mengen * Settings-Ansatz berechnet und prozentuale Sozialabzuege nicht mehr hart codiert, sondern aus den zentralen Settings gelesen werden

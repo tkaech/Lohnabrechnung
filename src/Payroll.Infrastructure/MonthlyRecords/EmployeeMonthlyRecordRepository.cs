@@ -70,6 +70,12 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
         var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
         var payrollPreview = BuildPayrollPreview(monthlyRecord, contract, payrollSettings);
+        var employeeMonthlyRecords = await _dbContext.EmployeeMonthlyRecords
+            .AsNoTracking()
+            .Where(record => record.EmployeeId == monthlyRecord.EmployeeId)
+            .Include(record => record.TimeEntries)
+            .Include(record => record.ExpenseEntry)
+            .ToListAsync(cancellationToken);
 
         var header = new MonthlyRecordHeaderDto(
             monthlyRecord.Id,
@@ -102,16 +108,46 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 entry.Note))
             .ToArray();
 
+        var timeEntryHistory = employeeMonthlyRecords
+            .SelectMany(record => record.TimeEntries)
+            .OrderBy(entry => entry.WorkDate)
+            .ThenBy(entry => entry.Id)
+            .Select(entry => new MonthlyTimeEntryDto(
+                entry.Id,
+                entry.WorkDate,
+                entry.HoursWorked,
+                entry.NightHours,
+                entry.SundayHours,
+                entry.HolidayHours,
+                entry.VehiclePauschalzone1Chf,
+                entry.VehiclePauschalzone2Chf,
+                entry.VehicleRegiezone1Chf,
+                entry.Note))
+            .ToArray();
+
         var expenseEntry = monthlyRecord.ExpenseEntry is null
             ? null
             : new MonthlyExpenseEntryDto(
                 monthlyRecord.ExpenseEntry.Id,
                 monthlyRecord.ExpenseEntry.ExpensesTotalChf);
 
+        var expenseEntryHistory = employeeMonthlyRecords
+            .Where(record => record.ExpenseEntry is not null)
+            .OrderBy(record => record.Year)
+            .ThenBy(record => record.Month)
+            .Select(record => new HistoricalMonthlyExpenseEntryDto(
+                record.ExpenseEntry!.Id,
+                record.Year,
+                record.Month,
+                record.ExpenseEntry.ExpensesTotalChf))
+            .ToArray();
+
         return new MonthlyRecordDetailsDto(
             header,
             timeEntries,
+            timeEntryHistory,
             expenseEntry,
+            expenseEntryHistory,
             new MonthlyRecordPreviewDto(previewRows, previewNotes),
             payrollPreview);
     }
@@ -252,7 +288,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             baseLine?.Quantity is null ? $"{workSummary.WorkHours:0.##} h" : $"{baseLine.Quantity.Value:0.##} h",
             contract is null ? "-" : $"{contract.HourlyRateChf:0.00} CHF",
             FormatAmount(baseLine?.AmountChf),
-            null));
+            null,
+            false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Stunden mit Zeitzuschlag",
@@ -263,7 +300,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 contract is not null && workSummary.SpecialHours > 0m && supplementLines.Length == 0),
             supplementLines.Length == 0
                 ? "Noch nicht vollstaendig ableitbar oder keine zuschlagspflichtigen Stunden im Monat."
-                : BuildSupplementDetail(supplementLines)));
+                : BuildSupplementDetail(supplementLines),
+            false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Spezialzuschlag gemaess Vertrag",
@@ -274,7 +312,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 ? "Ohne gueltigen Vertrag nicht ableitbar."
                 : contract.SpecialSupplementRateChf > 0m
                     ? "Arbeitsstunden multipliziert mit dem vertraglichen Spezialzuschlag."
-                    : "Im aktuellen Vertragsstand ist kein Spezialzuschlag hinterlegt."));
+                    : "Im aktuellen Vertragsstand ist kein Spezialzuschlag hinterlegt.",
+            false));
 
         lines.Add(BuildVehiclePreviewLine(
             "Fahrzeitentschaedigung Pauschalzone 1",
@@ -299,7 +338,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             "-",
             FormatAmount(contract is null ? null : subtotalChf),
-            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Summe der aktuell fachlich ableitbaren lohnrelevanten Positionen."));
+            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Summe der aktuell fachlich ableitbaren lohnrelevanten Positionen.",
+            true));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Ferienentschaedigung",
@@ -308,14 +348,16 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             FormatAmount(contract is null ? null : vacationCompensationLine?.AmountChf ?? 0m),
             contract is null
                 ? "Ohne gueltigen Vertrag nicht ableitbar."
-                : "Rate aus Einstellungen multipliziert mit Basislohn, Zeitzuschlaegen, Spezialzuschlag und Fahrzeitentschaedigung."));
+                : "Rate aus Einstellungen multipliziert mit Basislohn, Zeitzuschlaegen, Spezialzuschlag und Fahrzeitentschaedigung.",
+            false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "AHV-pflichtiger Bruttolohn",
             "-",
             "-",
             FormatAmount(contract is null ? null : ahvGrossChf),
-            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen und Fahrzeitentschaedigung."));
+            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen und Fahrzeitentschaedigung.",
+            true));
 
         lines.Add(BuildNamedAmountLine("AHV/IV/EO", derivationLines, "AHV_IV_EO"));
         lines.Add(BuildNamedAmountLine("ALV", derivationLines, "ALV"));
@@ -330,7 +372,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 "-",
                 "-",
                 FormatAmount(bvgLine.AmountChf),
-                "Aus dem aktuellen Vertragsstand."));
+                "Aus dem aktuellen Vertragsstand.",
+                false));
         }
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
@@ -338,21 +381,24 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             "-",
             FormatAmount(contract is null ? null : totalChf),
-            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Netto aus lohnrelevanten Positionen und Abzuegen ohne Spesen."));
+            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Netto aus lohnrelevanten Positionen und Abzuegen ohne Spesen.",
+            true));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Spesen gemaess Nachweis",
             "-",
             "-",
             $"{expensesChf:0.00} CHF",
-            expensesChf > 0m ? "Direkt aus dem monatlichen Spesenblock." : null));
+            expensesChf > 0m ? "Direkt aus dem monatlichen Spesenblock." : null,
+            false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             "Total Auszahlung",
             "-",
             "gerundet auf 0.05",
             FormatAmount(contract is null ? null : totalPayoutChf),
-            contract is null ? "Ohne gueltigen Vertrag nicht vollstaendig ableitbar." : "Summe aus Total und Spesen, analog Excel-Vorlage auf 5 Rappen gerundet."));
+            contract is null ? "Ohne gueltigen Vertrag nicht vollstaendig ableitbar." : "Summe aus Total und Spesen, analog Excel-Vorlage auf 5 Rappen gerundet.",
+            true));
 
         if (workSummary.SpecialHours == 0m)
         {
@@ -503,7 +549,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             $"{amountChf:0.00} CHF",
             quantity > 0m && rateChf <= 0m
                 ? "Menge vorhanden, aber kein zentraler CHF-Ansatz in den Einstellungen gepflegt."
-                : null);
+                : null,
+            false);
     }
 
     private static MonthlyPayrollPreviewLineDto BuildNamedAmountLine(
@@ -517,7 +564,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             matchingLine is null ? "-" : "gem. Settings",
             FormatAmount(matchingLine?.AmountChf),
-            null);
+            null,
+            false);
     }
 
     private static decimal GetVehicleAmount(IEnumerable<PayrollRunLine> derivationLines, string code)

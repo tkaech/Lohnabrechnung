@@ -1,6 +1,27 @@
 namespace Payroll.Application.Settings;
 
+public sealed record SettingOptionDto(
+    Guid OptionId,
+    string Name);
+
 public sealed record PayrollSettingsDto(
+    string CompanyAddress,
+    string AppFontFamily,
+    decimal AppFontSize,
+    string AppTextColorHex,
+    string AppMutedTextColorHex,
+    string AppBackgroundColorHex,
+    string AppAccentColorHex,
+    string AppLogoText,
+    string AppLogoPath,
+    string PrintFontFamily,
+    decimal PrintFontSize,
+    string PrintTextColorHex,
+    string PrintMutedTextColorHex,
+    string PrintAccentColorHex,
+    string PrintLogoText,
+    string PrintLogoPath,
+    string PrintTemplate,
     decimal? NightSupplementRate,
     decimal? SundaySupplementRate,
     decimal? HolidaySupplementRate,
@@ -11,9 +32,29 @@ public sealed record PayrollSettingsDto(
     decimal VacationCompensationRate,
     decimal VehiclePauschalzone1RateChf,
     decimal VehiclePauschalzone2RateChf,
-    decimal VehicleRegiezone1RateChf);
+    decimal VehicleRegiezone1RateChf,
+    IReadOnlyCollection<SettingOptionDto> Departments,
+    IReadOnlyCollection<SettingOptionDto> EmploymentCategories,
+    IReadOnlyCollection<SettingOptionDto> EmploymentLocations);
 
 public sealed record SavePayrollSettingsCommand(
+    string CompanyAddress,
+    string AppFontFamily,
+    decimal AppFontSize,
+    string AppTextColorHex,
+    string AppMutedTextColorHex,
+    string AppBackgroundColorHex,
+    string AppAccentColorHex,
+    string AppLogoText,
+    string AppLogoPath,
+    string PrintFontFamily,
+    decimal PrintFontSize,
+    string PrintTextColorHex,
+    string PrintMutedTextColorHex,
+    string PrintAccentColorHex,
+    string PrintLogoText,
+    string PrintLogoPath,
+    string PrintTemplate,
     decimal? NightSupplementRate,
     decimal? SundaySupplementRate,
     decimal? HolidaySupplementRate,
@@ -24,4 +65,7 @@ public sealed record SavePayrollSettingsCommand(
     decimal VacationCompensationRate,
     decimal VehiclePauschalzone1RateChf,
     decimal VehiclePauschalzone2RateChf,
-    decimal VehicleRegiezone1RateChf);
+    decimal VehicleRegiezone1RateChf,
+    IReadOnlyCollection<SettingOptionDto> Departments,
+    IReadOnlyCollection<SettingOptionDto> EmploymentCategories,
+    IReadOnlyCollection<SettingOptionDto> EmploymentLocations);

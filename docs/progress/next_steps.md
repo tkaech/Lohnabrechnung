@@ -1,6 +1,9 @@
 # Next Steps
 
 1. Monatserfassung von der jetzt funktionsfaehigen Einzelperson-Erfassung in eine echte monatszentrierte, tabellarische Erfassung fuer mehrere Mitarbeitende weiterentwickeln
-2. die getrennte Monatslogik `reine Spesen` plus `lohnrelevante Fahrzeugwerte in der Zeitzeile` im kuenftigen Mehrpersonen-Layout konsistent mitfuehren, ohne wieder Listen oder Detailsektionen einzufuehren
-3. Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln konkretisieren und sauber an den Monatskontext anschliessen
-4. Naechsten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren: gueltigen Vertrag, zentrale Zuschlags-, Abzugs-, Ferienentschaedigungs- und Fahrzeugsettings, WorkSummary und Spesen aus `EmployeeMonthlyRecord` zusammenfuehren, ohne offene Spezialfaelle zu automatisieren
+2. den neuen Backup-/Restore-Bereich um Dateiauswahl-Dialoge und eine kleine Sicherungs-Vorschau erweitern, damit Pfadwahl und Sicherungsart noch gefuehrter ablaufen
+3. die neue zentrale Theme-Struktur schrittweise in weitere Views und Panels uebernehmen, damit noch mehr hart codierte Farben und Typografie aus den Views verschwinden
+4. das jetzt in `Settings` pflegbare Druck-Template um Validierung oder kleine Template-Hinweise erweitern, damit Platzhalterfehler frueher sichtbar werden
+5. die getrennte Monatslogik `reine Spesen` plus `lohnrelevante Fahrzeugwerte in der Zeitzeile` im kuenftigen Mehrpersonen-Layout konsistent mitfuehren, ohne wieder Listen oder Detailsektionen einzufuehren
+6. Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln konkretisieren und sauber an den Monatskontext anschliessen
+7. Naechsten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren: gueltigen Vertrag, zentrale Zuschlags-, Abzugs-, Ferienentschaedigungs- und Fahrzeugsettings, WorkSummary und Spesen aus `EmployeeMonthlyRecord` zusammenfuehren, ohne offene Spezialfaelle zu automatisieren

@@ -62,7 +62,12 @@
 ## Zentrale Settings
 
 - `PayrollSettings`
+  - zentrale mehrzeilige `Firmenadresse` fuer PDF-/Lohnblatt-Kopf
   - zentrale Zuschlagssaetze fuer Nacht, Sonntag und Feiertag
+  - zentrale pflegbare Listen fuer:
+    - `Abteilung`
+    - `Anstellungskategorie`
+    - `Anstellungsort`
   - zentrale prozentuale Abzugsparameter fuer:
     - `AHV/IV/EO`
     - `ALV`
@@ -78,6 +83,7 @@
   - `Ferienentschaedigung` = `FerienentschaedigungRate` * (Basislohn + Zeitzuschlaege + Spezialzuschlag + Fahrzeitentschaedigung)
   - prozentuale Abzuege werden auf den lohnrelevanten Bruttobetrag angewendet
   - `Total Auszahlung` der Voransicht wird analog Excel-Vorlage auf 5 Rappen gerundet
+  - die Seite `Lohnlaeufe` kann aus Monatsdaten, Mitarbeitendenstammdaten und `PayrollSettings` ein PDF-Lohnblatt ableiten; der PDF-Kopf verwendet die zentrale Firmenadresse aus den Settings
 
 ## Employee Stammdaten
 
@@ -100,6 +106,10 @@
   - Ort
   - Land
 - vorbereitete payroll-relevante Stammdaten:
+  - referenzielle Zuordnung zu:
+    - `Abteilung`
+    - `Anstellungskategorie`
+    - `Anstellungsort`
   - Wohnsitzland
   - Nationalitaet
   - Bewilligung

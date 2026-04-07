@@ -1,0 +1,35 @@
+# Payroll statement template with simple placeholders.
+# Example: SPACER|12 inserts a 12-point blank line.
+# Example: SPACER|20 inserts a larger gap before the next line.
+LOGO|{{Logo}}
+COMPANY_BLOCK|{{Firmenadresse}}
+EMPLOYEE_BLOCK|{{MitarbeiterBlock}}
+AHV_LINE|AHV Nr. {{AhvNummer}}
+BANNER|Lohnblatt|{{Monat}}
+META_ROW|Abteilung|{{Abteilung}}|Anstellungskategorie|{{Anstellungskategorie}}
+META_ROW|Abrechnungsdatum|{{Abrechnungsdatum}}|Anstellungsort|{{Anstellungsort}}
+META_ROW|Gesamtstunden gemaess beigelegtem Stundennachweis|{{Gesamtstunden}}|Dienstjahre|{{Dienstjahre}}
+TABLE_HEADER|Bezeichnung|Einheit|Ansatz|Betrag
+PAYROLL_LINE|regular|Basislohn|{{BasislohnMenge}}|{{BasislohnAnsatz}}|{{Basislohn}}|{{BasislohnDetail}}
+PAYROLL_LINE|regular|Stunden mit Zeitzuschlag|{{ZeitzuschlagMenge}}|{{ZeitzuschlagAnsatz}}|{{Zeitzuschlag}}|{{ZeitzuschlagDetail}}
+PAYROLL_LINE|regular|Spezialzuschlag gemaess Vertrag|{{SpezialzuschlagMenge}}|{{SpezialzuschlagAnsatz}}|{{Spezialzuschlag}}|{{SpezialzuschlagDetail}}
+PAYROLL_LINE|regular|Fahrzeitentschaedigung Pauschalzone 1|{{Pauschalzone1Menge}}|{{Pauschalzone1Ansatz}}|{{Pauschalzone1}}|{{Pauschalzone1Detail}}
+PAYROLL_LINE|regular|Fahrzeitentschaedigung Pauschalzone 2|{{Pauschalzone2Menge}}|{{Pauschalzone2Ansatz}}|{{Pauschalzone2}}|{{Pauschalzone2Detail}}
+PAYROLL_LINE|regular|Fahrzeitentschaedigung Regiezone|{{Regiezone1Menge}}|{{Regiezone1Ansatz}}|{{Regiezone1}}|{{Regiezone1Detail}}
+SPACER|12
+PAYROLL_LINE|emphasis|Zwischentotal|{{ZwischentotalMenge}}|{{ZwischentotalAnsatz}}|{{Zwischentotal}}|{{ZwischentotalDetail}}
+PAYROLL_LINE|regular|Ferienentschaedigung|{{FerienentschaedigungMenge}}|{{FerienentschaedigungAnsatz}}|{{Ferienentschaedigung}}|{{FerienentschaedigungDetail}}
+PAYROLL_LINE|emphasis|AHV-pflichtiger Bruttolohn|{{AhvPflichtigerBruttolohnMenge}}|{{AhvPflichtigerBruttolohnAnsatz}}|{{AhvPflichtigerBruttolohn}}|{{AhvPflichtigerBruttolohnDetail}}
+PAYROLL_LINE|regular|AHV/IV/EO|{{AhvIveoMenge}}|{{AhvIveoAnsatz}}|{{AhvIveo}}|{{AhvIveoDetail}}
+PAYROLL_LINE|regular|ALV|{{AlvMenge}}|{{AlvAnsatz}}|{{Alv}}|{{AlvDetail}}
+PAYROLL_LINE|regular|Krankentaggeld/UVG|{{KtgUvgMenge}}|{{KtgUvgAnsatz}}|{{KtgUvg}}|{{KtgUvgDetail}}
+PAYROLL_LINE|regular|BVG|{{BvgMenge}}|{{BvgAnsatz}}|{{Bvg}}|{{BvgDetail}}
+PAYROLL_LINE|regular|Aus- und Weiterbildungskosten inkl. Ferienentschaedigung|{{AusUndWeiterbildungMenge}}|{{AusUndWeiterbildungAnsatz}}|{{AusUndWeiterbildung}}|{{AusUndWeiterbildungDetail}}
+SPACER|16
+PAYROLL_LINE|emphasis|Total|{{TotalMenge}}|{{TotalAnsatz}}|{{Total}}|{{TotalDetail}}
+PAYROLL_LINE|regular|Spesen gemaess Nachweis|{{SpesenMenge}}|{{SpesenAnsatz}}|{{Spesen}}|{{SpesenDetail}}
+SPACER|12
+PAYROLL_LINE|emphasis|Total Auszahlung|{{TotalAuszahlungMenge}}|{{TotalAuszahlungAnsatz}}|{{TotalAuszahlung}}|{{TotalAuszahlungDetail}}
+NOTES_BLOCK|{{Hinweise}}
+CLOSING|Freundliche Gruesse
+CLOSING|{{Firmenname}}

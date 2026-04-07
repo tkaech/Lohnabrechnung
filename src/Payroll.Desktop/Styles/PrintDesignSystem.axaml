@@ -1,0 +1,14 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <FontFamily x:Key="Print.FontFamily">Segoe UI, DejaVu Sans, Arial</FontFamily>
+    <x:Double x:Key="Print.FontSize.Title">11</x:Double>
+    <x:Double x:Key="Print.FontSize.Body">9</x:Double>
+    <x:Double x:Key="Print.FontSize.Caption">8</x:Double>
+    <SolidColorBrush x:Key="Print.Color.TextPrimary">#FF000000</SolidColorBrush>
+    <SolidColorBrush x:Key="Print.Color.TextMuted">#FF4B5563</SolidColorBrush>
+    <SolidColorBrush x:Key="Print.Color.Accent">#FFFFFF00</SolidColorBrush>
+    <SolidColorBrush x:Key="Print.Color.SurfaceEmphasis">#FFE7EEF7</SolidColorBrush>
+  </Styles.Resources>
+</Styles>

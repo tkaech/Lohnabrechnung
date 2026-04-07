@@ -1,0 +1,147 @@
+<Styles
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:Payroll.Desktop.Controls">
+  <Styles.Resources>
+    <FontFamily x:Key="Theme.FontFamily">Segoe UI, DejaVu Sans, Arial</FontFamily>
+    <x:Double x:Key="Theme.FontSize.Body">13</x:Double>
+    <x:Double x:Key="Theme.FontSize.Caption">12</x:Double>
+    <x:Double x:Key="Theme.FontSize.Section">16</x:Double>
+    <x:Double x:Key="Theme.FontSize.Page">18</x:Double>
+    <x:Double x:Key="Theme.FontSize.AppTitle">24</x:Double>
+    <Thickness x:Key="Theme.Spacing.CardPadding">16</Thickness>
+
+    <SolidColorBrush x:Key="Theme.Color.AppBackground">#FFF5F7FA</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.Surface">#FFFFFFFF</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.SurfaceMuted">#FFF8FAFC</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.SurfaceSubtle">#FFEFF4F8</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.Border">#FFD7DFEA</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.BorderSoft">#FFE2E8F0</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.TextPrimary">#FF1A2530</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.TextMuted">#FF5F6B7A</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.TextInverse">#FFFFFFFF</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.TextStatus">#FF304255</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.Brand">#FF14324A</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.BrandSoft">#FFD1DCE7</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.Danger">#FFC95F36</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.WarningSurface">#FFFFF1E6</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.WarningText">#FF6B4A1F</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.ChipSurface">#FFE6EEF5</SolidColorBrush>
+  </Styles.Resources>
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.AppBackground}" />
+    <Setter Property="FontFamily" Value="{DynamicResource Theme.FontFamily}" />
+    <Setter Property="FontSize" Value="{DynamicResource Theme.FontSize.Body}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextPrimary}" />
+  </Style>
+
+  <Style Selector="controls|AppSectionCard">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border
+            Background="{DynamicResource Theme.Color.Surface}"
+            BorderBrush="{DynamicResource Theme.Color.Border}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="{DynamicResource Theme.Spacing.CardPadding}">
+          <Grid RowDefinitions="Auto,*">
+            <TextBlock
+                Classes="section-title"
+                Text="{TemplateBinding Header}" />
+            <ContentPresenter
+                Grid.Row="1"
+                Margin="0,12,0,0"
+                Content="{TemplateBinding Content}" />
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TextBlock.section-caption">
+    <Setter Property="FontSize" Value="{DynamicResource Theme.FontSize.Caption}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextMuted}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="TextBlock.app-title">
+    <Setter Property="FontSize" Value="{DynamicResource Theme.FontSize.AppTitle}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
+  </Style>
+
+  <Style Selector="TextBlock.app-subtitle">
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.BrandSoft}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style Selector="TextBlock.page-title">
+    <Setter Property="FontSize" Value="{DynamicResource Theme.FontSize.Page}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="TextBlock.section-title">
+    <Setter Property="FontSize" Value="{DynamicResource Theme.FontSize.Section}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="TextBlock.body-muted">
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style Selector="TextBlock.status-text">
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextStatus}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style Selector="Border.surface-panel">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+  </Style>
+
+  <Style Selector="Border.subtle-panel">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.SurfaceMuted}" />
+  </Style>
+
+  <Style Selector="Border.emphasis-panel">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.SurfaceSubtle}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.BorderSoft}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="Border.warning-panel">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.WarningSurface}" />
+  </Style>
+
+  <Style Selector="Border.chip-panel">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.ChipSurface}" />
+  </Style>
+
+  <Style Selector="Button.nav-active">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.Brand}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Brand}" />
+  </Style>
+
+  <Style Selector="Button.nav-placeholder">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.SurfaceMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextMuted}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Border}" />
+  </Style>
+
+  <Style Selector="Button.primary-action">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.Brand}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Brand}" />
+  </Style>
+
+  <Style Selector="Button.danger-action">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.Danger}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Danger}" />
+  </Style>
+</Styles>
