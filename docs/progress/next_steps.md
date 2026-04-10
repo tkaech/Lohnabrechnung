@@ -1,7 +1,7 @@
 # Next Steps
 
-1. Monatserfassung von der jetzt funktionsfaehigen Einzelperson-Erfassung in eine echte monatszentrierte, tabellarische Erfassung fuer mehrere Mitarbeitende weiterentwickeln
-2. fuer den ersten Windows-Testlauf eine kurze Betriebsdokumentation mit konkreten Startbeispielen fuer `appsettings`, ENV-Override und `--db-path`/`--environment` nachziehen
+1. die neue Unterseite `Monats-/Stundenerfassungen` im naechsten Schritt um direkte Spruenge in die Einzel-Erfassung pro Mitarbeitendem erweitern, damit Monatsliste und Detailbearbeitung enger zusammenarbeiten
+2. nach dem ersten Windows-Testlauf entscheiden, ob der aktuelle portable `win-x64`-Publish als ZIP ausreicht oder als naechster Schritt ein echter Installer vorbereitet werden soll
 3. den neuen Backup-/Restore-Bereich um Dateiauswahl-Dialoge und eine kleine Sicherungs-Vorschau erweitern, damit Pfadwahl und Sicherungsart noch gefuehrter ablaufen
 4. die neue zentrale Theme-Struktur schrittweise in weitere Views und Panels uebernehmen, damit noch mehr hart codierte Farben und Typografie aus den Views verschwinden
 5. das jetzt in `Settings` pflegbare Druck-Template um Validierung oder kleine Template-Hinweise erweitern, damit Platzhalterfehler frueher sichtbar werden

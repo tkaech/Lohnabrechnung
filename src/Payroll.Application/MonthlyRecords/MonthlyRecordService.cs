@@ -85,6 +85,16 @@ public sealed class MonthlyRecordService
         return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
     }
 
+    public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(
+        MonthlyTimeCaptureOverviewQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        _repository.ClearTracking();
+        return _repository.ListTimeCaptureOverviewAsync(query.Year, query.Month, cancellationToken);
+    }
+
     private async Task<EmployeeMonthlyRecord> LoadAggregateAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
     {
         return await _repository.GetByIdAsync(monthlyRecordId, cancellationToken)

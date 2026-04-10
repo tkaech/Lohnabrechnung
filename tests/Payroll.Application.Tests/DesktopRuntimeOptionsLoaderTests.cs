@@ -30,4 +30,45 @@ public sealed class DesktopRuntimeOptionsLoaderTests
             Environment.SetEnvironmentVariable("PAYROLLAPP_DATABASE_PATH", previousValue);
         }
     }
+
+    [Fact]
+    public void Load_UsesEnvironmentOverrideToDisableTestDataSeeding()
+    {
+        var previousPath = Environment.GetEnvironmentVariable("PAYROLLAPP_DATABASE_PATH");
+        var previousSeed = Environment.GetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PAYROLLAPP_DATABASE_PATH", "/tmp/payroll-env.db");
+            Environment.SetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA", "false");
+
+            var options = DesktopRuntimeOptionsLoader.Load([]);
+
+            Assert.False(options.SeedTestData);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PAYROLLAPP_DATABASE_PATH", previousPath);
+            Environment.SetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA", previousSeed);
+        }
+    }
+
+    [Fact]
+    public void Load_UsesEnvironmentOverrideForTestDataSeeding()
+    {
+        var previousValue = Environment.GetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA", "true");
+
+            var options = DesktopRuntimeOptionsLoader.Load([]);
+
+            Assert.True(options.SeedTestData);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA", previousValue);
+        }
+    }
 }

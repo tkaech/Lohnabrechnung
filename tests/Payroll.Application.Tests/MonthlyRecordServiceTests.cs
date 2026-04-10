@@ -1,4 +1,5 @@
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Settings;
 using Payroll.Domain.MonthlyRecords;
 
 namespace Payroll.Application.Tests;
@@ -165,12 +166,17 @@ public sealed class MonthlyRecordServiceTests
                     ["Testvorschau"]),
                 new MonthlyPayrollPreviewDto(
                     [
-                        new MonthlyPayrollPreviewLineDto("Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null, false),
-                        new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null, true)
+                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null, false),
+                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null, true)
                     ],
                     ["Test-Lohnvorschau"]));
 
             return Task.FromResult<MonthlyRecordDetailsDto?>(details);
+        }
+
+        public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult((IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)

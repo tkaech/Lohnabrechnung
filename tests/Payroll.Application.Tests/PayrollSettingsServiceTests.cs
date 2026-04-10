@@ -29,7 +29,9 @@ public sealed class PayrollSettingsServiceTests
             "BSD",
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
+            ",",
             0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
+            PayrollPreviewHelpCatalog.GetDefaultOptions(),
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit")],
             [new SettingOptionDto(Guid.NewGuid(), "A")],
             [new SettingOptionDto(Guid.NewGuid(), "Schachenstr. 7, Emmenbruecke")]));
@@ -43,6 +45,7 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal(10m, saved.PrintFontSize);
         Assert.Equal("BSD", saved.PrintLogoText);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", saved.PrintTemplate);
+        Assert.Equal(",", saved.DecimalSeparator);
         Assert.Equal(0.25m, saved.NightSupplementRate);
         Assert.Equal(0.50m, saved.SundaySupplementRate);
         Assert.Equal(1.00m, saved.HolidaySupplementRate);
@@ -55,6 +58,7 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal(1.10m, saved.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, saved.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, saved.VehicleRegiezone1RateChf);
+        Assert.Equal(8, saved.PayrollPreviewHelpOptions.Count);
         Assert.Single(saved.Departments);
         Assert.Single(saved.EmploymentCategories);
         Assert.Single(saved.EmploymentLocations);
@@ -83,7 +87,8 @@ public sealed class PayrollSettingsServiceTests
             "PA",
             string.Empty,
             string.Empty,
-            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, [], [], []);
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
+            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, PayrollPreviewHelpCatalog.GetDefaultOptions(), [], [], []);
 
         public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
         {
@@ -118,6 +123,7 @@ public sealed class PayrollSettingsServiceTests
                 command.PrintLogoText,
                 command.PrintLogoPath,
                 command.PrintTemplate,
+                command.DecimalSeparator,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,
@@ -130,6 +136,7 @@ public sealed class PayrollSettingsServiceTests
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
                 command.VehicleRegiezone1RateChf,
+                command.PayrollPreviewHelpOptions,
                 command.Departments,
                 command.EmploymentCategories,
                 command.EmploymentLocations);

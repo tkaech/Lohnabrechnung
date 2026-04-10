@@ -25,6 +25,8 @@ public sealed class PayrollSettings : AuditableEntity
     public const string DefaultPrintAccentColorHex = "#FFFFFF00";
     public const string DefaultPrintLogoText = "PA";
     public const string DefaultPrintTemplate = "";
+    public const string DefaultDecimalSeparator = ",";
+    public const string DefaultPayrollPreviewHelpVisibilityJson = "";
 
     private PayrollSettings()
     {
@@ -45,6 +47,8 @@ public sealed class PayrollSettings : AuditableEntity
         PrintLogoText = DefaultPrintLogoText;
         PrintLogoPath = string.Empty;
         PrintTemplate = DefaultPrintTemplate;
+        DecimalSeparator = DefaultDecimalSeparator;
+        PayrollPreviewHelpVisibilityJson = DefaultPayrollPreviewHelpVisibilityJson;
         WorkTimeSupplementSettings = WorkTimeSupplementSettings.Empty;
         AhvIvEoRate = DefaultAhvIvEoRate;
         AlvRate = DefaultAlvRate;
@@ -84,6 +88,7 @@ public sealed class PayrollSettings : AuditableEntity
             DefaultPrintAccentColorHex,
             DefaultPrintLogoText,
             string.Empty);
+        UpdateDecimalSeparator(DefaultDecimalSeparator);
         WorkTimeSupplementSettings = workTimeSupplementSettings ?? WorkTimeSupplementSettings.Empty;
         UpdateDeductionAndVehicleRates(
             ahvIvEoRate,
@@ -115,6 +120,8 @@ public sealed class PayrollSettings : AuditableEntity
     public string PrintLogoText { get; private set; } = string.Empty;
     public string PrintLogoPath { get; private set; } = string.Empty;
     public string PrintTemplate { get; private set; } = string.Empty;
+    public string DecimalSeparator { get; private set; } = DefaultDecimalSeparator;
+    public string PayrollPreviewHelpVisibilityJson { get; private set; } = DefaultPayrollPreviewHelpVisibilityJson;
     public decimal AhvIvEoRate { get; private set; }
     public decimal AlvRate { get; private set; }
     public decimal SicknessAccidentInsuranceRate { get; private set; }
@@ -221,6 +228,18 @@ public sealed class PayrollSettings : AuditableEntity
         Touch();
     }
 
+    public void UpdateDecimalSeparator(string? decimalSeparator)
+    {
+        DecimalSeparator = NormalizeDecimalSeparator(decimalSeparator);
+        Touch();
+    }
+
+    public void UpdatePayrollPreviewHelpVisibilityJson(string? payrollPreviewHelpVisibilityJson)
+    {
+        PayrollPreviewHelpVisibilityJson = NormalizeOptional(payrollPreviewHelpVisibilityJson) ?? string.Empty;
+        Touch();
+    }
+
     private static string NormalizeCompanyAddress(string? companyAddress)
     {
         if (string.IsNullOrWhiteSpace(companyAddress))
@@ -255,5 +274,10 @@ public sealed class PayrollSettings : AuditableEntity
         }
 
         return value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Trim();
+    }
+
+    private static string NormalizeDecimalSeparator(string? value)
+    {
+        return value == "." ? "." : DefaultDecimalSeparator;
     }
 }

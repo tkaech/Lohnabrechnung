@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 using Payroll.Application.Settings;
+using Payroll.Desktop.Formatting;
 
 namespace Payroll.Desktop.Styles;
 
@@ -14,6 +15,8 @@ public static class ThemeSettingsApplier
         }
 
         var resources = Avalonia.Application.Current.Resources;
+
+        NumericFormatManager.ApplyDecimalSeparator(settings.DecimalSeparator);
 
         resources["Theme.FontFamily"] = CreateFontFamily(settings.AppFontFamily, Payroll.Domain.Settings.PayrollSettings.DefaultAppFontFamily);
         resources["Theme.FontSize.Body"] = (double)settings.AppFontSize;

@@ -11,13 +11,15 @@ Standardverhalten
 -----------------
 - Die Anwendung liest standardmaessig `appsettings.json`.
 - Der dort konfigurierte Datenbankpfad ist:
-  `{LocalAppData}/PayrollApp/payroll.test.db`
+  `{LocalAppData}/PayrollApp/payroll.windows-test.db`
 - Unter Windows wird `{LocalAppData}` typischerweise auf
   `C:\Users\<Benutzer>\AppData\Local`
   aufgeloest.
+- Fuer diesen Windows-Testlauf werden beim ersten Start Testdaten angelegt,
+  wenn die Datenbank noch leer ist.
 
 Beispiel:
-`C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.test.db`
+`C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.windows-test.db`
 
 
 Erster Start
@@ -26,8 +28,9 @@ Erster Start
 2. Falls die Datenbank noch nicht existiert:
    - wird die SQLite-Datei angelegt
    - werden EF-Migrationen ausgefuehrt
-   - werden nur Konfigurationsdaten initialisiert
-3. Es werden keine Demo-Mitarbeitenden oder Personendaten angelegt
+   - werden Konfigurationsdaten initialisiert
+   - werden Test-Mitarbeitende fuer den Windows-Test angelegt
+3. Wenn die Datenbank bereits existiert, bleibt sie unveraendert erhalten
 
 
 Weitere Starts
@@ -42,10 +45,13 @@ DB-Pfad ueberschreiben
 Es gibt drei Moeglichkeiten:
 
 1. Startparameter
-`Payroll.Desktop.exe --db-path="C:\Pfad\zur\payroll.test.db"`
+`Payroll.Desktop.exe --db-path="C:\Pfad\zur\payroll.windows-test.db"`
 
 2. Environment-Variable
 `PAYROLLAPP_DATABASE_PATH`
+
+Optional fuer Testdaten:
+`PAYROLLAPP_SEED_TESTDATA=true`
 
 3. Appsettings
 - `appsettings.json`
@@ -70,7 +76,7 @@ Standardstart:
 `Payroll.Desktop.exe`
 
 Start mit explizitem Testpfad:
-`Payroll.Desktop.exe --db-path="C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.test.db"`
+`Payroll.Desktop.exe --db-path="C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.windows-test.db"`
 
 Start mit anderem Environment:
 `Payroll.Desktop.exe --environment=Production`
@@ -82,3 +88,18 @@ Wichtige Hinweise
 - Der Ordner fuer die Datenbank wird bei Bedarf automatisch angelegt
 - Die Anwendung verwendet SQLite
 - Fuer diesen Testlauf gibt es noch keinen Installer
+
+
+Fehlerbehebung beim ersten Start
+--------------------------------
+Wenn der Start fehlschlaegt oder eine unvollstaendige Test-Datenbank vorliegt:
+
+1. Anwendung schliessen
+2. Datei loeschen:
+   `C:\Users\<Benutzer>\AppData\Local\PayrollApp\payroll.windows-test.db`
+3. Anwendung erneut starten
+
+Zusatz:
+- Beim erneuten Start werden Datenbank und Testdaten frisch aufgebaut
+- Falls weiterhin ein Fehler auftritt, Logdatei pruefen:
+  `C:\Users\<Benutzer>\AppData\Local\PayrollApp\startup-error.log`

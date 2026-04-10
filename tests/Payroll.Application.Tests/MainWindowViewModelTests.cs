@@ -3,6 +3,7 @@ using Payroll.Application.Employees;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
+using Payroll.Desktop.Formatting;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.Employees;
 using Payroll.Domain.MonthlyRecords;
@@ -11,6 +12,20 @@ namespace Payroll.Application.Tests;
 
 public sealed class MainWindowViewModelTests
 {
+    [Fact]
+    public void NumericFormatManager_ParsesDotAndCommaDecimalsWithoutIntegerFallback()
+    {
+        NumericFormatManager.ApplyDecimalSeparator(".");
+
+        Assert.True(NumericFormatManager.TryParseDecimal("0.053", out var dotValue));
+        Assert.Equal(0.053m, dotValue);
+
+        Assert.True(NumericFormatManager.TryParseDecimal("0,053", out var commaValue));
+        Assert.Equal(0.053m, commaValue);
+
+        NumericFormatManager.ApplyDecimalSeparator(",");
+    }
+
     [Fact]
     public async Task InitializeAsync_SelectsFirstEmployeeAndLoadsDetails()
     {
@@ -191,7 +206,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsEmployeesSettingsAndHelp()
+    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsReportingEmployeesSettingsAndHelp()
     {
         var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
         var repository = new TestEmployeeRepository(employee);
@@ -199,12 +214,23 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.IsTimeAndExpensesWorkspace);
         Assert.False(viewModel.IsPayrollRunsWorkspace);
+        Assert.False(viewModel.IsReportingWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
 
         viewModel.ShowPayrollRunsCommand.Execute(null);
 
         Assert.True(viewModel.IsPayrollRunsWorkspace);
         Assert.False(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsReportingWorkspace);
+        Assert.False(viewModel.IsEmployeeWorkspace);
+        Assert.True(viewModel.ShowEmployeeSelectionArea);
+        Assert.True(viewModel.ShowPrimaryWorkspaceArea);
+
+        viewModel.ShowReportingCommand.Execute(null);
+
+        Assert.True(viewModel.IsReportingWorkspace);
+        Assert.False(viewModel.IsTimeAndExpensesWorkspace);
+        Assert.False(viewModel.IsPayrollRunsWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
         Assert.True(viewModel.ShowEmployeeSelectionArea);
         Assert.True(viewModel.ShowPrimaryWorkspaceArea);
@@ -214,11 +240,13 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsEmployeeWorkspace);
         Assert.False(viewModel.IsTimeAndExpensesWorkspace);
         Assert.False(viewModel.IsPayrollRunsWorkspace);
+        Assert.False(viewModel.IsReportingWorkspace);
 
         viewModel.ShowTimeAndExpensesCommand.Execute(null);
 
         Assert.True(viewModel.IsTimeAndExpensesWorkspace);
         Assert.False(viewModel.IsPayrollRunsWorkspace);
+        Assert.False(viewModel.IsReportingWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
 
         viewModel.ShowSettingsCommand.Execute(null);
@@ -235,6 +263,51 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task MonthCaptureOverview_LoadsAndFiltersRowsForSelectedMonth()
+    {
+        var employeeRepository = new TestEmployeeRepository(
+            TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"),
+            TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich"));
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            4,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(Guid.NewGuid(), "1000", "Anna", "Aktiv", true, true, 12m, 1m, 0m, 0m, 2m, 0m, 0m, 2),
+                new MonthlyTimeCaptureOverviewRowDto(Guid.NewGuid(), "1001", "Bruno", "Bereit", true, false, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.MonthCaptureOverviewRows.Count == 2);
+
+        Assert.Equal("04/2026", viewModel.MonthCaptureMonthLabel);
+
+        viewModel.SelectedMonthCaptureFilter = "Ohne Monatserfassung";
+        Assert.Single(viewModel.MonthCaptureOverviewRows);
+        Assert.Equal("1001", viewModel.MonthCaptureOverviewRows[0].PersonnelNumber);
+
+        viewModel.SelectedMonthCaptureFilter = "Mit Monatserfassung";
+        Assert.Single(viewModel.MonthCaptureOverviewRows);
+        Assert.Equal("1000", viewModel.MonthCaptureOverviewRows[0].PersonnelNumber);
+    }
+
+    [Fact]
     public async Task SettingsWorkspace_LoadsAndSavesCentralSupplementRatesWithoutEmployeeSelection()
     {
         var employeeRepository = new TestEmployeeRepository();
@@ -248,25 +321,27 @@ public sealed class MainWindowViewModelTests
                 new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
                 new PayrollSettingsService(settingsRepository),
                 new TestPdfExportService()),
+            new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
             new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
             "Test");
 
         await viewModel.InitializeAsync();
-        await WaitUntilAsync(() => viewModel.SettingsNightSupplementRate == "0.25");
+        await WaitUntilAsync(() => viewModel.SettingsNightSupplementRate == "25");
 
         viewModel.ShowSettingsCommand.Execute(null);
-        viewModel.SettingsNightSupplementRate = "0.30";
-        viewModel.SettingsSundaySupplementRate = "0.60";
-        viewModel.SettingsHolidaySupplementRate = "1.10";
-        viewModel.SettingsAhvIvEoRate = "0.054";
-        viewModel.SettingsAlvRate = "0.012";
-        viewModel.SettingsSicknessAccidentInsuranceRate = "0.009";
-        viewModel.SettingsTrainingAndHolidayRate = "0.0002";
-        viewModel.SettingsVacationCompensationRate = "0.1064";
-        viewModel.SettingsVacationCompensationRateAge50Plus = "0.1264";
-        viewModel.SettingsVehiclePauschalzone1RateChf = "1.5";
-        viewModel.SettingsVehiclePauschalzone2RateChf = "2.5";
-        viewModel.SettingsVehicleRegiezone1RateChf = "3.5";
+        viewModel.SettingsDecimalSeparator = ",";
+        viewModel.SettingsNightSupplementRate = "30";
+        viewModel.SettingsSundaySupplementRate = "60";
+        viewModel.SettingsHolidaySupplementRate = "110";
+        viewModel.SettingsAhvIvEoRate = "5,4";
+        viewModel.SettingsAlvRate = "1,2";
+        viewModel.SettingsSicknessAccidentInsuranceRate = "0,9";
+        viewModel.SettingsTrainingAndHolidayRate = "0,02";
+        viewModel.SettingsVacationCompensationRate = "10,64";
+        viewModel.SettingsVacationCompensationRateAge50Plus = "12,64";
+        viewModel.SettingsVehiclePauschalzone1RateChf = "1,5";
+        viewModel.SettingsVehiclePauschalzone2RateChf = "2,5";
+        viewModel.SettingsVehicleRegiezone1RateChf = "3,5";
         viewModel.SettingsCompanyAddress = "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri";
         viewModel.SettingsAppFontFamily = "Aptos";
         viewModel.SettingsAppFontSize = "14";
@@ -309,6 +384,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(14m, settingsRepository.Current.AppFontSize);
         Assert.Equal("#FF224466", settingsRepository.Current.AppAccentColorHex);
         Assert.Equal("Helvetica", settingsRepository.Current.PrintFontFamily);
+        Assert.Equal(",", settingsRepository.Current.DecimalSeparator);
         Assert.Equal(10m, settingsRepository.Current.PrintFontSize);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", settingsRepository.Current.PrintTemplate);
         Assert.Equal("BSD", settingsRepository.Current.AppLogoText);
@@ -330,6 +406,7 @@ public sealed class MainWindowViewModelTests
                 new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
                 new PayrollSettingsService(settingsRepository),
                 new TestPdfExportService()),
+            new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
             new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
             "Test");
 
@@ -369,6 +446,7 @@ public sealed class MainWindowViewModelTests
                 monthlyRecordService,
                 new PayrollSettingsService(settingsRepository),
                 new TestPdfExportService()),
+            monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
             "Test");
     }
@@ -608,6 +686,13 @@ public sealed class MainWindowViewModelTests
 
     private sealed class InMemoryMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
     {
+        private readonly Dictionary<(int Year, int Month), IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> _overviewRows = [];
+
+        public void SetOverviewRows(int year, int month, IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto> rows)
+        {
+            _overviewRows[(year, month)] = rows;
+        }
+
         public Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
         {
             return Task.FromResult(new EmployeeMonthlyRecord(employeeId, year, month));
@@ -621,6 +706,13 @@ public sealed class MainWindowViewModelTests
         public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
             return Task.FromResult<MonthlyRecordDetailsDto?>(null);
+        }
+
+        public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_overviewRows.TryGetValue((year, month), out var rows)
+                ? rows
+                : (IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -688,7 +780,9 @@ public sealed class MainWindowViewModelTests
             "PA",
             string.Empty,
             "BANNER|Lohnblatt|{{Monat}}",
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
             0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m,
+            PayrollPreviewHelpCatalog.GetDefaultOptions(),
             [new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111111"), "Sicherheit"), new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111112"), "Buero")],
             [new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "A"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222223"), "B"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222224"), "C")],
             [new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333333"), "Schachenstr. 7, Emmenbruecke"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333334"), "Weinbergstrasse 8, Baar"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333335"), "Rainstrasse 37, Unteraegeri")]);
@@ -728,6 +822,7 @@ public sealed class MainWindowViewModelTests
                 command.PrintLogoText,
                 command.PrintLogoPath,
                 command.PrintTemplate,
+                command.DecimalSeparator,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,
@@ -740,6 +835,7 @@ public sealed class MainWindowViewModelTests
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
                 command.VehicleRegiezone1RateChf,
+                command.PayrollPreviewHelpOptions,
                 command.Departments,
                 command.EmploymentCategories,
                 command.EmploymentLocations);

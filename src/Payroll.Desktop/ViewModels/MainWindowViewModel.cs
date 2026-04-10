@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using Avalonia.Media.Imaging;
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
+using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
+using Payroll.Desktop.Formatting;
 using Payroll.Desktop.Styles;
 
 namespace Payroll.Desktop.ViewModels;
@@ -14,6 +17,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         TimeAndExpenses,
         PayrollRuns,
+        Reporting,
         Employees,
         Settings,
         Help
@@ -22,6 +26,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string ActivityFilterAll = "Alle";
     private const string ActivityFilterActive = "Aktiv";
     private const string ActivityFilterInactive = "Inaktiv";
+    private const string MonthCaptureFilterAll = "Alle Mitarbeitenden";
+    private const string MonthCaptureFilterWithoutMonth = "Ohne Monatserfassung";
+    private const string MonthCaptureFilterWithMonth = "Mit Monatserfassung";
     private const string WithholdingTaxUnknown = "Ungeklaert";
     private const string WithholdingTaxYes = "Ja";
     private const string WithholdingTaxNo = "Nein";
@@ -37,6 +44,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IBackupRestoreService _backupRestoreService;
     private readonly PayrollSettingsService _payrollSettingsService;
     private readonly ReportingService _reportingService;
+    private readonly MonthlyRecordService _monthlyRecordService;
     private EmployeeListItemViewModel? _selectedEmployee;
     private Guid? _currentEmployeeId;
     private Guid? _pendingEmployeeId;
@@ -108,6 +116,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsPrintLogoText = string.Empty;
     private string _settingsPrintLogoPath = string.Empty;
     private string _settingsPrintTemplate = string.Empty;
+    private string _settingsDecimalSeparator = Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator;
     private string _backupDirectoryPath = string.Empty;
     private string _backupFileName = string.Empty;
     private string _selectedBackupContentType = BackupTypeBothLabel;
@@ -121,14 +130,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _isCreatingNew;
     private bool _showDeleteConfirmation;
     private string _employeeCountSummary = "Keine Mitarbeitenden geladen.";
+    private string _selectedMonthCaptureFilter = MonthCaptureFilterAll;
+    private string _monthCaptureSummary = "Keine Stundenerfassungen geladen.";
+    private IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto> _allMonthCaptureOverviewRows = [];
     private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
 
-    public MainWindowViewModel(EmployeeService employeeService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
+    public MainWindowViewModel(EmployeeService employeeService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
     {
         _employeeService = employeeService;
         _backupRestoreService = backupRestoreService;
         _payrollSettingsService = payrollSettingsService;
         _reportingService = reportingService;
+        _monthlyRecordService = monthlyRecordService;
         MonthlyRecord = monthlyRecord;
         WorkspaceLabel = workspaceLabel;
         DatabasePathDisplay = string.IsNullOrWhiteSpace(databasePath) ? "Kein Pfad verfuegbar." : databasePath;
@@ -137,9 +150,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         DepartmentOptions = [];
         EmploymentCategoryOptions = [];
         EmploymentLocationOptions = [];
+        PayrollPreviewHelpOptions = [];
+        MonthCaptureOverviewRows = [];
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
+        MonthCaptureFilters = [MonthCaptureFilterAll, MonthCaptureFilterWithoutMonth, MonthCaptureFilterWithMonth];
         WithholdingTaxOptions = [WithholdingTaxUnknown, WithholdingTaxYes, WithholdingTaxNo];
         BackupContentTypeOptions = [BackupTypeConfigurationLabel, BackupTypeUserDataLabel, BackupTypeBothLabel];
+        DecimalSeparatorOptions = [",", "."];
         RefreshCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         SearchCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         NewEmployeeCommand = new DelegateCommand(BeginCreateEmployee, () => CanStartCreate);
@@ -152,6 +169,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ClearExitDateCommand = new DelegateCommand(ClearExitDate, () => CanClearExitDate);
         ShowTimeAndExpensesCommand = new DelegateCommand(SwitchToTimeAndExpensesWorkspace, () => !IsTimeAndExpensesWorkspace);
         ShowPayrollRunsCommand = new DelegateCommand(SwitchToPayrollRunsWorkspace, () => !IsPayrollRunsWorkspace);
+        ShowReportingCommand = new DelegateCommand(SwitchToReportingWorkspace, () => !IsReportingWorkspace);
         ShowEmployeesCommand = new DelegateCommand(SwitchToEmployeesWorkspace, () => !IsEmployeeWorkspace);
         ShowSettingsCommand = new DelegateCommand(SwitchToSettingsWorkspace, () => !IsSettingsWorkspace);
         ShowHelpCommand = new DelegateCommand(SwitchToHelpWorkspace, () => !IsHelpWorkspace);
@@ -167,6 +185,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         RemoveEmploymentLocationOptionCommand = new DelegateCommand(RemoveEmploymentLocationOption, () => CanRemoveEmploymentLocationOption);
         BackupDirectoryPath = _backupRestoreService.GetDefaultBackupDirectory();
         BackupFileName = _backupRestoreService.CreateDefaultFileName(DateTimeOffset.Now);
+        MonthlyRecord.PropertyChanged += OnMonthlyRecordPropertyChanged;
+        MonthlyRecord.TimeCaptureChanged += OnMonthlyRecordTimeCaptureChanged;
 
         ClearFormForEmptyState();
     }
@@ -200,9 +220,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<EditableSettingOptionViewModel> DepartmentOptions { get; }
     public ObservableCollection<EditableSettingOptionViewModel> EmploymentCategoryOptions { get; }
     public ObservableCollection<EditableSettingOptionViewModel> EmploymentLocationOptions { get; }
+    public ObservableCollection<PayrollPreviewHelpToggleViewModel> PayrollPreviewHelpOptions { get; }
+    public ObservableCollection<MonthlyTimeCaptureOverviewRowDto> MonthCaptureOverviewRows { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
+    public IReadOnlyList<string> MonthCaptureFilters { get; }
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
     public IReadOnlyList<string> BackupContentTypeOptions { get; }
+    public IReadOnlyList<string> DecimalSeparatorOptions { get; }
     public DelegateCommand RefreshCommand { get; }
     public DelegateCommand SearchCommand { get; }
     public DelegateCommand NewEmployeeCommand { get; }
@@ -215,6 +239,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand ClearExitDateCommand { get; }
     public DelegateCommand ShowTimeAndExpensesCommand { get; }
     public DelegateCommand ShowPayrollRunsCommand { get; }
+    public DelegateCommand ShowReportingCommand { get; }
     public DelegateCommand ShowEmployeesCommand { get; }
     public DelegateCommand ShowSettingsCommand { get; }
     public DelegateCommand ShowHelpCommand { get; }
@@ -230,16 +255,37 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand RemoveEmploymentLocationOptionCommand { get; }
     public bool IsTimeAndExpensesWorkspace => _currentSection == WorkspaceSection.TimeAndExpenses;
     public bool IsPayrollRunsWorkspace => _currentSection == WorkspaceSection.PayrollRuns;
+    public bool IsReportingWorkspace => _currentSection == WorkspaceSection.Reporting;
     public bool IsEmployeeWorkspace => _currentSection == WorkspaceSection.Employees;
     public bool IsSettingsWorkspace => _currentSection == WorkspaceSection.Settings;
     public bool IsHelpWorkspace => _currentSection == WorkspaceSection.Help;
     public bool ShowTimeAndExpensesWorkspace => IsTimeAndExpensesWorkspace;
     public bool ShowPayrollRunsWorkspace => IsPayrollRunsWorkspace;
+    public bool ShowReportingWorkspace => IsReportingWorkspace;
     public bool ShowEmployeeWorkspace => IsEmployeeWorkspace;
     public bool ShowSettingsWorkspace => IsSettingsWorkspace;
     public bool ShowHelpWorkspace => IsHelpWorkspace;
     public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace && !IsHelpWorkspace;
     public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace && !IsHelpWorkspace;
+    public string MonthCaptureMonthLabel => MonthlyRecord.SelectedMonth.HasValue
+        ? $"{MonthlyRecord.SelectedMonth.Value:MM/yyyy}"
+        : "-";
+    public string MonthCaptureSummary
+    {
+        get => _monthCaptureSummary;
+        private set => SetProperty(ref _monthCaptureSummary, value);
+    }
+    public string SelectedMonthCaptureFilter
+    {
+        get => _selectedMonthCaptureFilter;
+        set
+        {
+            if (SetProperty(ref _selectedMonthCaptureFilter, value))
+            {
+                ApplyMonthCaptureOverviewFilter();
+            }
+        }
+    }
 
     public string FormTitle => _isCreatingNew
         ? "Neuer Mitarbeitender"
@@ -763,6 +809,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _settingsPrintTemplate, value);
     }
 
+    public string SettingsDecimalSeparator
+    {
+        get => _settingsDecimalSeparator;
+        set => SetProperty(ref _settingsDecimalSeparator, NumericFormatManager.NormalizeDecimalSeparator(value));
+    }
+
     public string BackupDirectoryPath
     {
         get => _backupDirectoryPath;
@@ -854,6 +906,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await LoadSettingsAsync();
         await RefreshAsync();
+        await LoadMonthCaptureOverviewAsync();
 
         if (Employees.Count > 0 && _currentEmployeeId is null)
         {
@@ -868,6 +921,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             var selectedEmployeeId = _currentEmployeeId;
             await ReloadEmployeesAsync();
             await RestoreSelectionAfterReloadAsync(selectedEmployeeId, selectFirstIfMissing: !_isEditing);
+            await LoadMonthCaptureOverviewAsync();
             StatusMessage = $"{Employees.Count} Mitarbeitende geladen.";
         });
     }
@@ -1103,23 +1157,26 @@ public sealed class MainWindowViewModel : ViewModelBase
                 SettingsPrintLogoText,
                 SettingsPrintLogoPath,
                 SettingsPrintTemplate,
-                ParseOptionalDecimal(SettingsNightSupplementRate),
-                ParseOptionalDecimal(SettingsSundaySupplementRate),
-                ParseOptionalDecimal(SettingsHolidaySupplementRate),
-                ParseRequiredDecimal(SettingsAhvIvEoRate, nameof(SettingsAhvIvEoRate)),
-                ParseRequiredDecimal(SettingsAlvRate, nameof(SettingsAlvRate)),
-                ParseRequiredDecimal(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate)),
-                ParseRequiredDecimal(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate)),
-                ParseRequiredDecimal(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
-                ParseRequiredDecimal(SettingsVacationCompensationRateAge50Plus, nameof(SettingsVacationCompensationRateAge50Plus)),
+                SettingsDecimalSeparator,
+                ParseOptionalPercentage(SettingsNightSupplementRate),
+                ParseOptionalPercentage(SettingsSundaySupplementRate),
+                ParseOptionalPercentage(SettingsHolidaySupplementRate),
+                ParseRequiredPercentage(SettingsAhvIvEoRate, nameof(SettingsAhvIvEoRate)),
+                ParseRequiredPercentage(SettingsAlvRate, nameof(SettingsAlvRate)),
+                ParseRequiredPercentage(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate)),
+                ParseRequiredPercentage(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate)),
+                ParseRequiredPercentage(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
+                ParseRequiredPercentage(SettingsVacationCompensationRateAge50Plus, nameof(SettingsVacationCompensationRateAge50Plus)),
                 ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf)),
                 ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf)),
                 ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf)),
+                BuildPayrollPreviewHelpOptionDtos(PayrollPreviewHelpOptions),
                 BuildSettingOptionDtos(DepartmentOptions),
                 BuildSettingOptionDtos(EmploymentCategoryOptions),
                 BuildSettingOptionDtos(EmploymentLocationOptions)));
 
             ApplySettings(saved);
+            await MonthlyRecord.ReloadCurrentMonthAsync();
             StatusMessage = "Einstellungen gespeichert.";
         });
     }
@@ -1311,9 +1368,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidTo = employee.ContractValidTo.HasValue
             ? new DateTimeOffset(employee.ContractValidTo.Value.ToDateTime(TimeOnly.MinValue))
             : null;
-        HourlyRateChf = employee.HourlyRateChf.ToString("0.00");
-        MonthlyBvgDeductionChf = employee.MonthlyBvgDeductionChf.ToString("0.00");
-        SpecialSupplementRateChf = employee.SpecialSupplementRateChf.ToString("0.00");
+        HourlyRateChf = NumericFormatManager.FormatDecimal(employee.HourlyRateChf, "0.00");
+        MonthlyBvgDeductionChf = NumericFormatManager.FormatDecimal(employee.MonthlyBvgDeductionChf, "0.00");
+        SpecialSupplementRateChf = NumericFormatManager.FormatDecimal(employee.SpecialSupplementRateChf, "0.00");
     }
 
     private void ResetFormForNewDraft()
@@ -1345,9 +1402,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedEmploymentLocationOption = EmploymentLocationOptions.FirstOrDefault();
         ContractValidFrom = new DateTimeOffset(DateTime.Today);
         ContractValidTo = null;
-        HourlyRateChf = "0";
-        MonthlyBvgDeductionChf = "0";
-        SpecialSupplementRateChf = "3.00";
+        HourlyRateChf = NumericFormatManager.FormatDecimal(0m, "0");
+        MonthlyBvgDeductionChf = NumericFormatManager.FormatDecimal(0m, "0");
+        SpecialSupplementRateChf = NumericFormatManager.FormatDecimal(3m, "0.00");
     }
 
     private void ClearFormForEmptyState()
@@ -1428,6 +1485,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ClearExitDateCommand.RaiseCanExecuteChanged();
         ShowTimeAndExpensesCommand.RaiseCanExecuteChanged();
         ShowPayrollRunsCommand.RaiseCanExecuteChanged();
+        ShowReportingCommand.RaiseCanExecuteChanged();
         ShowEmployeesCommand.RaiseCanExecuteChanged();
         ShowSettingsCommand.RaiseCanExecuteChanged();
         SaveSettingsCommand.RaiseCanExecuteChanged();
@@ -1440,6 +1498,72 @@ public sealed class MainWindowViewModel : ViewModelBase
         RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
         AddEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
         RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private async void OnMonthlyRecordTimeCaptureChanged(object? sender, EventArgs e)
+    {
+        await LoadMonthCaptureOverviewAsync();
+    }
+
+    private async void OnMonthlyRecordPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MonthlyRecordViewModel.SelectedMonth) or nameof(MonthlyRecordViewModel.SelectedMonthText))
+        {
+            RaisePropertyChanged(nameof(MonthCaptureMonthLabel));
+            await LoadMonthCaptureOverviewAsync();
+        }
+    }
+
+    private async Task LoadMonthCaptureOverviewAsync()
+    {
+        if (!MonthlyRecord.SelectedMonth.HasValue)
+        {
+            _allMonthCaptureOverviewRows = [];
+            ApplyMonthCaptureOverviewFilter();
+            return;
+        }
+
+        try
+        {
+            _allMonthCaptureOverviewRows = await _monthlyRecordService.ListTimeCaptureOverviewAsync(
+                new MonthlyTimeCaptureOverviewQuery(
+                    MonthlyRecord.SelectedMonth.Value.Year,
+                    MonthlyRecord.SelectedMonth.Value.Month));
+            ApplyMonthCaptureOverviewFilter();
+        }
+        catch
+        {
+            MonthCaptureOverviewRows.Clear();
+            MonthCaptureSummary = "Stundenerfassungen konnten nicht geladen werden.";
+        }
+    }
+
+    private void ApplyMonthCaptureOverviewFilter()
+    {
+        IEnumerable<MonthlyTimeCaptureOverviewRowDto> filteredRows = _allMonthCaptureOverviewRows;
+
+        filteredRows = SelectedMonthCaptureFilter switch
+        {
+            MonthCaptureFilterWithoutMonth => filteredRows.Where(row => !row.HasMonthCapture),
+            MonthCaptureFilterWithMonth => filteredRows.Where(row => row.HasMonthCapture),
+            _ => filteredRows
+        };
+
+        var rows = filteredRows
+            .OrderBy(row => row.LastName)
+            .ThenBy(row => row.FirstName)
+            .ThenBy(row => row.PersonnelNumber)
+            .ToArray();
+
+        MonthCaptureOverviewRows.Clear();
+        foreach (var row in rows)
+        {
+            MonthCaptureOverviewRows.Add(row);
+        }
+
+        MonthCaptureSummary = rows.Length == 1
+            ? $"1 Mitarbeitender fuer {MonthCaptureMonthLabel} in der aktuellen Ansicht."
+            : $"{rows.Length} Mitarbeitende fuer {MonthCaptureMonthLabel} in der aktuellen Ansicht.";
     }
 
     private async Task<bool> LoadEmployeeIntoViewAsync(Guid employeeId)
@@ -1573,7 +1697,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private static decimal ParseRequiredDecimal(string value, string fieldName)
     {
-        if (!decimal.TryParse(value, out var parsedValue))
+        if (!NumericFormatManager.TryParseDecimal(value, out var parsedValue))
         {
             throw new InvalidOperationException($"{fieldName} muss eine gueltige Zahl sein.");
         }
@@ -1588,12 +1712,23 @@ public sealed class MainWindowViewModel : ViewModelBase
             return null;
         }
 
-        if (!decimal.TryParse(value, out var parsedValue))
+        if (!NumericFormatManager.TryParseDecimal(value, out var parsedValue))
         {
             throw new InvalidOperationException("Einstellungswerte muessen gueltige Zahlen sein.");
         }
 
         return parsedValue;
+    }
+
+    private static decimal ParseRequiredPercentage(string value, string fieldName)
+    {
+        return ParseRequiredDecimal(value, fieldName) / 100m;
+    }
+
+    private static decimal? ParseOptionalPercentage(string? value)
+    {
+        var parsedValue = ParseOptionalDecimal(value);
+        return parsedValue.HasValue ? parsedValue.Value / 100m : null;
     }
 
     private static BackupContentType ParseBackupContentType(string label)
@@ -1614,9 +1749,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void ApplySettings(PayrollSettingsDto settings)
     {
+        ThemeSettingsApplier.Apply(settings);
         SettingsCompanyAddress = settings.CompanyAddress;
         SettingsAppFontFamily = settings.AppFontFamily;
-        SettingsAppFontSize = settings.AppFontSize.ToString("0.##");
+        SettingsAppFontSize = NumericFormatManager.FormatDecimal(settings.AppFontSize, "0.##");
         SettingsAppTextColorHex = settings.AppTextColorHex;
         SettingsAppMutedTextColorHex = settings.AppMutedTextColorHex;
         SettingsAppBackgroundColorHex = settings.AppBackgroundColorHex;
@@ -1624,28 +1760,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsAppLogoText = settings.AppLogoText;
         SettingsAppLogoPath = settings.AppLogoPath;
         SettingsPrintFontFamily = settings.PrintFontFamily;
-        SettingsPrintFontSize = settings.PrintFontSize.ToString("0.##");
+        SettingsPrintFontSize = NumericFormatManager.FormatDecimal(settings.PrintFontSize, "0.##");
         SettingsPrintTextColorHex = settings.PrintTextColorHex;
         SettingsPrintMutedTextColorHex = settings.PrintMutedTextColorHex;
         SettingsPrintAccentColorHex = settings.PrintAccentColorHex;
         SettingsPrintLogoText = settings.PrintLogoText;
         SettingsPrintLogoPath = settings.PrintLogoPath;
         SettingsPrintTemplate = settings.PrintTemplate;
-        SettingsNightSupplementRate = settings.NightSupplementRate?.ToString("0.####");
-        SettingsSundaySupplementRate = settings.SundaySupplementRate?.ToString("0.####");
-        SettingsHolidaySupplementRate = settings.HolidaySupplementRate?.ToString("0.####");
-        SettingsAhvIvEoRate = settings.AhvIvEoRate.ToString("0.#####");
-        SettingsAlvRate = settings.AlvRate.ToString("0.#####");
-        SettingsSicknessAccidentInsuranceRate = settings.SicknessAccidentInsuranceRate.ToString("0.#####");
-        SettingsTrainingAndHolidayRate = settings.TrainingAndHolidayRate.ToString("0.#####");
-        SettingsVacationCompensationRate = settings.VacationCompensationRate.ToString("0.####");
-        SettingsVacationCompensationRateAge50Plus = settings.VacationCompensationRateAge50Plus.ToString("0.####");
-        SettingsVehiclePauschalzone1RateChf = settings.VehiclePauschalzone1RateChf.ToString("0.##");
-        SettingsVehiclePauschalzone2RateChf = settings.VehiclePauschalzone2RateChf.ToString("0.##");
-        SettingsVehicleRegiezone1RateChf = settings.VehicleRegiezone1RateChf.ToString("0.##");
+        SettingsDecimalSeparator = settings.DecimalSeparator;
+        SettingsNightSupplementRate = FormatNullablePercentage(settings.NightSupplementRate, "0.##");
+        SettingsSundaySupplementRate = FormatNullablePercentage(settings.SundaySupplementRate, "0.##");
+        SettingsHolidaySupplementRate = FormatNullablePercentage(settings.HolidaySupplementRate, "0.##");
+        SettingsAhvIvEoRate = FormatPercentage(settings.AhvIvEoRate, "0.###");
+        SettingsAlvRate = FormatPercentage(settings.AlvRate, "0.###");
+        SettingsSicknessAccidentInsuranceRate = FormatPercentage(settings.SicknessAccidentInsuranceRate, "0.###");
+        SettingsTrainingAndHolidayRate = FormatPercentage(settings.TrainingAndHolidayRate, "0.###");
+        SettingsVacationCompensationRate = FormatPercentage(settings.VacationCompensationRate, "0.##");
+        SettingsVacationCompensationRateAge50Plus = FormatPercentage(settings.VacationCompensationRateAge50Plus, "0.##");
+        SettingsVehiclePauschalzone1RateChf = NumericFormatManager.FormatDecimal(settings.VehiclePauschalzone1RateChf, "0.##");
+        SettingsVehiclePauschalzone2RateChf = NumericFormatManager.FormatDecimal(settings.VehiclePauschalzone2RateChf, "0.##");
+        SettingsVehicleRegiezone1RateChf = NumericFormatManager.FormatDecimal(settings.VehicleRegiezone1RateChf, "0.##");
+        ApplyPayrollPreviewHelpOptions(settings.PayrollPreviewHelpOptions);
         AppLogoText = settings.AppLogoText;
         AppLogoImage = TryLoadLogo(settings.AppLogoPath);
-        ThemeSettingsApplier.Apply(settings);
         ApplyOptions(DepartmentOptions, settings.Departments, ref _selectedDepartmentOption, nameof(SelectedDepartmentOption), ref _selectedSettingsDepartment, nameof(SelectedSettingsDepartment));
         ApplyOptions(EmploymentCategoryOptions, settings.EmploymentCategories, ref _selectedEmploymentCategoryOption, nameof(SelectedEmploymentCategoryOption), ref _selectedSettingsEmploymentCategory, nameof(SelectedSettingsEmploymentCategory));
         ApplyOptions(EmploymentLocationOptions, settings.EmploymentLocations, ref _selectedEmploymentLocationOption, nameof(SelectedEmploymentLocationOption), ref _selectedSettingsEmploymentLocation, nameof(SelectedSettingsEmploymentLocation));
@@ -1655,6 +1792,60 @@ public sealed class MainWindowViewModel : ViewModelBase
         RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
         RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
         RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private static string FormatPercentage(decimal value, string format)
+    {
+        return NumericFormatManager.FormatDecimal(value * 100m, format);
+    }
+
+    private static IReadOnlyCollection<PayrollPreviewHelpOptionDto> BuildPayrollPreviewHelpOptionDtos(
+        IEnumerable<PayrollPreviewHelpToggleViewModel> options)
+    {
+        return options
+            .Select(option => new PayrollPreviewHelpOptionDto(option.Code, option.Label, option.IsEnabled, option.HelpText))
+            .ToArray();
+    }
+
+    private void ApplyPayrollPreviewHelpOptions(IReadOnlyCollection<PayrollPreviewHelpOptionDto> options)
+    {
+        foreach (var existingOption in PayrollPreviewHelpOptions)
+        {
+            existingOption.PropertyChanged -= OnPayrollPreviewHelpOptionPropertyChanged;
+        }
+
+        PayrollPreviewHelpOptions.Clear();
+
+        foreach (var option in options)
+        {
+            var viewModel = new PayrollPreviewHelpToggleViewModel
+            {
+                Code = option.Code,
+                Label = option.Label,
+                IsEnabled = option.IsEnabled,
+                HelpText = option.HelpText
+            };
+            viewModel.PropertyChanged += OnPayrollPreviewHelpOptionPropertyChanged;
+            PayrollPreviewHelpOptions.Add(viewModel);
+        }
+
+        MonthlyRecord.ApplyPayrollPreviewHelpOptions(BuildPayrollPreviewHelpOptionDtos(PayrollPreviewHelpOptions));
+    }
+
+    private void OnPayrollPreviewHelpOptionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not nameof(PayrollPreviewHelpToggleViewModel.IsEnabled)
+            and not nameof(PayrollPreviewHelpToggleViewModel.HelpText))
+        {
+            return;
+        }
+
+        MonthlyRecord.ApplyPayrollPreviewHelpOptions(BuildPayrollPreviewHelpOptionDtos(PayrollPreviewHelpOptions));
+    }
+
+    private static string? FormatNullablePercentage(decimal? value, string format)
+    {
+        return value.HasValue ? FormatPercentage(value.Value, format) : null;
     }
 
     private static Bitmap? TryLoadLogo(string? path)
@@ -1727,6 +1918,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         SetWorkspaceSection(WorkspaceSection.PayrollRuns);
     }
 
+    private void SwitchToReportingWorkspace()
+    {
+        SetWorkspaceSection(WorkspaceSection.Reporting);
+    }
+
     private void SwitchToSettingsWorkspace()
     {
         SetWorkspaceSection(WorkspaceSection.Settings);
@@ -1747,11 +1943,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         _currentSection = section;
         RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
         RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
+        RaisePropertyChanged(nameof(IsReportingWorkspace));
         RaisePropertyChanged(nameof(IsEmployeeWorkspace));
         RaisePropertyChanged(nameof(IsSettingsWorkspace));
         RaisePropertyChanged(nameof(IsHelpWorkspace));
         RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
         RaisePropertyChanged(nameof(ShowPayrollRunsWorkspace));
+        RaisePropertyChanged(nameof(ShowReportingWorkspace));
         RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
         RaisePropertyChanged(nameof(ShowSettingsWorkspace));
         RaisePropertyChanged(nameof(ShowHelpWorkspace));

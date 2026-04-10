@@ -1,6 +1,7 @@
 # Payroll statement template with simple placeholders.
 # Example: SPACER|12 inserts a 12-point blank line.
 # Example: SPACER|20 inserts a larger gap before the next line.
+# Percentage placeholders in the "Ansatz" column are already formatted as real percent values, e.g. 25 % or 10,64 %.
 LOGO|{{Logo}}
 COMPANY_BLOCK|{{Firmenadresse}}
 EMPLOYEE_BLOCK|{{MitarbeiterBlock}}

@@ -61,7 +61,9 @@ public sealed class PayrollSettingsRepositorySqliteTests
             "BSD",
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
+            ".",
             0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
+            PayrollPreviewHelpCatalog.GetDefaultOptions(),
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit"), new SettingOptionDto(Guid.NewGuid(), "Buero")],
             [new SettingOptionDto(Guid.NewGuid(), "A"), new SettingOptionDto(Guid.NewGuid(), "B")],
             [new SettingOptionDto(Guid.NewGuid(), "Schachenstr. 7, Emmenbruecke")]),
@@ -75,6 +77,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Assert.Equal("Helvetica", loaded.PrintFontFamily);
         Assert.Equal(10m, loaded.PrintFontSize);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", loaded.PrintTemplate);
+        Assert.Equal(".", loaded.DecimalSeparator);
         Assert.Equal(0.25m, loaded.NightSupplementRate);
         Assert.Equal(0.50m, loaded.SundaySupplementRate);
         Assert.Equal(1.00m, loaded.HolidaySupplementRate);
@@ -87,6 +90,8 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Assert.Equal(1.10m, loaded.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, loaded.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, loaded.VehicleRegiezone1RateChf);
+        Assert.Equal(8, loaded.PayrollPreviewHelpOptions.Count);
+        Assert.All(loaded.PayrollPreviewHelpOptions, option => Assert.True(option.IsEnabled));
         Assert.Equal(2, loaded.Departments.Count);
         Assert.Equal(2, loaded.EmploymentCategories.Count);
         Assert.Single(loaded.EmploymentLocations);

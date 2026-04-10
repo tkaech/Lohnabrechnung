@@ -4,6 +4,12 @@ public sealed record SettingOptionDto(
     Guid OptionId,
     string Name);
 
+public sealed record PayrollPreviewHelpOptionDto(
+    string Code,
+    string Label,
+    bool IsEnabled,
+    string HelpText);
+
 public sealed record PayrollSettingsDto(
     string CompanyAddress,
     string AppFontFamily,
@@ -22,6 +28,7 @@ public sealed record PayrollSettingsDto(
     string PrintLogoText,
     string PrintLogoPath,
     string PrintTemplate,
+    string DecimalSeparator,
     decimal? NightSupplementRate,
     decimal? SundaySupplementRate,
     decimal? HolidaySupplementRate,
@@ -34,6 +41,7 @@ public sealed record PayrollSettingsDto(
     decimal VehiclePauschalzone1RateChf,
     decimal VehiclePauschalzone2RateChf,
     decimal VehicleRegiezone1RateChf,
+    IReadOnlyCollection<PayrollPreviewHelpOptionDto> PayrollPreviewHelpOptions,
     IReadOnlyCollection<SettingOptionDto> Departments,
     IReadOnlyCollection<SettingOptionDto> EmploymentCategories,
     IReadOnlyCollection<SettingOptionDto> EmploymentLocations);
@@ -56,6 +64,7 @@ public sealed record SavePayrollSettingsCommand(
     string PrintLogoText,
     string PrintLogoPath,
     string PrintTemplate,
+    string DecimalSeparator,
     decimal? NightSupplementRate,
     decimal? SundaySupplementRate,
     decimal? HolidaySupplementRate,
@@ -68,6 +77,7 @@ public sealed record SavePayrollSettingsCommand(
     decimal VehiclePauschalzone1RateChf,
     decimal VehiclePauschalzone2RateChf,
     decimal VehicleRegiezone1RateChf,
+    IReadOnlyCollection<PayrollPreviewHelpOptionDto> PayrollPreviewHelpOptions,
     IReadOnlyCollection<SettingOptionDto> Departments,
     IReadOnlyCollection<SettingOptionDto> EmploymentCategories,
     IReadOnlyCollection<SettingOptionDto> EmploymentLocations);

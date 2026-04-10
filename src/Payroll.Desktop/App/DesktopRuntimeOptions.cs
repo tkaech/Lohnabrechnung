@@ -4,11 +4,12 @@ namespace Payroll.Desktop.Bootstrapping;
 
 public sealed record DesktopRuntimeOptions(
     string EnvironmentName,
-    string DatabasePath);
+    string DatabasePath,
+    bool SeedTestData);
 
 public static class DesktopRuntimeOptionsLoader
 {
-    private const string DefaultEnvironmentName = "Development";
+    private const string DefaultEnvironmentName = "Production";
     private const string DatabasePathArgumentPrefix = "--db-path=";
     private const string EnvironmentArgumentPrefix = "--environment=";
 
@@ -19,8 +20,9 @@ public static class DesktopRuntimeOptionsLoader
         var configuredPath = ResolveConfiguredDatabasePath(appSettings, environmentName);
         var databasePathOverride = ResolveDatabasePathOverride(args);
         var databasePath = ResolvePath(databasePathOverride ?? configuredPath);
+        var seedTestData = ResolveSeedTestData(appSettings);
 
-        return new DesktopRuntimeOptions(environmentName, databasePath);
+        return new DesktopRuntimeOptions(environmentName, databasePath, seedTestData);
     }
 
     private static string ResolveEnvironmentName(string[] args)
@@ -62,13 +64,25 @@ public static class DesktopRuntimeOptionsLoader
     {
         if (source?.Database is null)
         {
-            return;
+            goto mergeSeed;
         }
 
         target.Database ??= new DatabaseSettingsSection();
         if (!string.IsNullOrWhiteSpace(source.Database.Path))
         {
             target.Database.Path = source.Database.Path;
+        }
+
+mergeSeed:
+        if (source?.Seed is null)
+        {
+            return;
+        }
+
+        target.Seed ??= new SeedSettingsSection();
+        if (source.Seed.TestData.HasValue)
+        {
+            target.Seed.TestData = source.Seed.TestData.Value;
         }
     }
 
@@ -100,6 +114,17 @@ public static class DesktopRuntimeOptionsLoader
         return Environment.GetEnvironmentVariable("PAYROLLAPP_DATABASE_PATH");
     }
 
+    private static bool ResolveSeedTestData(AppSettingsFile appSettings)
+    {
+        var environmentOverride = Environment.GetEnvironmentVariable("PAYROLLAPP_SEED_TESTDATA");
+        if (bool.TryParse(environmentOverride, out var seedFromEnvironment))
+        {
+            return seedFromEnvironment;
+        }
+
+        return appSettings.Seed?.TestData ?? false;
+    }
+
     private static string ResolvePath(string rawPath)
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -116,10 +141,16 @@ public static class DesktopRuntimeOptionsLoader
     private sealed class AppSettingsFile
     {
         public DatabaseSettingsSection? Database { get; set; }
+        public SeedSettingsSection? Seed { get; set; }
     }
 
     private sealed class DatabaseSettingsSection
     {
         public string? Path { get; set; }
+    }
+
+    private sealed class SeedSettingsSection
+    {
+        public bool? TestData { get; set; }
     }
 }

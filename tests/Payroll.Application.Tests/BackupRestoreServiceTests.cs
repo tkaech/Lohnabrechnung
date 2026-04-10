@@ -58,6 +58,7 @@ public sealed class BackupRestoreServiceTests
                 "PA",
                 string.Empty,
                 "BANNER|Lohnblatt|{{Monat}}",
+                ",",
                 0.25m,
                 0.50m,
                 1.00m,
@@ -70,6 +71,7 @@ public sealed class BackupRestoreServiceTests
                 1.10m,
                 2.20m,
                 3.30m,
+                PayrollPreviewHelpCatalog.GetDefaultOptions(),
                 [new SettingOptionDto(departmentId, "Sicherheit")],
                 [new SettingOptionDto(categoryId, "A")],
                 [new SettingOptionDto(locationId, "Schachenstr. 7, Emmenbruecke")]));
@@ -147,6 +149,7 @@ public sealed class BackupRestoreServiceTests
                 "BSD",
                 string.Empty,
                 "BANNER|Neu|{{Monat}}",
+                ".",
                 0.20m,
                 0.30m,
                 0.40m,
@@ -159,6 +162,7 @@ public sealed class BackupRestoreServiceTests
                 4m,
                 5m,
                 6m,
+                PayrollPreviewHelpCatalog.GetDefaultOptions(),
                 [new SettingOptionDto(departmentId, "Sicherheit")],
                 [new SettingOptionDto(categoryId, "A")],
                 [new SettingOptionDto(locationId, "Schachenstr. 7, Emmenbruecke")]));

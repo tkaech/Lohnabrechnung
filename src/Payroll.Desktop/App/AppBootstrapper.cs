@@ -23,16 +23,14 @@ public sealed class AppBootstrapper
         var databasePath = runtimeOptions.DatabasePath;
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory);
 
-        var dbContext = CreateDbContext(databasePath);
-        BaselineExistingDatabaseIfNeeded(dbContext);
-        dbContext.Database.Migrate();
-        EnsureCompatibleSchema(dbContext);
+        var dbContext = InitializeDatabase(databasePath, runtimeOptions.SeedTestData);
 
         var repository = new EmployeeRepository(dbContext);
         var employeeService = new EmployeeService(repository);
         var payrollSettingsRepository = new PayrollSettingsRepository(dbContext);
         var payrollSettingsService = new PayrollSettingsService(payrollSettingsRepository);
         EnsureConfigurationSeeded(payrollSettingsService);
+        EnsureTestDataSeeded(dbContext, runtimeOptions.SeedTestData);
         var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
         var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
@@ -47,6 +45,7 @@ public sealed class AppBootstrapper
             backupRestoreService,
             payrollSettingsService,
             reportingService,
+            monthlyRecordService,
             monthlyRecordViewModel,
             workspaceLabel,
             databasePath,
@@ -70,6 +69,81 @@ public sealed class AppBootstrapper
             .Options;
 
         return new PayrollDbContext(dbContextOptions);
+    }
+
+    private static PayrollDbContext InitializeDatabase(string databasePath, bool allowResetForInvalidTestDatabase)
+    {
+        var dbContext = CreateDbContext(databasePath);
+
+        try
+        {
+            PrepareDatabase(dbContext);
+
+            if (!HasCriticalTables(dbContext))
+            {
+                dbContext.Dispose();
+
+                if (allowResetForInvalidTestDatabase)
+                {
+                    RecreateInvalidDatabase(databasePath);
+                    dbContext = CreateDbContext(databasePath);
+                    PrepareDatabase(dbContext);
+
+                    if (!HasCriticalTables(dbContext))
+                    {
+                        dbContext.Dispose();
+                        RecreateInvalidDatabase(databasePath);
+                        dbContext = CreateDbContext(databasePath);
+                        dbContext.Database.EnsureCreated();
+                        EnsureCompatibleSchema(dbContext);
+
+                        if (!HasCriticalTables(dbContext))
+                        {
+                            dbContext.Dispose();
+                            RecreateInvalidDatabase(databasePath);
+                            dbContext = CreateDbContext(databasePath);
+                            var createScript = dbContext.Database.GenerateCreateScript();
+                            dbContext.Database.OpenConnection();
+                            try
+                            {
+                                dbContext.Database.ExecuteSqlRaw(createScript);
+                            }
+                            finally
+                            {
+                                dbContext.Database.CloseConnection();
+                            }
+
+                            EnsureCompatibleSchema(dbContext);
+                        }
+                    }
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Die SQLite-Datenbank unter '{databasePath}' ist unvollstaendig. Kritische Tabellen wie 'PayrollSettings' fehlen nach der Migration.");
+                }
+            }
+
+            if (!HasCriticalTables(dbContext))
+            {
+                throw new InvalidOperationException(
+                    $"Die SQLite-Datenbank unter '{databasePath}' konnte nicht korrekt initialisiert werden. Kritische Tabellen wie 'PayrollSettings' fehlen weiterhin.");
+            }
+
+            return dbContext;
+        }
+        catch
+        {
+            dbContext.Dispose();
+            throw;
+        }
+    }
+
+    private static void PrepareDatabase(PayrollDbContext dbContext)
+    {
+        BaselineExistingDatabaseIfNeeded(dbContext);
+        dbContext.Database.Migrate();
+        EnsureCompatibleSchema(dbContext);
     }
 
     private static void BaselineExistingDatabaseIfNeeded(PayrollDbContext dbContext)
@@ -128,6 +202,51 @@ public sealed class AppBootstrapper
         payrollSettingsService.GetAsync(CancellationToken.None).GetAwaiter().GetResult();
     }
 
+    private static bool HasCriticalTables(PayrollDbContext dbContext)
+    {
+        using var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != System.Data.ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            connection.Open();
+        }
+
+        try
+        {
+            return TableExists(connection, "PayrollSettings")
+                   && TableExists(connection, "Employees")
+                   && TableExists(connection, "EmployeeMonthlyRecords");
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                connection.Close();
+            }
+        }
+    }
+
+    private static void RecreateInvalidDatabase(string databasePath)
+    {
+        if (!File.Exists(databasePath))
+        {
+            return;
+        }
+
+        SqliteConnection.ClearAllPools();
+        File.Delete(databasePath);
+    }
+
+    private static void EnsureTestDataSeeded(PayrollDbContext dbContext, bool seedTestData)
+    {
+        if (!seedTestData)
+        {
+            return;
+        }
+
+        EmployeeDevelopmentDataSeeder.Seed(dbContext);
+    }
+
     private static bool HasExistingApplicationTables(DbConnection connection)
     {
         var applicationTables = new[]
@@ -140,7 +259,7 @@ public sealed class AppBootstrapper
             "PayrollSettings"
         };
 
-        return applicationTables.Any(tableName => TableExists(connection, tableName));
+        return applicationTables.All(tableName => TableExists(connection, tableName));
     }
 
     private static bool TableExists(DbConnection connection, string tableName)
@@ -170,8 +289,20 @@ public sealed class AppBootstrapper
             EnsureTableColumn(
                 connection,
                 "PayrollSettings",
+                "DecimalSeparator",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"DecimalSeparator\" TEXT NOT NULL DEFAULT ',';");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
                 "VacationCompensationRateAge50Plus",
                 "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"VacationCompensationRateAge50Plus\" TEXT NOT NULL DEFAULT 0.1064;");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "PayrollPreviewHelpVisibilityJson",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"PayrollPreviewHelpVisibilityJson\" TEXT NOT NULL DEFAULT '';");
 
             EnsureTableColumn(
                 connection,

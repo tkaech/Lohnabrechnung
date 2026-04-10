@@ -1,4 +1,5 @@
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.MonthlyRecords;
 using System.Globalization;
@@ -52,7 +53,7 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Single(viewModel.TimeEntries);
         Assert.Contains("05/2026", viewModel.ContextDescription, StringComparison.Ordinal);
         Assert.Contains("8", viewModel.TotalsSummary, StringComparison.Ordinal);
-        Assert.Contains("Fahrzeug 33.00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Contains("Fahrzeug 33,00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -70,8 +71,8 @@ public sealed class MonthlyRecordViewModelTests
         viewModel.SaveExpenseEntryCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.ActionMessage == "Spesen gespeichert.");
 
-        Assert.Equal("40.00", viewModel.ExpensesTotal);
-        Assert.Contains("Spesen 40.00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Equal("40,00", viewModel.ExpensesTotal);
+        Assert.Contains("Spesen 40,00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
         Assert.False(viewModel.HasPayrollPreviewLines);
         Assert.Single(viewModel.PayrollPreviewNotes, note => note == "Monat noch nicht erfasst");
     }
@@ -115,6 +116,34 @@ public sealed class MonthlyRecordViewModelTests
             CultureInfo.CurrentCulture = originalCulture;
             CultureInfo.CurrentUICulture = originalUiCulture;
         }
+    }
+
+    [Fact]
+    public async Task SaveTimeEntry_WithCommaDecimals_PersistsEntry()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Dora Dezimal");
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        await viewModel.SetEmployeeAsync(employeeId, "Dora Dezimal");
+
+        viewModel.TimeDate = "2026-04-01";
+        viewModel.HoursWorked = "3,5";
+        viewModel.NightHours = "2,25";
+        viewModel.SundayHours = "0";
+        viewModel.HolidayHours = "0";
+        viewModel.VehiclePauschalzone1 = "1,5";
+        viewModel.VehiclePauschalzone2 = "2,5";
+        viewModel.VehicleRegiezone1 = "3,25";
+
+        viewModel.SaveTimeEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
+
+        Assert.Single(viewModel.TimeEntries);
+        Assert.Equal(3.5m, viewModel.TimeEntries[0].HoursWorked);
+        Assert.Equal(1.5m, viewModel.TimeEntries[0].VehiclePauschalzone1Chf);
+        Assert.Equal(3.25m, viewModel.TimeEntries[0].VehicleRegiezone1Chf);
     }
 
     [Fact]
@@ -222,7 +251,7 @@ public sealed class MonthlyRecordViewModelTests
         await WaitUntilAsync(() => viewModel.ExpensePayrollMonth == "04/2026" && viewModel.SelectedExpenseEntry is not null);
 
         Assert.Equal("04/2026", viewModel.ExpensePayrollMonth);
-        Assert.Equal("18.50", viewModel.ExpensesTotal);
+        Assert.Equal("18,50", viewModel.ExpensesTotal);
         Assert.NotNull(viewModel.SelectedExpenseEntry);
         Assert.Equal((2026, 4), (viewModel.SelectedExpenseEntry!.Year, viewModel.SelectedExpenseEntry.Month));
         Assert.Contains("04/2026", viewModel.ContextDescription, StringComparison.Ordinal);
@@ -243,12 +272,12 @@ public sealed class MonthlyRecordViewModelTests
         viewModel.SaveTimeEntryCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
 
-        viewModel.ExpensesTotal = "18.50";
+        viewModel.ExpensesTotal = "18,50";
         viewModel.SaveExpenseEntryCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.ActionMessage == "Spesen gespeichert.");
 
-        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Basislohn" && line.AmountDisplay == "240.00 CHF");
-        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "AHV-pflichtiger Bruttolohn" && line.AmountDisplay == "240.00 CHF");
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Basislohn" && line.AmountDisplay == "240,00 CHF");
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "AHV-pflichtiger Bruttolohn" && line.AmountDisplay == "240,00 CHF");
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Total Auszahlung");
     }
 
@@ -371,6 +400,11 @@ public sealed class MonthlyRecordViewModelTests
             return Task.FromResult<MonthlyRecordDetailsDto?>(details);
         }
 
+        public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult((IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());
+        }
+
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
@@ -396,10 +430,10 @@ public sealed class MonthlyRecordViewModelTests
 
             return new MonthlyPayrollPreviewDto(
                 [
-                    new MonthlyPayrollPreviewLineDto("Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null, false),
-                    new MonthlyPayrollPreviewLineDto("AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null, true),
-                    new MonthlyPayrollPreviewLineDto("Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null, false),
-                    new MonthlyPayrollPreviewLineDto("Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null, true)
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null, false),
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.AhvGrossCode, "AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null, true),
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.ExpensesCode, "Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null, false),
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null, true)
                 ],
                 ["Test-Lohnvorschau"]);
         }

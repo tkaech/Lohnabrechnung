@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Settings;
+using Payroll.Desktop.Formatting;
 
 namespace Payroll.Desktop.ViewModels;
 
@@ -40,6 +42,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private bool _isTimeMonthPickerOpen;
     private bool _isExpenseMonthPickerOpen;
     private bool _isTimeDatePickerOpen;
+    private IReadOnlyCollection<MonthlyPayrollPreviewLineDto> _rawPayrollPreviewLines = [];
+    private IReadOnlyDictionary<string, PayrollPreviewHelpOptionDto> _payrollPreviewHelpOptions = new Dictionary<string, PayrollPreviewHelpOptionDto>(StringComparer.Ordinal);
+    public event EventHandler? TimeCaptureChanged;
 
     public MonthlyRecordViewModel(MonthlyRecordService monthlyRecordService)
     {
@@ -365,7 +370,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedExpenseEntry, value) && value is not null)
             {
-                ExpensesTotal = value.ExpensesTotalChf.ToString("0.00");
+                ExpensesTotal = NumericFormatManager.FormatDecimal(value.ExpensesTotalChf, "0.00");
             }
         }
     }
@@ -468,6 +473,24 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
 
         await ExecuteBusyAsync(LoadCurrentRecordAsync);
+    }
+
+    public async Task ReloadCurrentMonthAsync()
+    {
+        if (!_currentEmployeeId.HasValue || !SelectedMonth.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(LoadCurrentRecordAsync);
+    }
+
+    public void ApplyPayrollPreviewHelpOptions(IReadOnlyCollection<PayrollPreviewHelpOptionDto> options)
+    {
+        _payrollPreviewHelpOptions = options
+            .GroupBy(option => option.Code, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+        RefreshVisiblePayrollPreviewLines();
     }
 
     private async Task ActivateMonthAsync(int year, int month)
@@ -632,7 +655,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             });
         }
 
-        ExpensesTotal = details.ExpenseEntry?.ExpensesTotalChf.ToString("0.00") ?? "0";
+        ExpensesTotal = details.ExpenseEntry is not null
+            ? NumericFormatManager.FormatDecimal(details.ExpenseEntry.ExpensesTotalChf, "0.00")
+            : "0";
 
         TimeEntryHistory.Clear();
         foreach (var entry in details.TimeEntryHistory)
@@ -705,18 +730,16 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             PreviewNotes.Add(note);
         }
 
-        PayrollPreviewLines.Clear();
-        foreach (var line in details.PayrollPreview.Lines)
-        {
-            PayrollPreviewLines.Add(line);
-        }
-        RaisePropertyChanged(nameof(HasPayrollPreviewLines));
+        _rawPayrollPreviewLines = details.PayrollPreview.Lines.ToArray();
+        RefreshVisiblePayrollPreviewLines();
 
         PayrollPreviewNotes.Clear();
         foreach (var note in details.PayrollPreview.Notes)
         {
             PayrollPreviewNotes.Add(note);
         }
+
+        TimeCaptureChanged?.Invoke(this, EventArgs.Empty);
 
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
@@ -727,13 +750,13 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private void PopulateTimeEntryForm(MonthlyTimeEntryItemViewModel entry)
     {
         TimeDate = entry.WorkDate.ToString("yyyy-MM-dd");
-        HoursWorked = entry.HoursWorked.ToString("0.##");
-        NightHours = entry.NightHours.ToString("0.##");
-        SundayHours = entry.SundayHours.ToString("0.##");
-        HolidayHours = entry.HolidayHours.ToString("0.##");
-        VehiclePauschalzone1 = entry.VehiclePauschalzone1Chf.ToString("0.00");
-        VehiclePauschalzone2 = entry.VehiclePauschalzone2Chf.ToString("0.00");
-        VehicleRegiezone1 = entry.VehicleRegiezone1Chf.ToString("0.00");
+        HoursWorked = NumericFormatManager.FormatDecimal(entry.HoursWorked, "0.##");
+        NightHours = NumericFormatManager.FormatDecimal(entry.NightHours, "0.##");
+        SundayHours = NumericFormatManager.FormatDecimal(entry.SundayHours, "0.##");
+        HolidayHours = NumericFormatManager.FormatDecimal(entry.HolidayHours, "0.##");
+        VehiclePauschalzone1 = NumericFormatManager.FormatDecimal(entry.VehiclePauschalzone1Chf, "0.00");
+        VehiclePauschalzone2 = NumericFormatManager.FormatDecimal(entry.VehiclePauschalzone2Chf, "0.00");
+        VehicleRegiezone1 = NumericFormatManager.FormatDecimal(entry.VehicleRegiezone1Chf, "0.00");
         TimeNote = entry.Note;
     }
 
@@ -803,9 +826,11 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
         PreviewRows.Clear();
         PreviewNotes.Clear();
+        _rawPayrollPreviewLines = [];
         PayrollPreviewLines.Clear();
         PayrollPreviewNotes.Clear();
         RaisePropertyChanged(nameof(HasPayrollPreviewLines));
+        TimeCaptureChanged?.Invoke(this, EventArgs.Empty);
         PrepareNewExpenseEntry();
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
@@ -821,6 +846,38 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         DeleteTimeEntryCommand.RaiseCanExecuteChanged();
         ResetExpenseValuesCommand.RaiseCanExecuteChanged();
         SaveExpenseEntryCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshVisiblePayrollPreviewLines()
+    {
+        PayrollPreviewLines.Clear();
+
+        foreach (var line in _rawPayrollPreviewLines)
+        {
+            PayrollPreviewLines.Add(line with
+            {
+                Detail = ResolveVisiblePayrollPreviewDetail(line)
+            });
+        }
+
+        RaisePropertyChanged(nameof(HasPayrollPreviewLines));
+    }
+
+    private string? ResolveVisiblePayrollPreviewDetail(MonthlyPayrollPreviewLineDto line)
+    {
+        if (!_payrollPreviewHelpOptions.TryGetValue(line.Code, out var option))
+        {
+            return line.Detail;
+        }
+
+        if (!option.IsEnabled)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(option.HelpText)
+            ? line.Detail
+            : option.HelpText.Trim();
     }
 
     private static DateOnly ParseRequiredDate(string value, string fieldName)
@@ -864,18 +921,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     private static bool TryParseDecimal(string value, out decimal parsedValue)
     {
-        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out parsedValue))
-        {
-            return true;
-        }
-
-        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out parsedValue))
-        {
-            return true;
-        }
-
-        var normalized = value.Replace(',', '.');
-        return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out parsedValue);
+        return NumericFormatManager.TryParseDecimal(value, out parsedValue);
     }
 
     private static bool TryParseDate(string value, out DateOnly parsedDate)

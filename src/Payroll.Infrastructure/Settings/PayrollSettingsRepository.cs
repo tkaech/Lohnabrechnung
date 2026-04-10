@@ -4,6 +4,7 @@ using Payroll.Application.Settings;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace Payroll.Infrastructure.Settings;
 
@@ -17,6 +18,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         "Weinbergstrasse 8, Baar",
         "Rainstrasse 37, Unteraegeri"
     ];
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.Web);
 
     private readonly PayrollDbContext _dbContext;
 
@@ -58,6 +60,8 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.PrintLogoText,
             command.PrintLogoPath);
         settings.UpdatePrintTemplate(command.PrintTemplate);
+        settings.UpdateDecimalSeparator(command.DecimalSeparator);
+        settings.UpdatePayrollPreviewHelpVisibilityJson(SerializePayrollPreviewHelpOptions(command.PayrollPreviewHelpOptions));
         settings.UpdateWorkTimeSupplementSettings(new WorkTimeSupplementSettings(
             command.NightSupplementRate,
             command.SundaySupplementRate,
@@ -154,6 +158,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             settings.PrintLogoText,
             settings.PrintLogoPath,
             printTemplate,
+            settings.DecimalSeparator,
             settings.WorkTimeSupplementSettings.NightSupplementRate,
             settings.WorkTimeSupplementSettings.SundaySupplementRate,
             settings.WorkTimeSupplementSettings.HolidaySupplementRate,
@@ -166,9 +171,37 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             settings.VehiclePauschalzone1RateChf,
             settings.VehiclePauschalzone2RateChf,
             settings.VehicleRegiezone1RateChf,
+            LoadPayrollPreviewHelpOptions(settings),
             await LoadOptionsAsync(_dbContext.DepartmentOptions, cancellationToken),
             await LoadOptionsAsync(_dbContext.EmploymentCategoryOptions, cancellationToken),
             await LoadOptionsAsync(_dbContext.EmploymentLocationOptions, cancellationToken));
+    }
+
+    private static IReadOnlyCollection<PayrollPreviewHelpOptionDto> LoadPayrollPreviewHelpOptions(PayrollSettings settings)
+    {
+        if (string.IsNullOrWhiteSpace(settings.PayrollPreviewHelpVisibilityJson))
+        {
+            return PayrollPreviewHelpCatalog.GetDefaultOptions();
+        }
+
+        try
+        {
+            var storedOptions = JsonSerializer.Deserialize<PayrollPreviewHelpVisibility[]>(
+                settings.PayrollPreviewHelpVisibilityJson,
+                JsonSerializerOptions);
+
+            return PayrollPreviewHelpCatalog.MergeWithDefaults(storedOptions ?? []);
+        }
+        catch (JsonException)
+        {
+            return PayrollPreviewHelpCatalog.GetDefaultOptions();
+        }
+    }
+
+    private static string SerializePayrollPreviewHelpOptions(IReadOnlyCollection<PayrollPreviewHelpOptionDto> options)
+    {
+        var normalized = PayrollPreviewHelpCatalog.ToDomain(options);
+        return JsonSerializer.Serialize(normalized, JsonSerializerOptions);
     }
 
     private static Task<SettingOptionDto[]> LoadOptionsAsync<TOption>(DbSet<TOption> options, CancellationToken cancellationToken)

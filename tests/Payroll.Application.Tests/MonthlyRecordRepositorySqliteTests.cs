@@ -1,12 +1,14 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.Employees;
 using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.MonthlyRecords;
 using Payroll.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace Payroll.Application.Tests;
 
@@ -77,11 +79,11 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.NotNull(details);
         Assert.Single(details!.TimeEntries);
         Assert.NotNull(details.ExpenseEntry);
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260.00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.AmountDisplay == "247.63 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24.00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672.00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "18.50 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260,00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.AmountDisplay == "247,63 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24,00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672,00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "18,50 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Total Auszahlung");
         Assert.Equal(8m, details.Header.TotalWorkedHours);
         Assert.Equal(18.50m, details.Header.TotalExpensesChf);
@@ -141,9 +143,159 @@ public sealed class MonthlyRecordRepositorySqliteTests
         var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
 
         Assert.NotNull(details);
-        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.AmountDisplay == "8.13 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672.00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "0.1064");
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.AmountDisplay == "8,13 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.RateDisplay == "Nacht 25 %");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672,00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "10,64 %");
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_HidesConfiguredHelpTextsInPayrollPreview()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        var settings = new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m);
+        settings.UpdatePayrollPreviewHelpVisibilityJson(JsonSerializer.Serialize(
+            PayrollPreviewHelpCatalog.ToDomain(
+            [
+                new PayrollPreviewHelpOptionDto(PayrollPreviewHelpCatalog.SpecialSupplementCode, "Spezialzuschlag gemaess Vertrag", false, "Arbeitsstunden multipliziert mit dem vertraglichen Spezialzuschlag.")
+            ])));
+        dbContext.PayrollSettings.Add(settings);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        var specialSupplementLine = Assert.Single(details!.PayrollPreview.Lines, line => line.Code == PayrollPreviewHelpCatalog.SpecialSupplementCode);
+        Assert.Null(specialSupplementLine.Detail);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_UsesConfiguredHelpText_ForEnabledConfiguredPosition()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        var settings = new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m);
+        settings.UpdatePayrollPreviewHelpVisibilityJson(JsonSerializer.Serialize(
+            PayrollPreviewHelpCatalog.ToDomain(
+            [
+                new PayrollPreviewHelpOptionDto(
+                    PayrollPreviewHelpCatalog.TotalCode,
+                    "Total",
+                    true,
+                    "Eigener Test-Hinweis fuer Total.")
+            ])));
+        dbContext.PayrollSettings.Add(settings);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        var totalLine = Assert.Single(details!.PayrollPreview.Lines, line => line.Code == PayrollPreviewHelpCatalog.TotalCode);
+        Assert.Equal("Eigener Test-Hinweis fuer Total.", totalLine.Detail);
+
+        var expensesLine = Assert.Single(details.PayrollPreview.Lines, line => line.Code == PayrollPreviewHelpCatalog.ExpensesCode);
+        Assert.Null(expensesLine.Detail);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_UsesExistingDetailText_WhenHelpTextIsEnabledWithoutOverride()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        var settings = new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m);
+        settings.UpdatePayrollPreviewHelpVisibilityJson(JsonSerializer.Serialize(
+            PayrollPreviewHelpCatalog.ToDomain(
+            [
+                new PayrollPreviewHelpOptionDto(
+                    PayrollPreviewHelpCatalog.SpecialSupplementCode,
+                    "Spezialzuschlag gemaess Vertrag",
+                    true,
+                    string.Empty)
+            ])));
+        dbContext.PayrollSettings.Add(settings);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        var specialSupplementLine = Assert.Single(details!.PayrollPreview.Lines, line => line.Code == PayrollPreviewHelpCatalog.SpecialSupplementCode);
+        Assert.Equal("Arbeitsstunden multipliziert mit dem vertraglichen Spezialzuschlag.", specialSupplementLine.Detail);
     }
 
     [Fact]
@@ -189,8 +341,8 @@ public sealed class MonthlyRecordRepositorySqliteTests
         var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
 
         Assert.NotNull(details);
-        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260.00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24.00 CHF");
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260,00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24,00 CHF");
     }
 
     [Fact]
@@ -270,6 +422,37 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.Equal(2, details.ExpenseEntryHistory.Count);
         Assert.Equal((2026, 4), (details.ExpenseEntryHistory.First().Year, details.ExpenseEntryHistory.First().Month));
         Assert.Equal((2026, 5), (details.ExpenseEntryHistory.Last().Year, details.ExpenseEntryHistory.Last().Month));
+    }
+
+    [Fact]
+    public async Task ListTimeCaptureOverviewAsync_ReturnsEmployeesWithAndWithoutMonthCapture()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var firstEmployee = CreateEmployee("9000", "Anna", "Aktiv");
+        var secondEmployee = CreateEmployee("9001", "Bruno", "Leer");
+        dbContext.Employees.Add(firstEmployee);
+        dbContext.Employees.Add(secondEmployee);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var aprilRecord = await repository.GetOrCreateAsync(firstEmployee.Id, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 10), 7m, 1m, 0m, 0m, 2m, 3m, 4m, "April");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var rows = await repository.ListTimeCaptureOverviewAsync(2026, 4, CancellationToken.None);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.PersonnelNumber == "9000" && row.HasMonthCapture && row.HoursWorked == 7m && row.TimeEntryCount == 1);
+        Assert.Contains(rows, row => row.PersonnelNumber == "9001" && !row.HasMonthCapture && row.HoursWorked == 0m && row.TimeEntryCount == 0);
     }
 
     [Fact]
@@ -353,16 +536,16 @@ public sealed class MonthlyRecordRepositorySqliteTests
         }
 
         Assert.Equal("Spesen gespeichert.", viewModel.ActionMessage);
-        Assert.Equal("18.50", viewModel.ExpensesTotal);
-        Assert.Contains("Spesen 18.50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Equal("18,50", viewModel.ExpensesTotal);
+        Assert.Contains("Spesen 18,50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
-    private static global::Payroll.Domain.Employees.Employee CreateEmployee()
+    private static global::Payroll.Domain.Employees.Employee CreateEmployee(string personnelNumber = "9000", string firstName = "Anna", string lastName = "Aktiv")
     {
         return new global::Payroll.Domain.Employees.Employee(
-            "9000",
-            "Anna",
-            "Aktiv",
+            personnelNumber,
+            firstName,
+            lastName,
             new DateOnly(1990, 2, 1),
             new DateOnly(2025, 1, 1),
             null,

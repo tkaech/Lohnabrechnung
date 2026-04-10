@@ -7,6 +7,30 @@ public sealed record MonthlyRecordQuery(
     int Year,
     int Month);
 
+public sealed record MonthlyTimeCaptureOverviewQuery(
+    int Year,
+    int Month);
+
+public sealed record MonthlyTimeCaptureOverviewRowDto(
+    Guid EmployeeId,
+    string PersonnelNumber,
+    string FirstName,
+    string LastName,
+    bool IsActive,
+    bool HasMonthCapture,
+    decimal HoursWorked,
+    decimal NightHours,
+    decimal SundayHours,
+    decimal HolidayHours,
+    decimal VehiclePauschalzone1,
+    decimal VehiclePauschalzone2,
+    decimal VehicleRegiezone1,
+    int TimeEntryCount)
+{
+    public string StatusDisplay => IsActive ? "Aktiv" : "Inaktiv";
+    public string CaptureDisplay => HasMonthCapture ? "Ja" : "Nein";
+}
+
 public sealed record MonthlyRecordHeaderDto(
     Guid MonthlyRecordId,
     Guid EmployeeId,
@@ -58,6 +82,7 @@ public sealed record MonthlyRecordPreviewDto(
     IReadOnlyCollection<string> Notes);
 
 public sealed record MonthlyPayrollPreviewLineDto(
+    string Code,
     string Label,
     string QuantityDisplay,
     string RateDisplay,
@@ -66,6 +91,7 @@ public sealed record MonthlyPayrollPreviewLineDto(
     bool IsEmphasized)
 {
     public bool IsRegular => !IsEmphasized;
+    public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
 }
 
 public sealed record MonthlyPayrollPreviewDto(

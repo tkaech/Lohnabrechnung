@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Settings;
 using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace Payroll.Infrastructure.MonthlyRecords;
 
@@ -84,13 +86,14 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var contract = ResolveContractForMonth(
             monthlyRecord,
             await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken));
+        var currentPayrollSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
         var payrollSettings = ResolvePayrollSettingsForMonth(
             monthlyRecord,
-            await LoadCurrentPayrollSettingsAsync(cancellationToken));
+            currentPayrollSettings);
 
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
         var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
-        var payrollPreview = BuildPayrollPreview(monthlyRecord, employee.BirthDate, contract, payrollSettings);
+        var payrollPreview = BuildPayrollPreview(monthlyRecord, employee.BirthDate, contract, payrollSettings, currentPayrollSettings);
         var employeeMonthlyRecords = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Where(record => record.EmployeeId == monthlyRecord.EmployeeId)
@@ -171,6 +174,47 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             expenseEntryHistory,
             new MonthlyRecordPreviewDto(previewRows, previewNotes),
             payrollPreview);
+    }
+
+    public async Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
+    {
+        var employees = await _dbContext.Employees
+            .AsNoTracking()
+            .OrderBy(employee => employee.LastName)
+            .ThenBy(employee => employee.FirstName)
+            .ToListAsync(cancellationToken);
+
+        var monthlyRecords = await _dbContext.EmployeeMonthlyRecords
+            .AsNoTracking()
+            .Where(record => record.Year == year && record.Month == month)
+            .Include(record => record.TimeEntries)
+            .ToListAsync(cancellationToken);
+
+        var recordsByEmployeeId = monthlyRecords.ToDictionary(record => record.EmployeeId);
+
+        return employees
+            .Select(employee =>
+            {
+                recordsByEmployeeId.TryGetValue(employee.Id, out var monthlyRecord);
+                var timeEntries = monthlyRecord?.TimeEntries ?? [];
+
+                return new MonthlyTimeCaptureOverviewRowDto(
+                    employee.Id,
+                    employee.PersonnelNumber,
+                    employee.FirstName,
+                    employee.LastName,
+                    employee.IsActive,
+                    timeEntries.Count > 0,
+                    timeEntries.Sum(entry => entry.HoursWorked),
+                    timeEntries.Sum(entry => entry.NightHours),
+                    timeEntries.Sum(entry => entry.SundayHours),
+                    timeEntries.Sum(entry => entry.HolidayHours),
+                    timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf),
+                    timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf),
+                    timeEntries.Sum(entry => entry.VehicleRegiezone1Chf),
+                    timeEntries.Count);
+            })
+            .ToArray();
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -266,7 +310,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         EmployeeMonthlyRecord monthlyRecord,
         DateOnly? employeeBirthDate,
         Domain.Employees.EmploymentContract? contract,
-        PayrollSettings payrollSettings)
+        PayrollSettings payrollSettings,
+        PayrollSettings currentPayrollSettings)
     {
         var timeEntries = monthlyRecord.TimeEntries.OrderBy(entry => entry.WorkDate).ToArray();
         if (timeEntries.Length == 0)
@@ -331,6 +376,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var totalPayoutChf = RoundToFiveRappen(totalChf + expensesChf);
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.BaseSalaryCode,
             "Basislohn",
             baseLine?.Quantity is null ? $"{workSummary.WorkHours:0.##} h" : $"{baseLine.Quantity.Value:0.##} h",
             contract is null ? "-" : $"{contract.HourlyRateChf:0.00} CHF",
@@ -339,9 +385,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.TimeSupplementCode,
             "Stunden mit Zeitzuschlag",
             supplementLines.Length == 0 ? $"{workSummary.SpecialHours:0.##} h" : $"{supplementLines.Sum(line => line.Quantity ?? 0m):0.##} h",
-            "gem. Monatsparameter",
+            BuildSupplementRateDisplay(workSummary, payrollSettings.WorkTimeSupplementSettings),
             FormatAmountOrPending(
                 supplementLines.Sum(line => line.AmountChf),
                 contract is not null && workSummary.SpecialHours > 0m && supplementLines.Length == 0),
@@ -351,6 +398,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.SpecialSupplementCode,
             "Spezialzuschlag gemaess Vertrag",
             specialSupplementLine?.Quantity is null ? $"{workSummary.WorkHours:0.##} h" : $"{specialSupplementLine.Quantity.Value:0.##} h",
             contract is null ? "-" : $"{contract.SpecialSupplementRateChf:0.00} CHF",
@@ -363,24 +411,28 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             false));
 
         lines.Add(BuildVehiclePreviewLine(
+            PayrollPreviewHelpCatalog.VehiclePauschalzone1Code,
             "Fahrzeitentschaedigung Pauschalzone 1",
             timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf),
             payrollSettings.VehiclePauschalzone1RateChf,
             timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf) * payrollSettings.VehiclePauschalzone1RateChf));
 
         lines.Add(BuildVehiclePreviewLine(
+            PayrollPreviewHelpCatalog.VehiclePauschalzone2Code,
             "Fahrzeitentschaedigung Pauschalzone 2",
             timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf),
             payrollSettings.VehiclePauschalzone2RateChf,
             timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf) * payrollSettings.VehiclePauschalzone2RateChf));
 
         lines.Add(BuildVehiclePreviewLine(
+            PayrollPreviewHelpCatalog.VehicleRegiezone1Code,
             "Fahrzeitentschaedigung Regiezone",
             timeEntries.Sum(entry => entry.VehicleRegiezone1Chf),
             payrollSettings.VehicleRegiezone1RateChf,
             timeEntries.Sum(entry => entry.VehicleRegiezone1Chf) * payrollSettings.VehicleRegiezone1RateChf));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.SubtotalCode,
             "Zwischentotal",
             "-",
             "-",
@@ -391,9 +443,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, monthlyRecord.PeriodEnd);
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.VacationCompensationCode,
             "Ferienentschaedigung",
             "-",
-            contract is null ? "-" : $"{effectiveVacationCompensationRate:0.####}",
+            contract is null ? "-" : FormatPercentageRate(effectiveVacationCompensationRate),
             FormatAmount(contract is null ? null : vacationCompensationLine?.AmountChf ?? 0m),
             contract is null
                 ? "Ohne gueltigen Vertrag nicht ableitbar."
@@ -403,6 +456,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.AhvGrossCode,
             "AHV-pflichtiger Bruttolohn",
             "-",
             "-",
@@ -410,15 +464,16 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen und Fahrzeitentschaedigung.",
             true));
 
-        lines.Add(BuildNamedAmountLine("AHV/IV/EO", derivationLines, "AHV_IV_EO"));
-        lines.Add(BuildNamedAmountLine("ALV", derivationLines, "ALV"));
-        lines.Add(BuildNamedAmountLine("Krankentaggeld/UVG", derivationLines, "KTG_UVG"));
-        lines.Add(BuildNamedAmountLine("Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN"));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AlvCode, "ALV", derivationLines, "ALV", payrollSettings.AlvRate));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate));
 
         var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
         if (bvgLine is not null)
         {
             lines.Add(new MonthlyPayrollPreviewLineDto(
+                PayrollPreviewHelpCatalog.BvgCode,
                 "BVG",
                 "-",
                 "-",
@@ -428,6 +483,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         }
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.TotalCode,
             "Total",
             "-",
             "-",
@@ -436,6 +492,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             true));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.ExpensesCode,
             "Spesen gemaess Nachweis",
             "-",
             "-",
@@ -444,6 +501,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.TotalPayoutCode,
             "Total Auszahlung",
             "-",
             "gerundet auf 0.05",
@@ -466,7 +524,16 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             notes.Add("Lohn-Voransicht basiert auf Monatsdaten, aktuellem Vertrag und dem gespeicherten Monatsparameter-Snapshot.");
         }
 
-        return new MonthlyPayrollPreviewDto(lines, notes);
+        var helpTextSettings = PayrollPreviewHelpCatalog.MergeWithDefaults(DeserializePayrollPreviewHelpVisibilities(currentPayrollSettings.PayrollPreviewHelpVisibilityJson))
+            .ToDictionary(item => item.Code, item => item, StringComparer.Ordinal);
+        var filteredLines = lines
+            .Select(line => line with
+            {
+                Detail = ResolveConfiguredHelpText(line, helpTextSettings)
+            })
+            .ToArray();
+
+        return new MonthlyPayrollPreviewDto(filteredLines, notes);
     }
 
     private async Task<IReadOnlyCollection<MonthlyPreviewRowDto>> BuildPreviewRowsAsync(Guid employeeId, CancellationToken cancellationToken)
@@ -588,12 +655,14 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     }
 
     private static MonthlyPayrollPreviewLineDto BuildVehiclePreviewLine(
+        string code,
         string label,
         decimal quantity,
         decimal rateChf,
         decimal amountChf)
     {
         return new MonthlyPayrollPreviewLineDto(
+            code,
             label,
             $"{quantity:0.##}",
             rateChf > 0m ? $"{rateChf:0.00} CHF" : "-",
@@ -605,18 +674,74 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     }
 
     private static MonthlyPayrollPreviewLineDto BuildNamedAmountLine(
+        string previewCode,
         string label,
         IEnumerable<PayrollRunLine> derivationLines,
-        string code)
+        string code,
+        decimal rate)
     {
         var matchingLine = derivationLines.SingleOrDefault(line => line.Code == code);
         return new MonthlyPayrollPreviewLineDto(
+            previewCode,
             label,
             "-",
-            matchingLine is null ? "-" : "gem. Monatsparameter",
+            matchingLine is null ? "-" : FormatPercentageRate(rate),
             FormatAmount(matchingLine?.AmountChf),
             null,
             false);
+    }
+
+    private static IReadOnlyCollection<Payroll.Domain.Settings.PayrollPreviewHelpVisibility> DeserializePayrollPreviewHelpVisibilities(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<Payroll.Domain.Settings.PayrollPreviewHelpVisibility[]>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static string? ResolveConfiguredHelpText(
+        MonthlyPayrollPreviewLineDto line,
+        IReadOnlyDictionary<string, PayrollPreviewHelpOptionDto> helpTextSettings)
+    {
+        if (!helpTextSettings.TryGetValue(line.Code, out var option) || !option.IsEnabled)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(option.HelpText)
+            ? line.Detail
+            : option.HelpText.Trim();
+    }
+
+    private static string BuildSupplementRateDisplay(PayrollWorkSummary workSummary, Domain.Employees.WorkTimeSupplementSettings supplementSettings)
+    {
+        var parts = new List<string>();
+
+        if (workSummary.NightHours > 0m && supplementSettings.NightSupplementRate.HasValue)
+        {
+            parts.Add($"Nacht {FormatPercentageRate(supplementSettings.NightSupplementRate.Value)}");
+        }
+
+        if (workSummary.SundayHours > 0m && supplementSettings.SundaySupplementRate.HasValue)
+        {
+            parts.Add($"Sonntag {FormatPercentageRate(supplementSettings.SundaySupplementRate.Value)}");
+        }
+
+        if (workSummary.HolidayHours > 0m && supplementSettings.HolidaySupplementRate.HasValue)
+        {
+            parts.Add($"Feiertag {FormatPercentageRate(supplementSettings.HolidaySupplementRate.Value)}");
+        }
+
+        return parts.Count == 0 ? "-" : string.Join(" | ", parts);
     }
 
     private async Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken)
@@ -654,6 +779,11 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return amountChf.HasValue
             ? $"{amountChf.Value:0.00} CHF"
             : "Noch nicht ableitbar";
+    }
+
+    private static string FormatPercentageRate(decimal rate)
+    {
+        return $"{rate * 100m:0.###} %";
     }
 
     private static string FormatAmountOrPending(decimal amountChf, bool isPending)
