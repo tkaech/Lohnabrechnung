@@ -9,6 +9,8 @@ namespace Payroll.Desktop.Views;
 
 public sealed partial class MainWindow : Window
 {
+    private const string TimeEntryColumnDragFormat = "application/x-payroll-time-entry-column";
+
     public MainWindow()
     {
         InitializeComponent();
@@ -148,6 +150,51 @@ public sealed partial class MainWindow : Window
         {
             monthlyRecord.EnsureTimeDatePickerOpen();
         }
+    }
+
+    private void OnTimeDatePickerSelectedDateChanged(object? sender, DatePickerSelectedValueChangedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel { MonthlyRecord: { IsTimeDatePickerOpen: true } monthlyRecord })
+        {
+            monthlyRecord.CloseAllPickers();
+        }
+    }
+
+    private async void OnTimeEntryColumnHeaderPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control { DataContext: TimeEntryColumnViewModel column })
+        {
+            return;
+        }
+
+        var data = new DataObject();
+        data.Set(TimeEntryColumnDragFormat, column.Key);
+        await DragDrop.DoDragDrop(e, data, DragDropEffects.Move);
+    }
+
+    private void OnTimeEntryColumnHeaderDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = e.Data.Contains(TimeEntryColumnDragFormat)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnTimeEntryColumnHeaderDrop(object? sender, DragEventArgs e)
+    {
+        if (sender is not Control { DataContext: TimeEntryColumnViewModel targetColumn }
+            || !e.Data.Contains(TimeEntryColumnDragFormat)
+            || e.Data.Get(TimeEntryColumnDragFormat) is not string sourceColumnKey)
+        {
+            return;
+        }
+
+        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
+        {
+            monthlyRecord.MoveTimeEntryColumn(sourceColumnKey, targetColumn.Key);
+        }
+
+        e.Handled = true;
     }
 
     private void OnRootPointerPressed(object? sender, PointerPressedEventArgs e)

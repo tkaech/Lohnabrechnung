@@ -5,6 +5,7 @@ using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Persistence;
+using System.Globalization;
 using System.Text.Json;
 
 namespace Payroll.Infrastructure.MonthlyRecords;
@@ -105,6 +106,9 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             monthlyRecord.Id,
             monthlyRecord.EmployeeId,
             employee.FullName,
+            employee.FirstName,
+            employee.LastName,
+            employee.PersonnelNumber,
             monthlyRecord.Year,
             monthlyRecord.Month,
             monthlyRecord.Status,
@@ -321,6 +325,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
         var lines = new List<MonthlyPayrollPreviewLineDto>();
         var notes = new List<string>();
+        var numberCulture = CreateNumberCulture(currentPayrollSettings.DecimalSeparator, currentPayrollSettings.ThousandsSeparator);
+        var currencyCode = currentPayrollSettings.CurrencyCode;
         var workSummary = PayrollWorkSummary.FromTimeEntries(monthlyRecord.EmployeeId, timeEntries);
         var expenses = monthlyRecord.ExpenseEntry is null
             ? Array.Empty<Domain.Expenses.ExpenseEntry>()
@@ -378,31 +384,33 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.BaseSalaryCode,
             "Basislohn",
-            baseLine?.Quantity is null ? $"{workSummary.WorkHours:0.##} h" : $"{baseLine.Quantity.Value:0.##} h",
-            contract is null ? "-" : $"{contract.HourlyRateChf:0.00} CHF",
-            FormatAmount(baseLine?.AmountChf),
+            baseLine?.Quantity is null ? $"{FormatQuantity(workSummary.WorkHours, numberCulture)} h" : $"{FormatQuantity(baseLine.Quantity.Value, numberCulture)} h",
+            contract is null ? "-" : FormatMoney(contract.HourlyRateChf, numberCulture, currencyCode),
+            FormatAmount(baseLine?.AmountChf, numberCulture, currencyCode),
             null,
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.TimeSupplementCode,
             "Stunden mit Zeitzuschlag",
-            supplementLines.Length == 0 ? $"{workSummary.SpecialHours:0.##} h" : $"{supplementLines.Sum(line => line.Quantity ?? 0m):0.##} h",
-            BuildSupplementRateDisplay(workSummary, payrollSettings.WorkTimeSupplementSettings),
+            supplementLines.Length == 0 ? $"{FormatQuantity(workSummary.SpecialHours, numberCulture)} h" : $"{FormatQuantity(supplementLines.Sum(line => line.Quantity ?? 0m), numberCulture)} h",
+            BuildSupplementRateDisplay(workSummary, payrollSettings.WorkTimeSupplementSettings, numberCulture),
             FormatAmountOrPending(
                 supplementLines.Sum(line => line.AmountChf),
-                contract is not null && workSummary.SpecialHours > 0m && supplementLines.Length == 0),
+                contract is not null && workSummary.SpecialHours > 0m && supplementLines.Length == 0,
+                numberCulture,
+                currencyCode),
             supplementLines.Length == 0
                 ? "Noch nicht vollstaendig ableitbar oder keine zuschlagspflichtigen Stunden im Monat."
-                : BuildSupplementDetail(supplementLines),
+                : BuildSupplementDetail(supplementLines, numberCulture, currencyCode),
             false));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.SpecialSupplementCode,
             "Spezialzuschlag gemaess Vertrag",
-            specialSupplementLine?.Quantity is null ? $"{workSummary.WorkHours:0.##} h" : $"{specialSupplementLine.Quantity.Value:0.##} h",
-            contract is null ? "-" : $"{contract.SpecialSupplementRateChf:0.00} CHF",
-            FormatAmount(contract is null ? null : specialSupplementLine?.AmountChf ?? 0m),
+            specialSupplementLine?.Quantity is null ? $"{FormatQuantity(workSummary.WorkHours, numberCulture)} h" : $"{FormatQuantity(specialSupplementLine.Quantity.Value, numberCulture)} h",
+            contract is null ? "-" : FormatMoney(contract.SpecialSupplementRateChf, numberCulture, currencyCode),
+            FormatAmount(contract is null ? null : specialSupplementLine?.AmountChf ?? 0m, numberCulture, currencyCode),
             contract is null
                 ? "Ohne gueltigen Vertrag nicht ableitbar."
                 : contract.SpecialSupplementRateChf > 0m
@@ -415,28 +423,34 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "Fahrzeitentschaedigung Pauschalzone 1",
             timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf),
             payrollSettings.VehiclePauschalzone1RateChf,
-            timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf) * payrollSettings.VehiclePauschalzone1RateChf));
+            timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf) * payrollSettings.VehiclePauschalzone1RateChf,
+            numberCulture,
+            currencyCode));
 
         lines.Add(BuildVehiclePreviewLine(
             PayrollPreviewHelpCatalog.VehiclePauschalzone2Code,
             "Fahrzeitentschaedigung Pauschalzone 2",
             timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf),
             payrollSettings.VehiclePauschalzone2RateChf,
-            timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf) * payrollSettings.VehiclePauschalzone2RateChf));
+            timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf) * payrollSettings.VehiclePauschalzone2RateChf,
+            numberCulture,
+            currencyCode));
 
         lines.Add(BuildVehiclePreviewLine(
             PayrollPreviewHelpCatalog.VehicleRegiezone1Code,
             "Fahrzeitentschaedigung Regiezone",
             timeEntries.Sum(entry => entry.VehicleRegiezone1Chf),
             payrollSettings.VehicleRegiezone1RateChf,
-            timeEntries.Sum(entry => entry.VehicleRegiezone1Chf) * payrollSettings.VehicleRegiezone1RateChf));
+            timeEntries.Sum(entry => entry.VehicleRegiezone1Chf) * payrollSettings.VehicleRegiezone1RateChf,
+            numberCulture,
+            currencyCode));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.SubtotalCode,
             "Zwischentotal",
             "-",
             "-",
-            FormatAmount(contract is null ? null : subtotalChf),
+            FormatAmount(contract is null ? null : subtotalChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Summe der aktuell fachlich ableitbaren lohnrelevanten Positionen.",
             true));
 
@@ -446,8 +460,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             PayrollPreviewHelpCatalog.VacationCompensationCode,
             "Ferienentschaedigung",
             "-",
-            contract is null ? "-" : FormatPercentageRate(effectiveVacationCompensationRate),
-            FormatAmount(contract is null ? null : vacationCompensationLine?.AmountChf ?? 0m),
+            contract is null ? "-" : FormatPercentageRate(effectiveVacationCompensationRate, numberCulture),
+            FormatAmount(contract is null ? null : vacationCompensationLine?.AmountChf ?? 0m, numberCulture, currencyCode),
             contract is null
                 ? "Ohne gueltigen Vertrag nicht ableitbar."
                 : employeeBirthDate.HasValue
@@ -460,14 +474,14 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "AHV-pflichtiger Bruttolohn",
             "-",
             "-",
-            FormatAmount(contract is null ? null : ahvGrossChf),
+            FormatAmount(contract is null ? null : ahvGrossChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen und Fahrzeitentschaedigung.",
             true));
 
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate));
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AlvCode, "ALV", derivationLines, "ALV", payrollSettings.AlvRate));
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate));
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AlvCode, "ALV", derivationLines, "ALV", payrollSettings.AlvRate, numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, numberCulture, currencyCode));
 
         var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
         if (bvgLine is not null)
@@ -477,7 +491,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 "BVG",
                 "-",
                 "-",
-                FormatAmount(bvgLine.AmountChf),
+                FormatAmount(bvgLine.AmountChf, numberCulture, currencyCode),
                 "Aus dem aktuellen Vertragsstand.",
                 false));
         }
@@ -487,7 +501,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "Total",
             "-",
             "-",
-            FormatAmount(contract is null ? null : totalChf),
+            FormatAmount(contract is null ? null : totalChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Netto aus lohnrelevanten Positionen und Abzuegen ohne Spesen.",
             true));
 
@@ -496,7 +510,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "Spesen gemaess Nachweis",
             "-",
             "-",
-            $"{expensesChf:0.00} CHF",
+            FormatMoney(expensesChf, numberCulture, currencyCode),
             expensesChf > 0m ? "Direkt aus dem monatlichen Spesenblock." : null,
             false));
 
@@ -505,7 +519,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "Total Auszahlung",
             "-",
             "gerundet auf 0.05",
-            FormatAmount(contract is null ? null : totalPayoutChf),
+            FormatAmount(contract is null ? null : totalPayoutChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht vollstaendig ableitbar." : "Summe aus Total und Spesen, analog Excel-Vorlage auf 5 Rappen gerundet.",
             true));
 
@@ -659,14 +673,16 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         string label,
         decimal quantity,
         decimal rateChf,
-        decimal amountChf)
+        decimal amountChf,
+        CultureInfo numberCulture,
+        string currencyCode)
     {
         return new MonthlyPayrollPreviewLineDto(
             code,
             label,
-            $"{quantity:0.##}",
-            rateChf > 0m ? $"{rateChf:0.00} CHF" : "-",
-            $"{amountChf:0.00} CHF",
+            FormatQuantity(quantity, numberCulture),
+            rateChf > 0m ? FormatMoney(rateChf, numberCulture, currencyCode) : "-",
+            FormatMoney(amountChf, numberCulture, currencyCode),
             quantity > 0m && rateChf <= 0m
                 ? "Menge vorhanden, aber kein zentraler CHF-Ansatz in den Einstellungen gepflegt."
                 : null,
@@ -678,15 +694,17 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         string label,
         IEnumerable<PayrollRunLine> derivationLines,
         string code,
-        decimal rate)
+        decimal rate,
+        CultureInfo numberCulture,
+        string currencyCode)
     {
         var matchingLine = derivationLines.SingleOrDefault(line => line.Code == code);
         return new MonthlyPayrollPreviewLineDto(
             previewCode,
             label,
             "-",
-            matchingLine is null ? "-" : FormatPercentageRate(rate),
-            FormatAmount(matchingLine?.AmountChf),
+            matchingLine is null ? "-" : FormatPercentageRate(rate, numberCulture),
+            FormatAmount(matchingLine?.AmountChf, numberCulture, currencyCode),
             null,
             false);
     }
@@ -722,23 +740,26 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             : option.HelpText.Trim();
     }
 
-    private static string BuildSupplementRateDisplay(PayrollWorkSummary workSummary, Domain.Employees.WorkTimeSupplementSettings supplementSettings)
+    private static string BuildSupplementRateDisplay(
+        PayrollWorkSummary workSummary,
+        Domain.Employees.WorkTimeSupplementSettings supplementSettings,
+        CultureInfo numberCulture)
     {
         var parts = new List<string>();
 
         if (workSummary.NightHours > 0m && supplementSettings.NightSupplementRate.HasValue)
         {
-            parts.Add($"Nacht {FormatPercentageRate(supplementSettings.NightSupplementRate.Value)}");
+            parts.Add($"Nacht {FormatPercentageRate(supplementSettings.NightSupplementRate.Value, numberCulture)}");
         }
 
         if (workSummary.SundayHours > 0m && supplementSettings.SundaySupplementRate.HasValue)
         {
-            parts.Add($"Sonntag {FormatPercentageRate(supplementSettings.SundaySupplementRate.Value)}");
+            parts.Add($"Sonntag {FormatPercentageRate(supplementSettings.SundaySupplementRate.Value, numberCulture)}");
         }
 
         if (workSummary.HolidayHours > 0m && supplementSettings.HolidaySupplementRate.HasValue)
         {
-            parts.Add($"Feiertag {FormatPercentageRate(supplementSettings.HolidaySupplementRate.Value)}");
+            parts.Add($"Feiertag {FormatPercentageRate(supplementSettings.HolidaySupplementRate.Value, numberCulture)}");
         }
 
         return parts.Count == 0 ? "-" : string.Join(" | ", parts);
@@ -774,28 +795,53 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .Sum(line => line.AmountChf);
     }
 
-    private static string FormatAmount(decimal? amountChf)
+    private static string FormatAmount(decimal? amountChf, CultureInfo numberCulture, string currencyCode)
     {
         return amountChf.HasValue
-            ? $"{amountChf.Value:0.00} CHF"
+            ? FormatMoney(amountChf.Value, numberCulture, currencyCode)
             : "Noch nicht ableitbar";
     }
 
-    private static string FormatPercentageRate(decimal rate)
+    private static string FormatPercentageRate(decimal rate, CultureInfo numberCulture)
     {
-        return $"{rate * 100m:0.###} %";
+        return $"{(rate * 100m).ToString("#,##0.###", numberCulture)} %";
     }
 
-    private static string FormatAmountOrPending(decimal amountChf, bool isPending)
+    private static string FormatAmountOrPending(decimal amountChf, bool isPending, CultureInfo numberCulture, string currencyCode)
     {
         return isPending
             ? "Noch nicht ableitbar"
-            : $"{amountChf:0.00} CHF";
+            : FormatMoney(amountChf, numberCulture, currencyCode);
     }
 
-    private static string BuildSupplementDetail(IEnumerable<PayrollRunLine> supplementLines)
+    private static string BuildSupplementDetail(IEnumerable<PayrollRunLine> supplementLines, CultureInfo numberCulture, string currencyCode)
     {
-        return string.Join(" | ", supplementLines.Select(line => $"{line.Description} {line.AmountChf:0.00} CHF"));
+        return string.Join(" | ", supplementLines.Select(line => $"{line.Description} {FormatMoney(line.AmountChf, numberCulture, currencyCode)}"));
+    }
+
+    private static string FormatMoney(decimal value, CultureInfo numberCulture, string currencyCode)
+    {
+        return $"{value.ToString("#,##0.00", numberCulture)} {NormalizeCurrencyCode(currencyCode)}";
+    }
+
+    private static string FormatQuantity(decimal value, CultureInfo numberCulture)
+    {
+        return value.ToString("#,##0.##", numberCulture);
+    }
+
+    private static CultureInfo CreateNumberCulture(string? decimalSeparator, string? thousandsSeparator)
+    {
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.NumberDecimalSeparator = decimalSeparator == "." ? "." : ",";
+        culture.NumberFormat.NumberGroupSeparator = thousandsSeparator == " " ? " " : PayrollSettings.DefaultThousandsSeparator;
+        return culture;
+    }
+
+    private static string NormalizeCurrencyCode(string? currencyCode)
+    {
+        return string.IsNullOrWhiteSpace(currencyCode)
+            ? PayrollSettings.DefaultCurrencyCode
+            : currencyCode.Trim().ToUpperInvariant();
     }
 
     private static string TranslateDerivationIssue(string code)

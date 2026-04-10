@@ -109,6 +109,8 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(settings => settings.PrintLogoPath).HasMaxLength(1000).IsRequired();
             builder.Property(settings => settings.PrintTemplate).HasMaxLength(20000).IsRequired();
             builder.Property(settings => settings.DecimalSeparator).HasMaxLength(1).IsRequired();
+            builder.Property(settings => settings.ThousandsSeparator).HasMaxLength(1).IsRequired();
+            builder.Property(settings => settings.CurrencyCode).HasMaxLength(10).IsRequired();
             builder.Property(settings => settings.PayrollPreviewHelpVisibilityJson).HasMaxLength(8000).IsRequired();
             builder.Property(settings => settings.AhvIvEoRate).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.AlvRate).HasColumnType("TEXT").IsRequired();

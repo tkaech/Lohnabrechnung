@@ -6,20 +6,28 @@ namespace Payroll.Desktop.Formatting;
 public static class NumericFormatManager
 {
     private static string _decimalSeparator = PayrollSettings.DefaultDecimalSeparator;
+    private static string _thousandsSeparator = PayrollSettings.DefaultThousandsSeparator;
 
     static NumericFormatManager()
     {
-        ApplyDecimalSeparator(_decimalSeparator);
+        ApplyNumberSeparators(_decimalSeparator, _thousandsSeparator);
     }
 
     public static string DecimalSeparator => _decimalSeparator;
+    public static string ThousandsSeparator => _thousandsSeparator;
 
     public static CultureInfo CurrentCulture { get; private set; } = CultureInfo.CurrentCulture;
 
     public static void ApplyDecimalSeparator(string? separator)
     {
-        _decimalSeparator = NormalizeDecimalSeparator(separator);
-        CurrentCulture = CreateCulture(_decimalSeparator);
+        ApplyNumberSeparators(separator, _thousandsSeparator);
+    }
+
+    public static void ApplyNumberSeparators(string? decimalSeparator, string? thousandsSeparator)
+    {
+        _decimalSeparator = NormalizeDecimalSeparator(decimalSeparator);
+        _thousandsSeparator = NormalizeThousandsSeparator(thousandsSeparator);
+        CurrentCulture = CreateCulture(_decimalSeparator, _thousandsSeparator);
         CultureInfo.DefaultThreadCurrentCulture = CurrentCulture;
         CultureInfo.DefaultThreadCurrentUICulture = CurrentCulture;
         CultureInfo.CurrentCulture = CurrentCulture;
@@ -29,6 +37,11 @@ public static class NumericFormatManager
     public static string NormalizeDecimalSeparator(string? separator)
     {
         return separator == "." ? "." : ",";
+    }
+
+    public static string NormalizeThousandsSeparator(string? separator)
+    {
+        return separator == " " ? " " : PayrollSettings.DefaultThousandsSeparator;
     }
 
     public static string FormatDecimal(decimal value, string format)
@@ -84,12 +97,12 @@ public static class NumericFormatManager
         return trimmed.Replace(',', '.');
     }
 
-    private static CultureInfo CreateCulture(string separator)
+    private static CultureInfo CreateCulture(string decimalSeparator, string thousandsSeparator)
     {
         var culture = (CultureInfo)CultureInfo.CurrentCulture.Clone();
-        culture.NumberFormat.NumberDecimalSeparator = separator;
-        culture.NumberFormat.CurrencyDecimalSeparator = separator;
-        culture.NumberFormat.NumberGroupSeparator = separator == "," ? "." : ",";
+        culture.NumberFormat.NumberDecimalSeparator = decimalSeparator;
+        culture.NumberFormat.CurrencyDecimalSeparator = decimalSeparator;
+        culture.NumberFormat.NumberGroupSeparator = thousandsSeparator;
         culture.NumberFormat.CurrencyGroupSeparator = culture.NumberFormat.NumberGroupSeparator;
         return culture;
     }

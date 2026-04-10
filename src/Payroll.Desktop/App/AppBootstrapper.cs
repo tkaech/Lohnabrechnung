@@ -295,6 +295,18 @@ public sealed class AppBootstrapper
             EnsureTableColumn(
                 connection,
                 "PayrollSettings",
+                "ThousandsSeparator",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"ThousandsSeparator\" TEXT NOT NULL DEFAULT '''';");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "CurrencyCode",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"CurrencyCode\" TEXT NOT NULL DEFAULT 'CHF';");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
                 "VacationCompensationRateAge50Plus",
                 "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"VacationCompensationRateAge50Plus\" TEXT NOT NULL DEFAULT 0.1064;");
 

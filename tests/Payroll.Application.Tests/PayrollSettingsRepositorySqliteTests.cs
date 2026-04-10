@@ -62,6 +62,8 @@ public sealed class PayrollSettingsRepositorySqliteTests
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
             ".",
+            " ",
+            "EUR",
             0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
             PayrollPreviewHelpCatalog.GetDefaultOptions(),
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit"), new SettingOptionDto(Guid.NewGuid(), "Buero")],
@@ -78,6 +80,8 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Assert.Equal(10m, loaded.PrintFontSize);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", loaded.PrintTemplate);
         Assert.Equal(".", loaded.DecimalSeparator);
+        Assert.Equal(" ", loaded.ThousandsSeparator);
+        Assert.Equal("EUR", loaded.CurrencyCode);
         Assert.Equal(0.25m, loaded.NightSupplementRate);
         Assert.Equal(0.50m, loaded.SundaySupplementRate);
         Assert.Equal(1.00m, loaded.HolidaySupplementRate);

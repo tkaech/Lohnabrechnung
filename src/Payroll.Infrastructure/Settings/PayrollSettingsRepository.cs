@@ -61,6 +61,8 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.PrintLogoPath);
         settings.UpdatePrintTemplate(command.PrintTemplate);
         settings.UpdateDecimalSeparator(command.DecimalSeparator);
+        settings.UpdateThousandsSeparator(command.ThousandsSeparator);
+        settings.UpdateCurrencyCode(command.CurrencyCode);
         settings.UpdatePayrollPreviewHelpVisibilityJson(SerializePayrollPreviewHelpOptions(command.PayrollPreviewHelpOptions));
         settings.UpdateWorkTimeSupplementSettings(new WorkTimeSupplementSettings(
             command.NightSupplementRate,
@@ -159,6 +161,8 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             settings.PrintLogoPath,
             printTemplate,
             settings.DecimalSeparator,
+            settings.ThousandsSeparator,
+            settings.CurrencyCode,
             settings.WorkTimeSupplementSettings.NightSupplementRate,
             settings.WorkTimeSupplementSettings.SundaySupplementRate,
             settings.WorkTimeSupplementSettings.HolidaySupplementRate,

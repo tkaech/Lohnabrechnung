@@ -36,6 +36,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string BackupTypeUserDataLabel = "Nur Nutzdaten";
     private const string BackupTypeBothLabel = "Beides";
     private const string DefaultEnvironmentLabel = "Unbekannt";
+    private const string ThousandsSeparatorApostropheLabel = "Apostroph (')";
+    private const string ThousandsSeparatorSpaceLabel = "Leerzeichen";
     private static readonly string StartupArgumentsHelpText =
         "--db-path=/voller/pfad/zur/datei.db" + Environment.NewLine +
         "--environment=Development|Production|Test";
@@ -117,6 +119,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsPrintLogoPath = string.Empty;
     private string _settingsPrintTemplate = string.Empty;
     private string _settingsDecimalSeparator = Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator;
+    private string _settingsThousandsSeparator = ThousandsSeparatorApostropheLabel;
+    private string _settingsCurrencyCode = Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode;
     private string _backupDirectoryPath = string.Empty;
     private string _backupFileName = string.Empty;
     private string _selectedBackupContentType = BackupTypeBothLabel;
@@ -157,6 +161,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         WithholdingTaxOptions = [WithholdingTaxUnknown, WithholdingTaxYes, WithholdingTaxNo];
         BackupContentTypeOptions = [BackupTypeConfigurationLabel, BackupTypeUserDataLabel, BackupTypeBothLabel];
         DecimalSeparatorOptions = [",", "."];
+        ThousandsSeparatorOptions = [ThousandsSeparatorApostropheLabel, ThousandsSeparatorSpaceLabel];
         RefreshCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         SearchCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         NewEmployeeCommand = new DelegateCommand(BeginCreateEmployee, () => CanStartCreate);
@@ -227,6 +232,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
     public IReadOnlyList<string> BackupContentTypeOptions { get; }
     public IReadOnlyList<string> DecimalSeparatorOptions { get; }
+    public IReadOnlyList<string> ThousandsSeparatorOptions { get; }
     public DelegateCommand RefreshCommand { get; }
     public DelegateCommand SearchCommand { get; }
     public DelegateCommand NewEmployeeCommand { get; }
@@ -815,6 +821,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _settingsDecimalSeparator, NumericFormatManager.NormalizeDecimalSeparator(value));
     }
 
+    public string SettingsThousandsSeparator
+    {
+        get => _settingsThousandsSeparator;
+        set => SetProperty(ref _settingsThousandsSeparator, ToThousandsSeparatorLabel(value));
+    }
+
+    public string SettingsCurrencyCode
+    {
+        get => _settingsCurrencyCode;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value)
+                ? Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode
+                : value.Trim().ToUpperInvariant();
+            if (SetProperty(ref _settingsCurrencyCode, normalized))
+            {
+                RaisePropertyChanged(nameof(CurrencyPrefix));
+            }
+        }
+    }
+
+    public string CurrencyPrefix => $"{SettingsCurrencyCode} ";
+
     public string BackupDirectoryPath
     {
         get => _backupDirectoryPath;
@@ -1158,6 +1187,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 SettingsPrintLogoPath,
                 SettingsPrintTemplate,
                 SettingsDecimalSeparator,
+                ToThousandsSeparatorValue(SettingsThousandsSeparator),
+                SettingsCurrencyCode,
                 ParseOptionalPercentage(SettingsNightSupplementRate),
                 ParseOptionalPercentage(SettingsSundaySupplementRate),
                 ParseOptionalPercentage(SettingsHolidaySupplementRate),
@@ -1768,6 +1799,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsPrintLogoPath = settings.PrintLogoPath;
         SettingsPrintTemplate = settings.PrintTemplate;
         SettingsDecimalSeparator = settings.DecimalSeparator;
+        SettingsThousandsSeparator = settings.ThousandsSeparator;
+        SettingsCurrencyCode = settings.CurrencyCode;
         SettingsNightSupplementRate = FormatNullablePercentage(settings.NightSupplementRate, "0.##");
         SettingsSundaySupplementRate = FormatNullablePercentage(settings.SundaySupplementRate, "0.##");
         SettingsHolidaySupplementRate = FormatNullablePercentage(settings.HolidaySupplementRate, "0.##");
@@ -1797,6 +1830,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static string FormatPercentage(decimal value, string format)
     {
         return NumericFormatManager.FormatDecimal(value * 100m, format);
+    }
+
+    private static string ToThousandsSeparatorValue(string? label)
+    {
+        return label == ThousandsSeparatorSpaceLabel ? " " : Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator;
+    }
+
+    private static string ToThousandsSeparatorLabel(string? value)
+    {
+        return value == " " || value == ThousandsSeparatorSpaceLabel
+            ? ThousandsSeparatorSpaceLabel
+            : ThousandsSeparatorApostropheLabel;
     }
 
     private static IReadOnlyCollection<PayrollPreviewHelpOptionDto> BuildPayrollPreviewHelpOptionDtos(

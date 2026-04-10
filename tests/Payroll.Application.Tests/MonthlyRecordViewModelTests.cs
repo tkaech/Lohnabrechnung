@@ -221,7 +221,7 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Single(viewModel.TimeEntries);
         Assert.Equal(new DateOnly(2026, 4, 8), viewModel.TimeEntries[0].WorkDate);
         Assert.NotNull(viewModel.SelectedTimeEntry);
-        Assert.Equal("2026-04-08", viewModel.TimeDate);
+        Assert.Equal("08.04.2026", viewModel.TimeDate);
         Assert.Equal("6", viewModel.HoursWorked);
         Assert.Contains("04/2026", viewModel.ContextDescription, StringComparison.Ordinal);
     }
@@ -356,6 +356,9 @@ public sealed class MonthlyRecordViewModelTests
                     record.Id,
                     record.EmployeeId,
                     employeeName,
+                    "Nora",
+                    "Feld",
+                    "1000",
                     record.Year,
                     record.Month,
                     record.Status,

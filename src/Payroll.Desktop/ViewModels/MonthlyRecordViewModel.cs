@@ -21,7 +21,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _contractSummary = "Kein Vertragsstand geladen.";
     private string _totalsSummary = "Noch keine Monatssummen vorhanden.";
     private string _actionMessage = "Noch keine Aktion ausgefuehrt.";
-    private string _timeDate = DateTime.Today.ToString("yyyy-MM-dd");
+    private string _timeDate = DateTime.Today.ToString("dd.MM.yyyy");
     private string _hoursWorked = "0";
     private string _nightHours = "0";
     private string _sundayHours = "0";
@@ -38,6 +38,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _previewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
     private string _previewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
     private string _previewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
+    private string _payrollPreviewTitle = "Lohn-Voransicht";
     private string _payrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
     private bool _isTimeMonthPickerOpen;
     private bool _isExpenseMonthPickerOpen;
@@ -51,6 +52,18 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         _monthlyRecordService = monthlyRecordService;
         TimeEntries = [];
         TimeEntryHistory = [];
+        TimeEntryColumns =
+        [
+            new(TimeEntryColumnViewModel.WorkDateKey, "Datum", 100d),
+            new(TimeEntryColumnViewModel.MonthKey, "Monat", 90d),
+            new(TimeEntryColumnViewModel.HoursWorkedKey, "Arbeit", 72d),
+            new(TimeEntryColumnViewModel.NightHoursKey, "Nacht", 72d),
+            new(TimeEntryColumnViewModel.SundayHoursKey, "Sonntag", 72d),
+            new(TimeEntryColumnViewModel.HolidayHoursKey, "Feiertag", 72d),
+            new(TimeEntryColumnViewModel.VehiclePauschalzone1Key, "P1", 78d),
+            new(TimeEntryColumnViewModel.VehiclePauschalzone2Key, "P2", 78d),
+            new(TimeEntryColumnViewModel.VehicleRegiezone1Key, "R1", 78d)
+        ];
         ExpenseEntryHistory = [];
         PreviewRows = [];
         PreviewNotes = [];
@@ -66,6 +79,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntryHistory { get; }
+    public ObservableCollection<TimeEntryColumnViewModel> TimeEntryColumns { get; }
     public ObservableCollection<MonthlyExpenseEntryItemViewModel> ExpenseEntryHistory { get; }
     public ObservableCollection<MonthlyPreviewRowViewModel> PreviewRows { get; }
     public ObservableCollection<string> PreviewNotes { get; }
@@ -203,9 +217,47 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 return;
             }
 
-            TimeDate = DateOnly.FromDateTime(value.Value.Date).ToString("yyyy-MM-dd");
+            TimeDate = DateOnly.FromDateTime(value.Value.Date).ToString("dd.MM.yyyy");
             IsTimeDatePickerOpen = false;
             RaisePropertyChanged(nameof(TimeDatePicker));
+        }
+    }
+
+    public void MoveTimeEntryColumn(string? sourceKey, string? targetKey)
+    {
+        if (string.IsNullOrWhiteSpace(sourceKey) || string.IsNullOrWhiteSpace(targetKey) || sourceKey == targetKey)
+        {
+            return;
+        }
+
+        var source = TimeEntryColumns.FirstOrDefault(column => column.Key == sourceKey);
+        var target = TimeEntryColumns.FirstOrDefault(column => column.Key == targetKey);
+        if (source is null || target is null)
+        {
+            return;
+        }
+
+        var oldIndex = TimeEntryColumns.IndexOf(source);
+        var newIndex = TimeEntryColumns.IndexOf(target);
+        if (oldIndex < 0 || newIndex < 0 || oldIndex == newIndex)
+        {
+            return;
+        }
+
+        TimeEntryColumns.Move(oldIndex, newIndex);
+        RefreshTimeEntryCells();
+    }
+
+    private void RefreshTimeEntryCells()
+    {
+        foreach (var entry in TimeEntries)
+        {
+            entry.ApplyColumnOrder(TimeEntryColumns);
+        }
+
+        foreach (var entry in TimeEntryHistory)
+        {
+            entry.ApplyColumnOrder(TimeEntryColumns);
         }
     }
 
@@ -281,6 +333,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     {
         get => _payrollPreviewSummary;
         private set => SetProperty(ref _payrollPreviewSummary, value);
+    }
+
+    public string PayrollPreviewTitle
+    {
+        get => _payrollPreviewTitle;
+        private set => SetProperty(ref _payrollPreviewTitle, value);
     }
 
     public bool HasPayrollPreviewLines => PayrollPreviewLines.Count > 0;
@@ -449,6 +507,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
         PreviewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
+        PayrollPreviewTitle = "Lohn-Voransicht";
         PayrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
         TimeEntries.Clear();
         TimeEntryHistory.Clear();
@@ -525,9 +584,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private void PrepareNewTimeEntry()
     {
         SelectedTimeEntry = null;
-        TimeDate = SelectedMonth.HasValue
-            ? new DateOnly(SelectedMonth.Value.Year, SelectedMonth.Value.Month, 1).ToString("yyyy-MM-dd")
-            : DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
+        TimeDate = DateOnly.FromDateTime(DateTime.Today).ToString("dd.MM.yyyy");
         HoursWorked = "0";
         NightHours = "0";
         SundayHours = "0";
@@ -629,14 +686,15 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewSummary = "Monatsvorschau zeigt alle vorhandenen Monate der selektierten Person tabellarisch untereinander.";
         PreviewTotals = $"Arbeitsstunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
         PreviewEntryCounts = $"Eintraege im aktuellen Monat: Zeiten {details.TimeEntries.Count} | Spesenblock {(details.ExpenseEntry is null ? 0 : 1)}";
+        PayrollPreviewTitle = $"{details.Header.EmployeeLastName} {details.Header.EmployeeFirstName} | {details.Header.PersonnelNumber}";
         PayrollPreviewSummary = details.PayrollPreview.Lines.Count == 0
             ? "Monat noch nicht erfasst"
-            : $"Lohn-Voransicht fuer {details.Header.Month:00}/{details.Header.Year} nach aktuellem Berechnungsstand.";
+            : $"{details.Header.Month:00}/{details.Header.Year}";
 
         TimeEntries.Clear();
         foreach (var entry in details.TimeEntries)
         {
-            TimeEntries.Add(new MonthlyTimeEntryItemViewModel
+            var timeEntry = new MonthlyTimeEntryItemViewModel
             {
                 TimeEntryId = entry.TimeEntryId,
                 Year = entry.WorkDate.Year,
@@ -652,7 +710,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 IsCurrentMonth = true,
                 Note = entry.Note,
                 Summary = $"{entry.WorkDate:dd.MM.yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
-            });
+            };
+            timeEntry.ApplyColumnOrder(TimeEntryColumns);
+            TimeEntries.Add(timeEntry);
         }
 
         ExpensesTotal = details.ExpenseEntry is not null
@@ -665,7 +725,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             var isCurrentMonth = entry.WorkDate.Year == details.Header.Year
                 && entry.WorkDate.Month == details.Header.Month;
 
-            TimeEntryHistory.Add(new MonthlyTimeEntryItemViewModel
+            var timeEntry = new MonthlyTimeEntryItemViewModel
             {
                 TimeEntryId = entry.TimeEntryId,
                 Year = entry.WorkDate.Year,
@@ -681,7 +741,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 IsCurrentMonth = isCurrentMonth,
                 Note = entry.Note,
                 Summary = $"{entry.WorkDate:dd.MM.yyyy} | Monat {entry.WorkDate:MM/yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
-            });
+            };
+            timeEntry.ApplyColumnOrder(TimeEntryColumns);
+            TimeEntryHistory.Add(timeEntry);
         }
 
         ExpenseEntryHistory.Clear();
@@ -749,7 +811,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     private void PopulateTimeEntryForm(MonthlyTimeEntryItemViewModel entry)
     {
-        TimeDate = entry.WorkDate.ToString("yyyy-MM-dd");
+        TimeDate = entry.WorkDate.ToString("dd.MM.yyyy");
         HoursWorked = NumericFormatManager.FormatDecimal(entry.HoursWorked, "0.##");
         NightHours = NumericFormatManager.FormatDecimal(entry.NightHours, "0.##");
         SundayHours = NumericFormatManager.FormatDecimal(entry.SundayHours, "0.##");
@@ -813,6 +875,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
         PreviewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
+        PayrollPreviewTitle = "Lohn-Voransicht";
         PayrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
         TimeEntries.Clear();
         TimeEntryHistory.Clear();

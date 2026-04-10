@@ -252,6 +252,8 @@ public sealed class BackupRestoreService : IBackupRestoreService
             settings.PrintLogoPath,
             settings.PrintTemplate,
             settings.DecimalSeparator,
+            settings.ThousandsSeparator,
+            settings.CurrencyCode,
             settings.NightSupplementRate,
             settings.SundaySupplementRate,
             settings.HolidaySupplementRate,

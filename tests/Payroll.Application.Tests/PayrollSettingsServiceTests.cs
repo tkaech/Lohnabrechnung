@@ -30,6 +30,8 @@ public sealed class PayrollSettingsServiceTests
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
             ",",
+            "'",
+            "CHF",
             0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
             PayrollPreviewHelpCatalog.GetDefaultOptions(),
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit")],
@@ -46,6 +48,8 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal("BSD", saved.PrintLogoText);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", saved.PrintTemplate);
         Assert.Equal(",", saved.DecimalSeparator);
+        Assert.Equal("'", saved.ThousandsSeparator);
+        Assert.Equal("CHF", saved.CurrencyCode);
         Assert.Equal(0.25m, saved.NightSupplementRate);
         Assert.Equal(0.50m, saved.SundaySupplementRate);
         Assert.Equal(1.00m, saved.HolidaySupplementRate);
@@ -88,6 +92,8 @@ public sealed class PayrollSettingsServiceTests
             string.Empty,
             string.Empty,
             global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator,
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode,
             null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, PayrollPreviewHelpCatalog.GetDefaultOptions(), [], [], []);
 
         public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
@@ -124,6 +130,8 @@ public sealed class PayrollSettingsServiceTests
                 command.PrintLogoPath,
                 command.PrintTemplate,
                 command.DecimalSeparator,
+                command.ThousandsSeparator,
+                command.CurrencyCode,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,

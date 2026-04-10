@@ -16,7 +16,7 @@ public static class ThemeSettingsApplier
 
         var resources = Avalonia.Application.Current.Resources;
 
-        NumericFormatManager.ApplyDecimalSeparator(settings.DecimalSeparator);
+        NumericFormatManager.ApplyNumberSeparators(settings.DecimalSeparator, settings.ThousandsSeparator);
 
         resources["Theme.FontFamily"] = CreateFontFamily(settings.AppFontFamily, Payroll.Domain.Settings.PayrollSettings.DefaultAppFontFamily);
         resources["Theme.FontSize.Body"] = (double)settings.AppFontSize;

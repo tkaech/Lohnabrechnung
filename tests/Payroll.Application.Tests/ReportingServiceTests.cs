@@ -89,7 +89,7 @@ public sealed class ReportingServiceTests
         Assert.Equal("Unterer Chaemletenweg 8", pdfExportService.LastDocument.EmployeeAddressLine1);
         Assert.Equal("6333 Huenenberg See", pdfExportService.LastDocument.EmployeeAddressLine3);
         Assert.Equal("Yvonne Kaech", pdfExportService.LastDocument.TemplatePlaceholders["MitarbeiterName"]);
-        Assert.Equal("42.00 CHF", pdfExportService.LastDocument.TemplatePlaceholders["Spesen"]);
+        Assert.Equal("42,00 CHF", pdfExportService.LastDocument.TemplatePlaceholders["Spesen"]);
         Assert.Contains("Blesinger Sicherheits Dienste GmbH", pdfExportService.LastDocument.TemplatePlaceholders["Firmenadresse"], StringComparison.Ordinal);
         Assert.Contains(pdfExportService.LastDocument.Lines, line => line.Label == "Basislohn");
         Assert.Contains(pdfExportService.LastDocument.Lines, line => line.Label == "Total Auszahlung");

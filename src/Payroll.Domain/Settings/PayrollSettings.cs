@@ -26,6 +26,8 @@ public sealed class PayrollSettings : AuditableEntity
     public const string DefaultPrintLogoText = "PA";
     public const string DefaultPrintTemplate = "";
     public const string DefaultDecimalSeparator = ",";
+    public const string DefaultThousandsSeparator = "'";
+    public const string DefaultCurrencyCode = "CHF";
     public const string DefaultPayrollPreviewHelpVisibilityJson = "";
 
     private PayrollSettings()
@@ -48,6 +50,8 @@ public sealed class PayrollSettings : AuditableEntity
         PrintLogoPath = string.Empty;
         PrintTemplate = DefaultPrintTemplate;
         DecimalSeparator = DefaultDecimalSeparator;
+        ThousandsSeparator = DefaultThousandsSeparator;
+        CurrencyCode = DefaultCurrencyCode;
         PayrollPreviewHelpVisibilityJson = DefaultPayrollPreviewHelpVisibilityJson;
         WorkTimeSupplementSettings = WorkTimeSupplementSettings.Empty;
         AhvIvEoRate = DefaultAhvIvEoRate;
@@ -89,6 +93,8 @@ public sealed class PayrollSettings : AuditableEntity
             DefaultPrintLogoText,
             string.Empty);
         UpdateDecimalSeparator(DefaultDecimalSeparator);
+        UpdateThousandsSeparator(DefaultThousandsSeparator);
+        UpdateCurrencyCode(DefaultCurrencyCode);
         WorkTimeSupplementSettings = workTimeSupplementSettings ?? WorkTimeSupplementSettings.Empty;
         UpdateDeductionAndVehicleRates(
             ahvIvEoRate,
@@ -121,6 +127,8 @@ public sealed class PayrollSettings : AuditableEntity
     public string PrintLogoPath { get; private set; } = string.Empty;
     public string PrintTemplate { get; private set; } = string.Empty;
     public string DecimalSeparator { get; private set; } = DefaultDecimalSeparator;
+    public string ThousandsSeparator { get; private set; } = DefaultThousandsSeparator;
+    public string CurrencyCode { get; private set; } = DefaultCurrencyCode;
     public string PayrollPreviewHelpVisibilityJson { get; private set; } = DefaultPayrollPreviewHelpVisibilityJson;
     public decimal AhvIvEoRate { get; private set; }
     public decimal AlvRate { get; private set; }
@@ -234,6 +242,18 @@ public sealed class PayrollSettings : AuditableEntity
         Touch();
     }
 
+    public void UpdateThousandsSeparator(string? thousandsSeparator)
+    {
+        ThousandsSeparator = NormalizeThousandsSeparator(thousandsSeparator);
+        Touch();
+    }
+
+    public void UpdateCurrencyCode(string? currencyCode)
+    {
+        CurrencyCode = NormalizeCurrencyCode(currencyCode);
+        Touch();
+    }
+
     public void UpdatePayrollPreviewHelpVisibilityJson(string? payrollPreviewHelpVisibilityJson)
     {
         PayrollPreviewHelpVisibilityJson = NormalizeOptional(payrollPreviewHelpVisibilityJson) ?? string.Empty;
@@ -279,5 +299,17 @@ public sealed class PayrollSettings : AuditableEntity
     private static string NormalizeDecimalSeparator(string? value)
     {
         return value == "." ? "." : DefaultDecimalSeparator;
+    }
+
+    private static string NormalizeThousandsSeparator(string? value)
+    {
+        return value == " " ? " " : DefaultThousandsSeparator;
+    }
+
+    private static string NormalizeCurrencyCode(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? DefaultCurrencyCode
+            : value.Trim().ToUpperInvariant();
     }
 }
