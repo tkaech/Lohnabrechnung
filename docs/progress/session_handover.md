@@ -117,7 +117,8 @@ Als naechstes die Monatserfassung in Richtung echter excel-artiger Mehrpersonenl
 - der naechste groessere Bereich ist nicht mehr nur Sollbild, sondern ein implementierter Monatsanker mit erstem UI- und Service-Schnitt
 - die naechste Session sollte diesen Schnitt mit Vertragshistorie, Statusfluss und erster Payroll-Orchestrierung zusammenfuehren
 - in `Einstellungen` gibt es jetzt einen separaten Bereich `Import`; Personendaten koennen per CSV geladen, auf echte Mitarbeitendenfelder gemappt, als Mapping gespeichert und per Personalnummer importiert werden
-- die Persistenz fuer Import-Mappings ist als eigener, typisierter Konfigurationsspeicher vorbereitet; `Stundendaten` nutzt denselben Strukturansatz derzeit nur als Platzhalter
+- die Persistenz fuer Import-Mappings ist als eigener, typisierter Konfigurationsspeicher umgesetzt; `Stundendaten` nutzt denselben Strukturansatz jetzt ebenfalls funktional
+- fuer Stundendaten existiert jetzt ein erster CSV-Import mit explizitem Importmonat, Monatsstatus, Ueberschreiben und Loeschen importierter Monate
 
 ## Risiken
 - Spezialfälle aus einzelnen Excel-Blättern können noch zusätzliche Payroll-Line-Typen oder Regeln erfordern
@@ -143,9 +144,9 @@ Als naechstes die Monatserfassung in Richtung echter excel-artiger Mehrpersonenl
 - Vertragsverwaltung deckt weiterhin nur den aktuellen bzw. neuesten Vertragsstand ab
 - Vertragshistorie ist erst fachlich vorbereitet, noch nicht als eigener Bearbeitungsfluss umgesetzt
 - Die naechste UX-Stufe fuer den Bereich ist eine echte, excel-artige Monatsliste ueber mehrere Mitarbeitende
-- Der neue Import-Bereich ist fuer Personendaten funktional, fuer Stundendaten aber noch nicht fachlich durchimplementiert
+- Der neue Import-Bereich ist fuer Personen- und einen ersten funktionalen Stundendaten-Schnitt umgesetzt; offen bleiben CSV-Vorschau, feinere Konfliktstrategien und tiefere Payroll-Anbindung
 
 ## Naechste 3 Schritte
-- Den Stundendaten-Import auf Basis der vorhandenen Mapping-Struktur fachlich eingrenzen und als ersten Zeitimport-Schnitt umsetzen
+- Den Stundenimport um Vorschau, feinere Konfliktbehandlung und robustere fachliche Rueckmeldungen pro Monat erweitern
 - Die Monatserfassung in eine echte, excel-artige Mehrpersonenliste pro Monat weiterentwickeln
 - Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln konkretisieren

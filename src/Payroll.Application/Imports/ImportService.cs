@@ -1,5 +1,6 @@
 using System.Globalization;
 using Payroll.Application.Employees;
+using Payroll.Application.MonthlyRecords;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Imports;
 
@@ -62,7 +63,6 @@ public sealed class ImportService
     private static readonly ImportFieldDefinitionDto[] TimeDataFieldDefinitions =
     [
         new("personnel_number", "Personalnummer", true),
-        new("work_date", "Datum", true),
         new("hours_worked", "Arbeitsstunden", true),
         new("night_hours", "Nachtstunden", false),
         new("sunday_hours", "Sonntagsstunden", false),
@@ -107,15 +107,21 @@ public sealed class ImportService
     private readonly IImportMappingConfigurationRepository _configurationRepository;
     private readonly ICsvImportFileReader _csvImportFileReader;
     private readonly IEmployeeRepository _employeeRepository;
+    private readonly IEmployeeMonthlyRecordRepository _monthlyRecordRepository;
+    private readonly IImportExecutionStatusRepository _importExecutionStatusRepository;
 
     public ImportService(
         IImportMappingConfigurationRepository configurationRepository,
         ICsvImportFileReader csvImportFileReader,
-        IEmployeeRepository employeeRepository)
+        IEmployeeRepository employeeRepository,
+        IEmployeeMonthlyRecordRepository monthlyRecordRepository,
+        IImportExecutionStatusRepository importExecutionStatusRepository)
     {
         _configurationRepository = configurationRepository;
         _csvImportFileReader = csvImportFileReader;
         _employeeRepository = employeeRepository;
+        _monthlyRecordRepository = monthlyRecordRepository;
+        _importExecutionStatusRepository = importExecutionStatusRepository;
     }
 
     public IReadOnlyCollection<ImportFieldDefinitionDto> GetFieldDefinitions(ImportConfigurationType type)
@@ -372,6 +378,139 @@ public sealed class ImportService
         return previewItems;
     }
 
+    public Task<IReadOnlyCollection<ImportedMonthStatusDto>> ListImportedMonthsAsync(ImportConfigurationType type, CancellationToken cancellationToken = default)
+    {
+        return _importExecutionStatusRepository.ListAsync(type, cancellationToken);
+    }
+
+    public Task<bool> IsMonthImportedAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken = default)
+    {
+        return _importExecutionStatusRepository.ExistsAsync(type, year, month, cancellationToken);
+    }
+
+    public async Task<TimeDataImportResultDto> ImportTimeDataAsync(ImportTimeDataCommand command, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var document = await _csvImportFileReader.ReadAsync(
+            new ReadCsvImportDocumentCommand(command.FilePath, command.Delimiter, command.FieldsEnclosed, command.TextQualifier),
+            cancellationToken);
+
+        var validation = ValidateMappings(ImportConfigurationType.TimeData, document.Headers, command.Mappings);
+        if (!validation.IsValid)
+        {
+            return new TimeDataImportResultDto(0, validation.Errors.Count, validation.Errors);
+        }
+
+        var alreadyImported = await _importExecutionStatusRepository.ExistsAsync(ImportConfigurationType.TimeData, command.Year, command.Month, cancellationToken);
+        if (alreadyImported && !command.OverwriteExistingMonth)
+        {
+            throw new InvalidOperationException("Fuer diesen Monat wurden bereits Stundendaten importiert.");
+        }
+
+        if (alreadyImported)
+        {
+            await _monthlyRecordRepository.DeleteTimeEntriesForMonthAsync(command.Year, command.Month, cancellationToken);
+            await _importExecutionStatusRepository.DeleteAsync(ImportConfigurationType.TimeData, command.Year, command.Month, cancellationToken);
+        }
+
+        _monthlyRecordRepository.ClearTracking();
+
+        var mappingByField = command.Mappings
+            .Where(item => !string.IsNullOrWhiteSpace(item.CsvColumnName))
+            .GroupBy(item => item.FieldKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToDictionary(item => item.FieldKey, item => new ImportFieldMappingDto(item.FieldKey, item.CsvColumnName.Trim(), item.AllowEmpty), StringComparer.OrdinalIgnoreCase);
+
+        var importedCount = 0;
+        var errors = new List<string>();
+        var workDate = new DateOnly(command.Year, command.Month, 1);
+        var rowIndex = 1;
+
+        foreach (var row in document.Rows)
+        {
+            rowIndex++;
+            if (IsEmptyRow(row))
+            {
+                continue;
+            }
+
+            var rowErrors = new List<string>();
+            var personnelNumber = GetRequiredString(row, mappingByField, "personnel_number", "Personalnummer", rowErrors);
+            var hoursWorked = GetRequiredDecimal(row, mappingByField, "hours_worked", "Arbeitsstunden", rowErrors);
+            var nightHours = GetOptionalDecimal(row, mappingByField, "night_hours", "Nachtstunden", rowErrors) ?? 0m;
+            var sundayHours = GetOptionalDecimal(row, mappingByField, "sunday_hours", "Sonntagsstunden", rowErrors) ?? 0m;
+            var holidayHours = GetOptionalDecimal(row, mappingByField, "holiday_hours", "Feiertagsstunden", rowErrors) ?? 0m;
+            var vehicleP1 = GetOptionalDecimal(row, mappingByField, "vehicle_p1", "Pauschalzone 1", rowErrors) ?? 0m;
+            var vehicleP2 = GetOptionalDecimal(row, mappingByField, "vehicle_p2", "Pauschalzone 2", rowErrors) ?? 0m;
+            var vehicleR1 = GetOptionalDecimal(row, mappingByField, "vehicle_r1", "Regiezone 1", rowErrors) ?? 0m;
+            var note = GetOptionalString(row, mappingByField, "note");
+
+            if (rowErrors.Count > 0)
+            {
+                errors.Add($"Zeile {rowIndex}: {string.Join(" | ", rowErrors)}");
+                continue;
+            }
+
+            var employee = await _employeeRepository.GetByPersonnelNumberAsync(personnelNumber!, cancellationToken);
+            if (employee is null)
+            {
+                errors.Add($"Zeile {rowIndex}: Personalnummer `{personnelNumber}` wurde nicht gefunden.");
+                continue;
+            }
+
+            try
+            {
+                var monthlyRecord = await _monthlyRecordRepository.GetOrCreateAsync(employee.EmployeeId, command.Year, command.Month, cancellationToken);
+                var isNewEntry = monthlyRecord.TimeEntries.Count == 0;
+                var timeEntry = monthlyRecord.SaveTimeEntry(
+                    null,
+                    workDate,
+                    hoursWorked!.Value,
+                    nightHours,
+                    sundayHours,
+                    holidayHours,
+                    vehicleP1,
+                    vehicleP2,
+                    vehicleR1,
+                    note);
+
+                if (isNewEntry)
+                {
+                    _monthlyRecordRepository.MarkAsAdded(timeEntry);
+                }
+
+                importedCount++;
+            }
+            catch (Exception exception)
+            {
+                errors.Add($"Zeile {rowIndex}: {BuildImportErrorMessage(exception)}");
+            }
+        }
+
+        await _monthlyRecordRepository.SaveChangesAsync(cancellationToken);
+
+        if (importedCount > 0)
+        {
+            await _importExecutionStatusRepository.MarkImportedAsync(
+                ImportConfigurationType.TimeData,
+                command.Year,
+                command.Month,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+        }
+
+        var messages = new List<string> { $"{importedCount} importiert." };
+        messages.AddRange(errors);
+        return new TimeDataImportResultDto(importedCount, errors.Count, messages);
+    }
+
+    public async Task DeleteImportedTimeMonthAsync(int year, int month, CancellationToken cancellationToken = default)
+    {
+        await _monthlyRecordRepository.DeleteTimeEntriesForMonthAsync(year, month, cancellationToken);
+        await _importExecutionStatusRepository.DeleteAsync(ImportConfigurationType.TimeData, year, month, cancellationToken);
+    }
+
     private static bool IsEmptyRow(IReadOnlyDictionary<string, string> row)
     {
         return row.Values.All(value => string.IsNullOrWhiteSpace(value));
@@ -588,6 +727,63 @@ public sealed class ImportService
         return mappingByField.TryGetValue(fieldKey, out var mapping) && mapping.AllowEmpty;
     }
 
+    private static decimal? GetRequiredDecimal(
+        IReadOnlyDictionary<string, string> row,
+        IReadOnlyDictionary<string, ImportFieldMappingDto> mappingByField,
+        string fieldKey,
+        string label,
+        ICollection<string> errors)
+    {
+        var value = GetOptionalString(row, mappingByField, fieldKey);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (!IsEmptyAllowed(mappingByField, fieldKey))
+            {
+                errors.Add($"Muss-Feld `{label}` ist in der CSV-Zeile leer.");
+            }
+
+            return null;
+        }
+
+        if (!TryParseDecimal(value, out var parsed))
+        {
+            if (!IsEmptyAllowed(mappingByField, fieldKey))
+            {
+                errors.Add($"`{label}` hat kein gueltiges Zahlenformat.");
+            }
+
+            return null;
+        }
+
+        return parsed;
+    }
+
+    private static decimal? GetOptionalDecimal(
+        IReadOnlyDictionary<string, string> row,
+        IReadOnlyDictionary<string, ImportFieldMappingDto> mappingByField,
+        string fieldKey,
+        string label,
+        ICollection<string> errors)
+    {
+        var value = GetOptionalString(row, mappingByField, fieldKey);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!TryParseDecimal(value, out var parsed))
+        {
+            if (!IsEmptyAllowed(mappingByField, fieldKey))
+            {
+                errors.Add($"`{label}` hat kein gueltiges Zahlenformat.");
+            }
+
+            return null;
+        }
+
+        return parsed;
+    }
+
     private static decimal ResolveHourlyRate(EmployeeDetailsDto? existingEmployee)
     {
         return existingEmployee?.HourlyRateChf > 0m
@@ -651,6 +847,28 @@ public sealed class ImportService
                 parsed = false;
                 return false;
         }
+    }
+
+    private static bool TryParseDecimal(string value, out decimal parsed)
+    {
+        foreach (var culture in SupportedCultures)
+        {
+            if (decimal.TryParse(value, NumberStyles.Number, culture, out parsed))
+            {
+                return true;
+            }
+        }
+
+        var normalized = value.Replace("'", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal);
+
+        if (decimal.TryParse(normalized.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out parsed))
+        {
+            return true;
+        }
+
+        parsed = default;
+        return false;
     }
 
     private static bool TryParseWageType(string value, out EmployeeWageType wageType)

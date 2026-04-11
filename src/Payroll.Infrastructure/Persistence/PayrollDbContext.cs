@@ -25,6 +25,7 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
     public DbSet<ImportMappingConfiguration> ImportMappingConfigurations => Set<ImportMappingConfiguration>();
+    public DbSet<ImportExecutionStatus> ImportExecutionStatuses => Set<ImportExecutionStatus>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -167,6 +168,17 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(configuration => configuration.TextQualifier).HasMaxLength(1).IsRequired();
             builder.Property(configuration => configuration.FieldMappingsJson).HasMaxLength(20000).IsRequired();
             builder.HasIndex(configuration => new { configuration.Type, configuration.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ImportExecutionStatus>(builder =>
+        {
+            builder.ToTable("ImportExecutionStatuses");
+            builder.HasKey(status => status.Id);
+            builder.Property(status => status.Type).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(status => status.Year).IsRequired();
+            builder.Property(status => status.Month).IsRequired();
+            builder.Property(status => status.ImportedAtUtc).IsRequired();
+            builder.HasIndex(status => new { status.Type, status.Year, status.Month }).IsUnique();
         });
 
         modelBuilder.Entity<EmployeeMonthlyRecord>(builder =>

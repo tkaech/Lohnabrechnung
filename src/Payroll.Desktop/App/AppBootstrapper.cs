@@ -30,13 +30,14 @@ public sealed class AppBootstrapper
         var repository = new EmployeeRepository(dbContext);
         var employeeService = new EmployeeService(repository);
         var importMappingConfigurationRepository = new ImportMappingConfigurationRepository(dbContext);
+        var importExecutionStatusRepository = new ImportExecutionStatusRepository(dbContext);
         var csvImportFileReader = new CsvImportFileReader();
-        var importService = new ImportService(importMappingConfigurationRepository, csvImportFileReader, repository);
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        var importService = new ImportService(importMappingConfigurationRepository, csvImportFileReader, repository, monthlyRecordRepository, importExecutionStatusRepository);
         var payrollSettingsRepository = new PayrollSettingsRepository(dbContext);
         var payrollSettingsService = new PayrollSettingsService(payrollSettingsRepository);
         EnsureConfigurationSeeded(payrollSettingsService);
         EnsureTestDataSeeded(dbContext, runtimeOptions.SeedTestData);
-        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
         var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
         var backupRestoreService = new BackupRestoreService(() => CreateDbContext(databasePath), employeeService, monthlyRecordService, payrollSettingsService, backupDirectory);
@@ -222,7 +223,8 @@ public sealed class AppBootstrapper
             return TableExists(connection, "PayrollSettings")
                    && TableExists(connection, "Employees")
                    && TableExists(connection, "EmployeeMonthlyRecords")
-                   && TableExists(connection, "ImportMappingConfigurations");
+                   && TableExists(connection, "ImportMappingConfigurations")
+                   && TableExists(connection, "ImportExecutionStatuses");
         }
         finally
         {
@@ -455,6 +457,25 @@ public sealed class AppBootstrapper
                 connection,
                 "IX_ImportMappingConfigurations_Type_Name",
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ImportMappingConfigurations_Type_Name\" ON \"ImportMappingConfigurations\" (\"Type\", \"Name\");");
+
+            EnsureTable(
+                connection,
+                "ImportExecutionStatuses",
+                """
+                CREATE TABLE IF NOT EXISTS "ImportExecutionStatuses" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_ImportExecutionStatuses" PRIMARY KEY,
+                    "Type" TEXT NOT NULL,
+                    "Year" INTEGER NOT NULL,
+                    "Month" INTEGER NOT NULL,
+                    "ImportedAtUtc" TEXT NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NULL
+                );
+                """);
+            EnsureIndex(
+                connection,
+                "IX_ImportExecutionStatuses_Type_Year_Month",
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ImportExecutionStatuses_Type_Year_Month\" ON \"ImportExecutionStatuses\" (\"Type\", \"Year\", \"Month\");");
         }
         finally
         {

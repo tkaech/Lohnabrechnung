@@ -226,6 +226,21 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteTimeEntriesForMonthAsync(int year, int month, CancellationToken cancellationToken)
+    {
+        var entries = await _dbContext.TimeEntries
+            .Where(entry => entry.WorkDate.Year == year && entry.WorkDate.Month == month)
+            .ToListAsync(cancellationToken);
+
+        if (entries.Count == 0)
+        {
+            return;
+        }
+
+        _dbContext.TimeEntries.RemoveRange(entries);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public void ClearTracking()
     {
         _dbContext.ChangeTracker.Clear();

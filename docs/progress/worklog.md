@@ -145,3 +145,9 @@ Projekt neu strukturiert
 - Personendaten-Import ueber Application-/Infrastructure-Schicht umgesetzt; Pflichtfeldpruefung, Header-Erkennung, Mapping-Speichern/Laden und Upsert per Personalnummer ergänzt
 - neue Tests fuer Mapping-Persistenz, CSV-Header, Muss-Felder und Personendaten-Upsert ergänzt
 - `dotnet build Lohnabrechnung.sln -m:1` erfolgreich ausgeführt; `dotnet test` bleibt in der Sandbox weiterhin am VSTest-Socket blockiert
+- `Einstellungen > Import > Stundendaten` von Platzhalter auf funktionalen CSV-Import erweitert
+- erster Stundendaten-Import verwendet den in der UI gewaelten Monat als Importkontext; CSV selbst liefert dafuer kein Datum
+- Importstatus je Monat in eigener Persistenz eingefuehrt, damit erneuter Import erkannt, bestaetigt ueberschrieben und ein importierter Monat wieder geloescht werden kann
+- Stundendaten-UI um CSV-Auswahl, Mapping speichern/laden, suchbare Spaltenzuordnung, Monatswahl, Liste importierter Monate und Bestaetigungsdialoge fuer Ueberschreiben/Loeschen erweitert
+- Application-Tests fuer Monatskontext, Importstatus, Ueberschreiben und Loeschen sowie ViewModel-Tests fuer Monatswahl und Mapping-Ladefluss ergänzt
+- `dotnet build Lohnabrechnung.sln -m:1` nach dem Stundenimport erfolgreich; `dotnet test tests/Payroll.Application.Tests/Payroll.Application.Tests.csproj --no-build -m:1` in der Sandbox weiter durch `SocketException (13): Permission denied` blockiert

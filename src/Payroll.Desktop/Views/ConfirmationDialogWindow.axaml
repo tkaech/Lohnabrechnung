@@ -1,0 +1,20 @@
+<Window
+    x:Class="Payroll.Desktop.Views.ConfirmationDialogWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="{Binding DialogTitle}"
+    Width="560"
+    Height="220"
+    MinWidth="420"
+    MinHeight="180"
+    Background="{DynamicResource Theme.Color.AppBackground}">
+  <Grid RowDefinitions="*,Auto" Margin="20">
+    <TextBlock Text="{Binding DialogMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="0,16,0,0">
+      <TextBlock />
+      <Button Grid.Column="1" Margin="12,0,0,0" Content="Abbrechen" Click="OnCancelClick" />
+      <Button Grid.Column="2" Margin="12,0,0,0" Classes="primary-action" Content="{Binding ConfirmButtonText}" Click="OnConfirmClick" />
+    </Grid>
+  </Grid>
+</Window>

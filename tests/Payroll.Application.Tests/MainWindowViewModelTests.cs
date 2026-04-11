@@ -494,7 +494,9 @@ public sealed class MainWindowViewModelTests
         var importService = new ImportService(
             importRepository,
             new InMemoryCsvImportFileReader(),
-            employeeRepository);
+            employeeRepository,
+            new InMemoryMonthlyRecordRepository(),
+            new InMemoryImportExecutionStatusRepository());
         var viewModel = new MainWindowViewModel(
             new EmployeeService(employeeRepository),
             importService,
@@ -523,6 +525,91 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Personalnummer", viewModel.PersonImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn);
     }
 
+    [Fact]
+    public async Task TimeImport_RequiresMonthSelectionBeforeImportIsEnabled()
+    {
+        var repository = new TestEmployeeRepository();
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+
+        viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
+        foreach (var row in viewModel.TimeImportFieldMappings)
+        {
+            if (row.FieldKey == "personnel_number")
+            {
+                row.ApplyAvailableCsvColumns(["Personalnummer", "Stunden"]);
+                row.SelectedCsvColumn = "Personalnummer";
+            }
+            else if (row.FieldKey == "hours_worked")
+            {
+                row.ApplyAvailableCsvColumns(["Personalnummer", "Stunden"]);
+                row.SelectedCsvColumn = "Stunden";
+            }
+        }
+
+        viewModel.TimeImportMonth = null;
+
+        Assert.False(viewModel.CanImportTimeData);
+    }
+
+    [Fact]
+    public async Task SelectingSavedTimeImportConfiguration_LoadsItImmediately()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var importRepository = new InMemoryImportMappingConfigurationRepository();
+        await importRepository.SaveAsync(
+            new SaveImportConfigurationCommand(
+                null,
+                ImportConfigurationType.TimeData,
+                "Stunden CSV",
+                ";",
+                true,
+                "\"",
+                [
+                    new ImportFieldMappingDto("personnel_number", "Personalnummer", false),
+                    new ImportFieldMappingDto("hours_worked", "Stunden", false)
+                ]),
+            CancellationToken.None);
+
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = new ImportService(
+            importRepository,
+            new InMemoryCsvImportFileReader(),
+            employeeRepository,
+            new InMemoryMonthlyRecordRepository(),
+            new InMemoryImportExecutionStatusRepository());
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+
+        var savedItem = viewModel.TimeImportConfigurations.Single(item => item.Name == "Stunden CSV");
+        viewModel.TimeImportConfigurationName = string.Empty;
+        viewModel.SelectedTimeImportConfiguration = savedItem;
+
+        await WaitUntilAsync(() => viewModel.TimeImportConfigurationName == "Stunden CSV");
+
+        Assert.Equal("Stunden CSV", viewModel.TimeImportConfigurationName);
+        Assert.Contains("geladen", viewModel.TimeImportStatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Personalnummer", viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn);
+        Assert.Equal("Stunden", viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn);
+    }
+
     private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository)
     {
         var settingsRepository = new InMemoryPayrollSettingsRepository();
@@ -549,7 +636,9 @@ public sealed class MainWindowViewModelTests
         return new ImportService(
             new InMemoryImportMappingConfigurationRepository(),
             new InMemoryCsvImportFileReader(),
-            employeeRepository);
+            employeeRepository,
+            new InMemoryMonthlyRecordRepository(),
+            new InMemoryImportExecutionStatusRepository());
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
@@ -877,12 +966,40 @@ public sealed class MainWindowViewModelTests
             return Task.CompletedTask;
         }
 
+        public Task DeleteTimeEntriesForMonthAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
         public void ClearTracking()
         {
         }
 
         public void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class
         {
+        }
+    }
+
+    private sealed class InMemoryImportExecutionStatusRepository : IImportExecutionStatusRepository
+    {
+        public Task<bool> ExistsAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task MarkImportedAsync(ImportConfigurationType type, int year, int month, DateTimeOffset importedAtUtc, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyCollection<ImportedMonthStatusDto>> ListAsync(ImportConfigurationType type, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<ImportedMonthStatusDto>>([]);
         }
     }
 
