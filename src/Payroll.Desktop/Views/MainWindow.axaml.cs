@@ -218,6 +218,22 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void OnPayrollPreviewDerivationGroupInitialized(object? sender, EventArgs e)
+    {
+        if (sender is not Expander expander || expander.Tag is not string title)
+        {
+            return;
+        }
+
+        expander.IsExpanded = title switch
+        {
+            "Eingaben" => true,
+            "Regeln / Saetze" => false,
+            "Rechenschritte" => false,
+            _ => false
+        };
+    }
+
     private async void OnBrowseBackupDirectoryClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel viewModel)

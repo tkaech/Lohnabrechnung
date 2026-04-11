@@ -40,6 +40,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _previewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
     private string _payrollPreviewTitle = "Lohn-Voransicht";
     private string _payrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
+    private bool _isPayrollPreviewDerivationVisible;
     private bool _isTimeMonthPickerOpen;
     private bool _isExpenseMonthPickerOpen;
     private bool _isTimeDatePickerOpen;
@@ -68,6 +69,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewRows = [];
         PreviewNotes = [];
         PayrollPreviewLines = [];
+        PayrollPreviewDerivationGroups = [];
         PayrollPreviewNotes = [];
         LoadMonthlyRecordCommand = new DelegateCommand(LoadAsync, () => CanManageRecord);
         NewTimeEntryCommand = new DelegateCommand(PrepareNewTimeEntry, () => CanManageRecord);
@@ -84,6 +86,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public ObservableCollection<MonthlyPreviewRowViewModel> PreviewRows { get; }
     public ObservableCollection<string> PreviewNotes { get; }
     public ObservableCollection<MonthlyPayrollPreviewLineDto> PayrollPreviewLines { get; }
+    public ObservableCollection<MonthlyPayrollPreviewDerivationGroupDto> PayrollPreviewDerivationGroups { get; }
     public ObservableCollection<string> PayrollPreviewNotes { get; }
     public DelegateCommand LoadMonthlyRecordCommand { get; }
     public DelegateCommand NewTimeEntryCommand { get; }
@@ -342,6 +345,24 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     }
 
     public bool HasPayrollPreviewLines => PayrollPreviewLines.Count > 0;
+    public bool HasPayrollPreviewDerivationGroups => PayrollPreviewDerivationGroups.Any(group => group.HasItems);
+    public bool IsPayrollPreviewDerivationVisible
+    {
+        get => _isPayrollPreviewDerivationVisible;
+        set
+        {
+            if (SetProperty(ref _isPayrollPreviewDerivationVisible, value))
+            {
+                RaisePropertyChanged(nameof(ShowPayrollPreviewDerivation));
+                RaisePropertyChanged(nameof(ShowPayrollPreviewResultOnly));
+                RaisePropertyChanged(nameof(ShowPayrollPreviewSplitView));
+            }
+        }
+    }
+
+    public bool ShowPayrollPreviewDerivation => IsPayrollPreviewDerivationVisible && HasPayrollPreviewDerivationGroups;
+    public bool ShowPayrollPreviewResultOnly => HasPayrollPreviewLines && !ShowPayrollPreviewDerivation;
+    public bool ShowPayrollPreviewSplitView => HasPayrollPreviewLines && ShowPayrollPreviewDerivation;
 
     public string TimeDate
     {
@@ -519,7 +540,13 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewRows.Clear();
         PreviewNotes.Clear();
         PayrollPreviewLines.Clear();
+        PayrollPreviewDerivationGroups.Clear();
         PayrollPreviewNotes.Clear();
+        RaisePropertyChanged(nameof(HasPayrollPreviewLines));
+        RaisePropertyChanged(nameof(HasPayrollPreviewDerivationGroups));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewDerivation));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewResultOnly));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewSplitView));
         PrepareNewTimeEntry();
         PrepareNewExpenseEntry();
     }
@@ -808,11 +835,22 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         _rawPayrollPreviewLines = details.PayrollPreview.Lines.ToArray();
         RefreshVisiblePayrollPreviewLines();
 
+        PayrollPreviewDerivationGroups.Clear();
+        foreach (var group in details.PayrollPreview.DerivationGroups)
+        {
+            PayrollPreviewDerivationGroups.Add(group);
+        }
+
         PayrollPreviewNotes.Clear();
         foreach (var note in details.PayrollPreview.Notes)
         {
             PayrollPreviewNotes.Add(note);
         }
+
+        RaisePropertyChanged(nameof(HasPayrollPreviewDerivationGroups));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewDerivation));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewResultOnly));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewSplitView));
 
         TimeCaptureChanged?.Invoke(this, EventArgs.Empty);
 
@@ -904,8 +942,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PreviewNotes.Clear();
         _rawPayrollPreviewLines = [];
         PayrollPreviewLines.Clear();
+        PayrollPreviewDerivationGroups.Clear();
         PayrollPreviewNotes.Clear();
         RaisePropertyChanged(nameof(HasPayrollPreviewLines));
+        RaisePropertyChanged(nameof(HasPayrollPreviewDerivationGroups));
         TimeCaptureChanged?.Invoke(this, EventArgs.Empty);
         PrepareNewExpenseEntry();
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
@@ -937,6 +977,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
 
         RaisePropertyChanged(nameof(HasPayrollPreviewLines));
+        RaisePropertyChanged(nameof(HasPayrollPreviewDerivationGroups));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewDerivation));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewResultOnly));
+        RaisePropertyChanged(nameof(ShowPayrollPreviewSplitView));
     }
 
     private string? ResolveVisiblePayrollPreviewDetail(MonthlyPayrollPreviewLineDto line)

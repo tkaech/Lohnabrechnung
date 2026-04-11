@@ -91,14 +91,42 @@ public sealed record MonthlyPayrollPreviewLineDto(
     string RateDisplay,
     string AmountDisplay,
     string? Detail,
-    bool IsEmphasized)
+    bool IsEmphasized,
+    string? LinkKey = null,
+    string? DisplayTag = null,
+    string? ColorHint = null)
 {
     public bool IsRegular => !IsEmphasized;
     public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
+    public bool HasDisplayTag => !string.IsNullOrWhiteSpace(DisplayTag);
+}
+
+public sealed record MonthlyPayrollPreviewDerivationItemDto(
+    string StepId,
+    string KindLabel,
+    string Label,
+    string ValueDisplay,
+    string? FormulaDisplay,
+    string? Detail,
+    string? LinkKey,
+    string? DisplayTag,
+    string? ColorHint)
+{
+    public bool HasFormula => !string.IsNullOrWhiteSpace(FormulaDisplay);
+    public bool HasDetail => !string.IsNullOrWhiteSpace(Detail);
+    public bool HasDisplayTag => !string.IsNullOrWhiteSpace(DisplayTag);
+}
+
+public sealed record MonthlyPayrollPreviewDerivationGroupDto(
+    string Title,
+    IReadOnlyCollection<MonthlyPayrollPreviewDerivationItemDto> Items)
+{
+    public bool HasItems => Items.Count > 0;
 }
 
 public sealed record MonthlyPayrollPreviewDto(
     IReadOnlyCollection<MonthlyPayrollPreviewLineDto> Lines,
+    IReadOnlyCollection<MonthlyPayrollPreviewDerivationGroupDto> DerivationGroups,
     IReadOnlyCollection<string> Notes);
 
 public sealed record MonthlyRecordDetailsDto(

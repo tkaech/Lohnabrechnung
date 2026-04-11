@@ -320,7 +320,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var timeEntries = monthlyRecord.TimeEntries.OrderBy(entry => entry.WorkDate).ToArray();
         if (timeEntries.Length == 0)
         {
-            return new MonthlyPayrollPreviewDto([], ["Monat noch nicht erfasst"]);
+            return new MonthlyPayrollPreviewDto([], [], ["Monat noch nicht erfasst"]);
         }
 
         var lines = new List<MonthlyPayrollPreviewLineDto>();
@@ -388,7 +388,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             contract is null ? "-" : FormatMoney(contract.HourlyRateChf, numberCulture, currencyCode),
             FormatAmount(baseLine?.AmountChf, numberCulture, currencyCode),
             null,
-            false));
+            false,
+            "BASE",
+            "BAS",
+            GetPreviewColorHint("BASE")));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.TimeSupplementCode,
@@ -403,7 +406,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             supplementLines.Length == 0
                 ? "Noch nicht vollstaendig ableitbar oder keine zuschlagspflichtigen Stunden im Monat."
                 : BuildSupplementDetail(supplementLines, numberCulture, currencyCode),
-            false));
+            false,
+            "TIME_SUPPLEMENTS",
+            "ZT",
+            GetPreviewColorHint("TIME_SUPPLEMENTS")));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.SpecialSupplementCode,
@@ -416,7 +422,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 : contract.SpecialSupplementRateChf > 0m
                     ? "Arbeitsstunden multipliziert mit dem vertraglichen Spezialzuschlag."
                     : "Im aktuellen Vertragsstand ist kein Spezialzuschlag hinterlegt.",
-            false));
+            false,
+            "SPECIAL_CONTRACT",
+            "SZ",
+            GetPreviewColorHint("SPECIAL_CONTRACT")));
 
         lines.Add(BuildVehiclePreviewLine(
             PayrollPreviewHelpCatalog.VehiclePauschalzone1Code,
@@ -424,6 +433,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf),
             payrollSettings.VehiclePauschalzone1RateChf,
             timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf) * payrollSettings.VehiclePauschalzone1RateChf,
+            "VEHICLE_P1",
+            "P1",
             numberCulture,
             currencyCode));
 
@@ -433,6 +444,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf),
             payrollSettings.VehiclePauschalzone2RateChf,
             timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf) * payrollSettings.VehiclePauschalzone2RateChf,
+            "VEHICLE_P2",
+            "P2",
             numberCulture,
             currencyCode));
 
@@ -442,6 +455,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             timeEntries.Sum(entry => entry.VehicleRegiezone1Chf),
             payrollSettings.VehicleRegiezone1RateChf,
             timeEntries.Sum(entry => entry.VehicleRegiezone1Chf) * payrollSettings.VehicleRegiezone1RateChf,
+            "VEHICLE_R1",
+            "R1",
             numberCulture,
             currencyCode));
 
@@ -452,7 +467,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             FormatAmount(contract is null ? null : subtotalChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Summe der aktuell fachlich ableitbaren lohnrelevanten Positionen.",
-            true));
+            true,
+            "SUBTOTAL",
+            "SUB",
+            GetPreviewColorHint("SUBTOTAL")));
 
         var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, monthlyRecord.PeriodEnd);
 
@@ -467,7 +485,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 : employeeBirthDate.HasValue
                     ? "Automatisch nach Alter aus Geburtsdatum und gespeicherten Monatsparametern gewaehlt."
                     : "Ohne Geburtsdatum wird der Standardsatz aus den gespeicherten Monatsparametern verwendet.",
-            false));
+            false,
+            "VACATION_COMP",
+            "FER",
+            GetPreviewColorHint("VACATION_COMP")));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.AhvGrossCode,
@@ -476,12 +497,15 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             FormatAmount(contract is null ? null : ahvGrossChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen und Fahrzeitentschaedigung.",
-            true));
+            true,
+            "AHV_GROSS",
+            "BRU",
+            GetPreviewColorHint("AHV_GROSS")));
 
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, numberCulture, currencyCode));
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AlvCode, "ALV", derivationLines, "ALV", payrollSettings.AlvRate, numberCulture, currencyCode));
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, numberCulture, currencyCode));
-        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, "AHV_IV_EO", "AHV", numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AlvCode, "ALV", derivationLines, "ALV", payrollSettings.AlvRate, "ALV", "ALV", numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, "KTG_UVG", "UVG", numberCulture, currencyCode));
+        lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, "AUSBILDUNG_FERIEN", "AW", numberCulture, currencyCode));
 
         var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
         if (bvgLine is not null)
@@ -493,7 +517,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 "-",
                 FormatAmount(bvgLine.AmountChf, numberCulture, currencyCode),
                 "Aus dem aktuellen Vertragsstand.",
-                false));
+                false,
+                "BVG",
+                "BVG",
+                GetPreviewColorHint("BVG")));
         }
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
@@ -503,7 +530,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             FormatAmount(contract is null ? null : totalChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Netto aus lohnrelevanten Positionen und Abzuegen ohne Spesen.",
-            true));
+            true,
+            "TOTAL",
+            "TOT",
+            GetPreviewColorHint("TOTAL")));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.ExpensesCode,
@@ -512,7 +542,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             FormatMoney(expensesChf, numberCulture, currencyCode),
             expensesChf > 0m ? "Direkt aus dem monatlichen Spesenblock." : null,
-            false));
+            false,
+            "EXPENSES",
+            "SPS",
+            GetPreviewColorHint("EXPENSES")));
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.TotalPayoutCode,
@@ -521,7 +554,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "gerundet auf 0.05",
             FormatAmount(contract is null ? null : totalPayoutChf, numberCulture, currencyCode),
             contract is null ? "Ohne gueltigen Vertrag nicht vollstaendig ableitbar." : "Summe aus Total und Spesen, analog Excel-Vorlage auf 5 Rappen gerundet.",
-            true));
+            true,
+            "TOTAL_PAYOUT",
+            "AUS",
+            GetPreviewColorHint("TOTAL_PAYOUT")));
 
         if (workSummary.SpecialHours == 0m)
         {
@@ -547,7 +583,24 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             })
             .ToArray();
 
-        return new MonthlyPayrollPreviewDto(filteredLines, notes);
+        var derivationGroups = BuildPayrollPreviewDerivationGroups(
+            monthlyRecord.PeriodEnd,
+            employeeBirthDate,
+            contract,
+            payrollSettings,
+            workSummary,
+            timeEntries,
+            derivationLines,
+            derivationResult?.Issues ?? [],
+            subtotalChf,
+            ahvGrossChf,
+            totalChf,
+            expensesChf,
+            totalPayoutChf,
+            numberCulture,
+            currencyCode);
+
+        return new MonthlyPayrollPreviewDto(filteredLines, derivationGroups, notes);
     }
 
     private async Task<IReadOnlyCollection<MonthlyPreviewRowDto>> BuildPreviewRowsAsync(Guid employeeId, CancellationToken cancellationToken)
@@ -674,6 +727,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         decimal quantity,
         decimal rateChf,
         decimal amountChf,
+        string linkKey,
+        string displayTag,
         CultureInfo numberCulture,
         string currencyCode)
     {
@@ -686,7 +741,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             quantity > 0m && rateChf <= 0m
                 ? "Menge vorhanden, aber kein zentraler CHF-Ansatz in den Einstellungen gepflegt."
                 : null,
-            false);
+            false,
+            linkKey,
+            displayTag,
+            GetPreviewColorHint(linkKey));
     }
 
     private static MonthlyPayrollPreviewLineDto BuildNamedAmountLine(
@@ -695,6 +753,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         IEnumerable<PayrollRunLine> derivationLines,
         string code,
         decimal rate,
+        string linkKey,
+        string displayTag,
         CultureInfo numberCulture,
         string currencyCode)
     {
@@ -706,7 +766,157 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             matchingLine is null ? "-" : FormatPercentageRate(rate, numberCulture),
             FormatAmount(matchingLine?.AmountChf, numberCulture, currencyCode),
             null,
-            false);
+            false,
+            linkKey,
+            displayTag,
+            GetPreviewColorHint(linkKey));
+    }
+
+    private static IReadOnlyCollection<MonthlyPayrollPreviewDerivationGroupDto> BuildPayrollPreviewDerivationGroups(
+        DateOnly payrollReferenceDate,
+        DateOnly? employeeBirthDate,
+        Domain.Employees.EmploymentContract? contract,
+        PayrollSettings payrollSettings,
+        PayrollWorkSummary workSummary,
+        IReadOnlyCollection<Domain.TimeTracking.TimeEntry> timeEntries,
+        IReadOnlyCollection<PayrollRunLine> derivationLines,
+        IReadOnlyCollection<PayrollDerivationIssue> derivationIssues,
+        decimal subtotalChf,
+        decimal ahvGrossChf,
+        decimal totalChf,
+        decimal expensesChf,
+        decimal totalPayoutChf,
+        CultureInfo numberCulture,
+        string currencyCode)
+    {
+        if (contract is null)
+        {
+            return
+            [
+                new MonthlyPayrollPreviewDerivationGroupDto(
+                    "Hinweise / Konflikte",
+                    [
+                        CreateDerivationItem(
+                            "ISSUE_CONTRACT",
+                            "Hinweis",
+                            "Kein gueltiger Vertragsstand",
+                            "Lohn-Voransicht kann nur teilweise aufgebaut werden.",
+                            null,
+                            "Ohne gueltigen Vertrag bleiben ableitbare Lohnpositionen, Totale und Abzuege offen.",
+                            "ISSUE")
+                    ])
+            ];
+        }
+
+        var supplementLines = derivationLines
+            .Where(line => line.LineType is PayrollLineType.NightSupplement or PayrollLineType.SundaySupplement or PayrollLineType.HolidaySupplement)
+            .ToArray();
+        var specialSupplementLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.SpecialSupplement);
+        var vacationCompensationLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.VacationCompensation);
+        var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
+        var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, payrollReferenceDate);
+        var inputs = new List<MonthlyPayrollPreviewDerivationItemDto>
+        {
+            CreateDerivationItem("INPUT_BASE_HOURS", "Eingabe", "Arbeitsstunden", $"{FormatQuantity(workSummary.WorkHours, numberCulture)} h", null, "Aus den Zeiteintraegen des gewaelten Monats.", "BASE"),
+            CreateDerivationItem("INPUT_NIGHT_HOURS", "Eingabe", "Nachtstunden", $"{FormatQuantity(workSummary.NightHours, numberCulture)} h", null, "Zuschlagspflichtige Nachtstunden aus der Monatserfassung.", "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("INPUT_SUNDAY_HOURS", "Eingabe", "Sonntagsstunden", $"{FormatQuantity(workSummary.SundayHours, numberCulture)} h", null, "Zuschlagspflichtige Sonntagsstunden aus der Monatserfassung.", "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("INPUT_HOLIDAY_HOURS", "Eingabe", "Feiertagsstunden", $"{FormatQuantity(workSummary.HolidayHours, numberCulture)} h", null, "Zuschlagspflichtige Feiertagsstunden aus der Monatserfassung.", "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("INPUT_VEHICLE_P1", "Eingabe", "Pauschalzone 1 Menge", FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf), numberCulture), null, "Monatssumme aus den erfassten Zeitzeilen.", "VEHICLE_P1"),
+            CreateDerivationItem("INPUT_VEHICLE_P2", "Eingabe", "Pauschalzone 2 Menge", FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf), numberCulture), null, "Monatssumme aus den erfassten Zeitzeilen.", "VEHICLE_P2"),
+            CreateDerivationItem("INPUT_VEHICLE_R1", "Eingabe", "Regiezone 1 Menge", FormatQuantity(timeEntries.Sum(entry => entry.VehicleRegiezone1Chf), numberCulture), null, "Monatssumme aus den erfassten Zeitzeilen.", "VEHICLE_R1"),
+            CreateDerivationItem("INPUT_EXPENSES", "Eingabe", "Spesenblock", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock.", "EXPENSES")
+        };
+
+        var rules = new List<MonthlyPayrollPreviewDerivationItemDto>
+        {
+            CreateDerivationItem("RULE_HOURLY_RATE", "Regel", "Stundenlohn", FormatMoney(contract.HourlyRateChf, numberCulture, currencyCode), null, "Aus dem gueltigen Vertragsstand des Monats.", "BASE"),
+            CreateDerivationItem("RULE_SPECIAL_RATE", "Regel", "Spezialzuschlag gemaess Vertrag", FormatMoney(contract.SpecialSupplementRateChf, numberCulture, currencyCode), null, contract.SpecialSupplementRateChf > 0m ? "Vertraglicher CHF-Betrag pro Arbeitsstunde." : "Im Vertragsstand ist kein Spezialzuschlag hinterlegt.", "SPECIAL_CONTRACT"),
+            CreateDerivationItem("RULE_NIGHT_RATE", "Regel", "Nachtzuschlagssatz", FormatOptionalPercentageRate(payrollSettings.WorkTimeSupplementSettings.NightSupplementRate, numberCulture), null, "Gespeicherter Monatsparameter fuer Nachtzuschlag.", "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("RULE_SUNDAY_RATE", "Regel", "Sonntagszuschlagssatz", FormatOptionalPercentageRate(payrollSettings.WorkTimeSupplementSettings.SundaySupplementRate, numberCulture), null, "Gespeicherter Monatsparameter fuer Sonntagszuschlag.", "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("RULE_HOLIDAY_RATE", "Regel", "Feiertagszuschlagssatz", FormatOptionalPercentageRate(payrollSettings.WorkTimeSupplementSettings.HolidaySupplementRate, numberCulture), null, "Gespeicherter Monatsparameter fuer Feiertagszuschlag.", "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("RULE_VACATION_RATE", "Regel", "Ferienentschaedigungssatz", FormatPercentageRate(effectiveVacationCompensationRate, numberCulture), null, employeeBirthDate.HasValue ? "Automatisch nach Alter und gespeichertem Monatsparameter gewaehlt." : "Standardsatz aus dem gespeicherten Monatsparameter-Snapshot.", "VACATION_COMP"),
+            CreateDerivationItem("RULE_VEHICLE_P1_RATE", "Regel", "Pauschalzone 1 Ansatz", FormatMoney(payrollSettings.VehiclePauschalzone1RateChf, numberCulture, currencyCode), null, "Globaler CHF-Ansatz aus dem gespeicherten Monatsparameter-Snapshot.", "VEHICLE_P1"),
+            CreateDerivationItem("RULE_VEHICLE_P2_RATE", "Regel", "Pauschalzone 2 Ansatz", FormatMoney(payrollSettings.VehiclePauschalzone2RateChf, numberCulture, currencyCode), null, "Globaler CHF-Ansatz aus dem gespeicherten Monatsparameter-Snapshot.", "VEHICLE_P2"),
+            CreateDerivationItem("RULE_VEHICLE_R1_RATE", "Regel", "Regiezone 1 Ansatz", FormatMoney(payrollSettings.VehicleRegiezone1RateChf, numberCulture, currencyCode), null, "Globaler CHF-Ansatz aus dem gespeicherten Monatsparameter-Snapshot.", "VEHICLE_R1"),
+            CreateDerivationItem("RULE_AHV_RATE", "Regel", "AHV/IV/EO", FormatPercentageRate(payrollSettings.AhvIvEoRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AHV_IV_EO"),
+            CreateDerivationItem("RULE_ALV_RATE", "Regel", "ALV", FormatPercentageRate(payrollSettings.AlvRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "ALV"),
+            CreateDerivationItem("RULE_KTG_RATE", "Regel", "Krankentaggeld/UVG", FormatPercentageRate(payrollSettings.SicknessAccidentInsuranceRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "KTG_UVG"),
+            CreateDerivationItem("RULE_TRAINING_RATE", "Regel", "Aus- und Weiterbildung inkl. Ferien", FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AUSBILDUNG_FERIEN")
+        };
+
+        if (contract.MonthlyBvgDeductionChf > 0m)
+        {
+            rules.Add(CreateDerivationItem("RULE_BVG", "Regel", "BVG", FormatMoney(contract.MonthlyBvgDeductionChf, numberCulture, currencyCode), null, "Fixbetrag aus dem aktuellen Vertragsstand.", "BVG"));
+        }
+
+        var steps = new List<MonthlyPayrollPreviewDerivationItemDto>
+        {
+            CreateDerivationItem("STEP_BASE", "Schritt", "Grundlohn", derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BaseHours) is { } baseLine
+                ? FormatMoney(baseLine.AmountChf, numberCulture, currencyCode)
+                : "Noch nicht ableitbar",
+                $"{FormatQuantity(workSummary.WorkHours, numberCulture)} h x {FormatMoney(contract.HourlyRateChf, numberCulture, currencyCode)}",
+                "Arbeitsstunden multipliziert mit dem Stundenlohn.",
+                "BASE"),
+            CreateDerivationItem("STEP_SUPPLEMENTS", "Schritt", "Zeitzuschlaege", supplementLines.Length == 0
+                ? (workSummary.SpecialHours > 0m ? "Noch nicht ableitbar" : FormatMoney(0m, numberCulture, currencyCode))
+                : FormatMoney(supplementLines.Sum(line => line.AmountChf), numberCulture, currencyCode),
+                BuildSupplementStepFormula(supplementLines, contract.HourlyRateChf, payrollSettings.WorkTimeSupplementSettings, workSummary, numberCulture, currencyCode),
+                supplementLines.Length == 0
+                    ? "Keine vollstaendig ableitbaren Nacht-/Sonntags-/Feiertagszuschlaege im Monat."
+                    : "Summe der fachlich ableitbaren Zeitzuschlaege.",
+                "TIME_SUPPLEMENTS"),
+            CreateDerivationItem("STEP_SPECIAL", "Schritt", "Spezialzuschlag gemaess Vertrag", specialSupplementLine is null
+                ? FormatMoney(0m, numberCulture, currencyCode)
+                : FormatMoney(specialSupplementLine.AmountChf, numberCulture, currencyCode),
+                $"{FormatQuantity(workSummary.WorkHours, numberCulture)} h x {FormatMoney(contract.SpecialSupplementRateChf, numberCulture, currencyCode)}",
+                contract.SpecialSupplementRateChf > 0m
+                    ? "Arbeitsstunden multipliziert mit dem vertraglichen Spezialzuschlag."
+                    : "Im Vertragsstand ist kein Spezialzuschlag hinterlegt.",
+                "SPECIAL_CONTRACT"),
+            CreateDerivationItem("STEP_VEHICLE_P1", "Schritt", "Fahrzeitentschaedigung Pauschalzone 1", FormatMoney(GetVehicleAmount(derivationLines, "VEHICLE_P1"), numberCulture, currencyCode), $"{FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf), numberCulture)} x {FormatMoney(payrollSettings.VehiclePauschalzone1RateChf, numberCulture, currencyCode)}", null, "VEHICLE_P1"),
+            CreateDerivationItem("STEP_VEHICLE_P2", "Schritt", "Fahrzeitentschaedigung Pauschalzone 2", FormatMoney(GetVehicleAmount(derivationLines, "VEHICLE_P2"), numberCulture, currencyCode), $"{FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf), numberCulture)} x {FormatMoney(payrollSettings.VehiclePauschalzone2RateChf, numberCulture, currencyCode)}", null, "VEHICLE_P2"),
+            CreateDerivationItem("STEP_VEHICLE_R1", "Schritt", "Fahrzeitentschaedigung Regiezone", FormatMoney(GetVehicleAmount(derivationLines, "VEHICLE_R1"), numberCulture, currencyCode), $"{FormatQuantity(timeEntries.Sum(entry => entry.VehicleRegiezone1Chf), numberCulture)} x {FormatMoney(payrollSettings.VehicleRegiezone1RateChf, numberCulture, currencyCode)}", null, "VEHICLE_R1"),
+            CreateDerivationItem("STEP_SUBTOTAL", "Schritt", "Zwischentotal", FormatMoney(subtotalChf, numberCulture, currencyCode), "Basislohn + Zeitzuschlaege + Spezialzuschlag + Fahrzeugentschaedigungen", "Erstes lohnrelevantes Zwischentotal vor weiteren Abzuegen.", "SUBTOTAL"),
+            CreateDerivationItem("STEP_VACATION", "Schritt", "Ferienentschaedigung", vacationCompensationLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(vacationCompensationLine.AmountChf, numberCulture, currencyCode), $"{FormatPercentageRate(effectiveVacationCompensationRate, numberCulture)} x {FormatMoney(subtotalChf, numberCulture, currencyCode)}", "Altersabhaengiger Satz aus dem gespeicherten Monatsparameter-Snapshot.", "VACATION_COMP"),
+            CreateDerivationItem("STEP_AHV_GROSS", "Schritt", "AHV-pflichtiger Bruttolohn", FormatMoney(ahvGrossChf, numberCulture, currencyCode), "Basislohn + Zuschlaege + Fahrzeugentschaedigungen", "In der aktuellen Vorschau ohne separaten Ferienanteil ausgewiesen.", "AHV_GROSS"),
+            BuildDeductionDerivationItem("STEP_AHV", "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, "AHV_IV_EO", numberCulture, currencyCode),
+            BuildDeductionDerivationItem("STEP_ALV", "ALV", derivationLines, "ALV", payrollSettings.AlvRate, "ALV", numberCulture, currencyCode),
+            BuildDeductionDerivationItem("STEP_KTG", "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, "KTG_UVG", numberCulture, currencyCode),
+            BuildDeductionDerivationItem("STEP_TRAINING", "Aus- und Weiterbildung inkl. Ferien", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, "AUSBILDUNG_FERIEN", numberCulture, currencyCode),
+            CreateDerivationItem("STEP_TOTAL", "Schritt", "Total", FormatMoney(totalChf, numberCulture, currencyCode), "Lohnrelevante Positionen minus Abzuege, ohne Spesen", "Netto vor separatem Spesenblock.", "TOTAL"),
+            CreateDerivationItem("STEP_EXPENSES", "Schritt", "Spesen gemaess Nachweis", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock uebernommen.", "EXPENSES"),
+            CreateDerivationItem("STEP_PAYOUT", "Schritt", "Total Auszahlung", FormatMoney(totalPayoutChf, numberCulture, currencyCode), $"{FormatMoney(totalChf, numberCulture, currencyCode)} + {FormatMoney(expensesChf, numberCulture, currencyCode)}", "Summe aus Total und Spesen, auf 0.05 gerundet.", "TOTAL_PAYOUT")
+        };
+
+        if (bvgLine is not null)
+        {
+            steps.Insert(12, CreateDerivationItem("STEP_BVG", "Schritt", "BVG", FormatMoney(bvgLine.AmountChf, numberCulture, currencyCode), FormatMoney(contract.MonthlyBvgDeductionChf, numberCulture, currencyCode), "Fixbetrag aus dem Vertragsstand.", "BVG"));
+        }
+
+        var issueItems = derivationIssues
+            .Select((issue, index) => CreateDerivationItem(
+                $"ISSUE_{index + 1}",
+                "Hinweis",
+                TranslateDerivationIssue(issue.Code),
+                issue.Code,
+                null,
+                issue.Message,
+                "ISSUE"))
+            .ToArray();
+
+        var groups = new List<MonthlyPayrollPreviewDerivationGroupDto>
+        {
+            new("Eingaben", inputs),
+            new("Regeln / Saetze", rules),
+            new("Rechenschritte", steps)
+        };
+
+        if (issueItems.Length > 0)
+        {
+            groups.Add(new MonthlyPayrollPreviewDerivationGroupDto("Hinweise / Konflikte", issueItems));
+        }
+
+        return groups;
     }
 
     private static IReadOnlyCollection<Payroll.Domain.Settings.PayrollPreviewHelpVisibility> DeserializePayrollPreviewHelpVisibilities(string? json)
@@ -807,6 +1017,13 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return $"{(rate * 100m).ToString("#,##0.###", numberCulture)} %";
     }
 
+    private static string FormatOptionalPercentageRate(decimal? rate, CultureInfo numberCulture)
+    {
+        return rate.HasValue
+            ? FormatPercentageRate(rate.Value, numberCulture)
+            : "offen";
+    }
+
     private static string FormatAmountOrPending(decimal amountChf, bool isPending, CultureInfo numberCulture, string currencyCode)
     {
         return isPending
@@ -819,6 +1036,89 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return string.Join(" | ", supplementLines.Select(line => $"{line.Description} {FormatMoney(line.AmountChf, numberCulture, currencyCode)}"));
     }
 
+    private static string BuildSupplementStepFormula(
+        IReadOnlyCollection<PayrollRunLine> supplementLines,
+        decimal hourlyRateChf,
+        Domain.Employees.WorkTimeSupplementSettings supplementSettings,
+        PayrollWorkSummary workSummary,
+        CultureInfo numberCulture,
+        string currencyCode)
+    {
+        if (supplementLines.Count == 0)
+        {
+            var missingParts = new List<string>();
+
+            if (workSummary.NightHours > 0m)
+            {
+                missingParts.Add($"Nacht {FormatQuantity(workSummary.NightHours, numberCulture)} h x {FormatMoney(hourlyRateChf, numberCulture, currencyCode)} x {FormatOptionalPercentageRate(supplementSettings.NightSupplementRate, numberCulture)}");
+            }
+
+            if (workSummary.SundayHours > 0m)
+            {
+                missingParts.Add($"Sonntag {FormatQuantity(workSummary.SundayHours, numberCulture)} h x {FormatMoney(hourlyRateChf, numberCulture, currencyCode)} x {FormatOptionalPercentageRate(supplementSettings.SundaySupplementRate, numberCulture)}");
+            }
+
+            if (workSummary.HolidayHours > 0m)
+            {
+                missingParts.Add($"Feiertag {FormatQuantity(workSummary.HolidayHours, numberCulture)} h x {FormatMoney(hourlyRateChf, numberCulture, currencyCode)} x {FormatOptionalPercentageRate(supplementSettings.HolidaySupplementRate, numberCulture)}");
+            }
+
+            return missingParts.Count == 0
+                ? "-"
+                : string.Join(" | ", missingParts);
+        }
+
+        return string.Join(
+            " | ",
+            supplementLines.Select(line => $"{line.Description} {FormatQuantity(line.Quantity ?? 0m, numberCulture)} h = {FormatMoney(line.AmountChf, numberCulture, currencyCode)}"));
+    }
+
+    private static MonthlyPayrollPreviewDerivationItemDto BuildDeductionDerivationItem(
+        string stepId,
+        string label,
+        IEnumerable<PayrollRunLine> derivationLines,
+        string code,
+        decimal rate,
+        string linkKey,
+        CultureInfo numberCulture,
+        string currencyCode)
+    {
+        var matchingLine = derivationLines.SingleOrDefault(line => line.Code == code);
+        var basisDisplay = matchingLine is not null && rate > 0m
+            ? FormatMoney(Math.Abs(matchingLine.AmountChf) / rate, numberCulture, currencyCode)
+            : "-";
+
+        return CreateDerivationItem(
+            stepId,
+            "Schritt",
+            label,
+            FormatAmount(matchingLine?.AmountChf, numberCulture, currencyCode),
+            matchingLine is null ? "-" : $"{FormatPercentageRate(rate, numberCulture)} x {basisDisplay}",
+            "Abzug aus der im Berechnungslauf abgeleiteten beitragspflichtigen Basis.",
+            linkKey);
+    }
+
+    private static MonthlyPayrollPreviewDerivationItemDto CreateDerivationItem(
+        string stepId,
+        string kindLabel,
+        string label,
+        string valueDisplay,
+        string? formulaDisplay,
+        string? detail,
+        string linkKey)
+    {
+        return new MonthlyPayrollPreviewDerivationItemDto(
+            stepId,
+            kindLabel,
+            label,
+            valueDisplay,
+            formulaDisplay,
+            detail,
+            linkKey,
+            GetPreviewDisplayTag(linkKey),
+            GetPreviewColorHint(linkKey));
+    }
+
     private static string FormatMoney(decimal value, CultureInfo numberCulture, string currencyCode)
     {
         return $"{value.ToString("#,##0.00", numberCulture)} {NormalizeCurrencyCode(currencyCode)}";
@@ -827,6 +1127,49 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     private static string FormatQuantity(decimal value, CultureInfo numberCulture)
     {
         return value.ToString("#,##0.##", numberCulture);
+    }
+
+    private static string GetPreviewDisplayTag(string linkKey)
+    {
+        return linkKey switch
+        {
+            "BASE" => "BAS",
+            "TIME_SUPPLEMENTS" => "ZT",
+            "SPECIAL_CONTRACT" => "SZ",
+            "VEHICLE_P1" => "P1",
+            "VEHICLE_P2" => "P2",
+            "VEHICLE_R1" => "R1",
+            "SUBTOTAL" => "SUB",
+            "VACATION_COMP" => "FER",
+            "AHV_GROSS" => "BRU",
+            "AHV_IV_EO" => "AHV",
+            "ALV" => "ALV",
+            "KTG_UVG" => "UVG",
+            "AUSBILDUNG_FERIEN" => "AW",
+            "BVG" => "BVG",
+            "TOTAL" => "TOT",
+            "EXPENSES" => "SPS",
+            "TOTAL_PAYOUT" => "AUS",
+            _ => "!"
+        };
+    }
+
+    private static string GetPreviewColorHint(string linkKey)
+    {
+        return linkKey switch
+        {
+            "BASE" => "#FFDCEBFF",
+            "TIME_SUPPLEMENTS" => "#FFE0F2FE",
+            "SPECIAL_CONTRACT" => "#FFFDE7D7",
+            "VEHICLE_P1" or "VEHICLE_P2" or "VEHICLE_R1" => "#FFE7F5E8",
+            "SUBTOTAL" or "AHV_GROSS" => "#FFEFF4F8",
+            "VACATION_COMP" => "#FFFFF4CC",
+            "AHV_IV_EO" or "ALV" or "KTG_UVG" or "AUSBILDUNG_FERIEN" or "BVG" => "#FFFCE7E7",
+            "TOTAL" => "#FFEAF0F8",
+            "EXPENSES" => "#FFF3E8FF",
+            "TOTAL_PAYOUT" => "#FFE4F7EC",
+            _ => "#FFF8E7E7"
+        };
     }
 
     private static CultureInfo CreateNumberCulture(string? decimalSeparator, string? thousandsSeparator)

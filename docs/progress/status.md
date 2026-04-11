@@ -17,6 +17,8 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - `Employee` um referenzielle Felder `Abteilung`, `Anstellungskategorie` und `Anstellungsort` erweitert
 - Mitarbeitendenstamm um `Lohnart` (`Stundenlohn` | `Monatslohn`) erweitert; bestehende Stundenlohn-Logik bleibt aktiv, Monatslohn ist als fachliche Grundlage vorbereitet
 - Bereich `Einstellungen > Berechnung` in die Unterseiten `Allgemein`, `Stundenlohn` und vorbereitend `Monatslohn` gegliedert, damit allgemeine und lohnartbezogene Parameter kuenftig sauber getrennt gepflegt werden koennen
+- Lohnlauf-/Berechnungsdarstellung in `Lohnlaeufe` um eine strukturierte Herleitungsansicht erweitert: Eingaben, Regeln/Saetze, Rechenschritte und Konflikte werden jetzt aus derselben Preview-Quelle wie die Ergebniszeilen aufgebaut
+- Ergebniszeilen und Herleitungselemente teilen sich semantische Kennungen (`LinkKey`, Tag, Farbhilfe), damit Herkunft und Wiederverwendung fachlicher Werte in der UI nachvollziehbar bleiben, ohne Berechnungslogik in die UI zu duplizieren
 - globales UI-Design-System fuer Bildschirm und spaeteren Print logisch in zentrale Style-Bereiche gegliedert
 - zentrale Theme-Dateien fuer App-/Screen-Stile und getrennte Print-/Report-Stile eingefuehrt; Schrift, Farben, Brand-Text und spaetere Logo-Nutzung sind damit an einer Stelle steuerbar
 - `App.axaml` auf zentrale Style-Includes umgestellt und den Shell-Kopf auf zentrale Branding-/Theme-Ressourcen angebunden

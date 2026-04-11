@@ -301,6 +301,8 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Basislohn" && line.AmountDisplay == "240,00 CHF");
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "AHV-pflichtiger Bruttolohn" && line.AmountDisplay == "240,00 CHF");
         Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Total Auszahlung");
+        Assert.True(viewModel.HasPayrollPreviewDerivationGroups);
+        Assert.Contains(viewModel.PayrollPreviewDerivationGroups.SelectMany(group => group.Items), item => item.Label == "Grundlohn" && item.DisplayTag == "BAS");
     }
 
     [Fact]
@@ -447,7 +449,7 @@ public sealed class MonthlyRecordViewModelTests
         {
             if (record.TimeEntries.Count == 0)
             {
-                return new MonthlyPayrollPreviewDto([], ["Monat noch nicht erfasst"]);
+                return new MonthlyPayrollPreviewDto([], [], ["Monat noch nicht erfasst"]);
             }
 
             var baseAmount = record.TimeEntries.Sum(item => item.HoursWorked) * 30m;
@@ -455,10 +457,18 @@ public sealed class MonthlyRecordViewModelTests
 
             return new MonthlyPayrollPreviewDto(
                 [
-                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null, false),
-                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.AhvGrossCode, "AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null, true),
-                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.ExpensesCode, "Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null, false),
-                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null, true)
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null, false, "BASE", "BAS", "#FFDCEBFF"),
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.AhvGrossCode, "AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null, true, "AHV_GROSS", "BRU", "#FFEFF4F8"),
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.ExpensesCode, "Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null, false, "EXPENSES", "SPS", "#FFF3E8FF"),
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null, true, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
+                ],
+                [
+                    new MonthlyPayrollPreviewDerivationGroupDto(
+                        "Rechenschritte",
+                        [
+                            new MonthlyPayrollPreviewDerivationItemDto("STEP_BASE", "Schritt", "Grundlohn", $"{baseAmount:0.00} CHF", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h x 30.00 CHF", null, "BASE", "BAS", "#FFDCEBFF"),
+                            new MonthlyPayrollPreviewDerivationItemDto("STEP_PAYOUT", "Schritt", "Total Auszahlung", $"{(baseAmount + expenses):0.00} CHF", $"{baseAmount:0.00} CHF + {expenses:0.00} CHF", null, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
+                        ])
                 ],
                 ["Test-Lohnvorschau"]);
         }

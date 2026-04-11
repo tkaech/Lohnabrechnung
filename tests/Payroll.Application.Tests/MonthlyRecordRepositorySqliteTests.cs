@@ -85,6 +85,8 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672,00 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "18,50 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Total Auszahlung");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Grundlohn" && item.DisplayTag == "BAS");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Total Auszahlung" && item.LinkKey == "TOTAL_PAYOUT");
         Assert.Equal(8m, details.Header.TotalWorkedHours);
         Assert.Equal(18.50m, details.Header.TotalExpensesChf);
         Assert.Equal(260m, details.Header.TotalVehicleCompensationChf);
@@ -383,6 +385,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
 
         Assert.NotNull(details);
         Assert.Empty(details!.PayrollPreview.Lines);
+        Assert.Empty(details.PayrollPreview.DerivationGroups);
         Assert.Single(details.PayrollPreview.Notes, note => note == "Monat noch nicht erfasst");
     }
 

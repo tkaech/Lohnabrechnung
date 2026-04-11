@@ -169,8 +169,15 @@ public sealed class MonthlyRecordServiceTests
                     ["Testvorschau"]),
                 new MonthlyPayrollPreviewDto(
                     [
-                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null, false),
-                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null, true)
+                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", "0 h", "0.00 CHF", "0.00 CHF", null, false, "BASE", "BAS", "#FFDCEBFF"),
+                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(record.ExpenseEntry?.ExpensesTotalChf ?? 0m):0.00} CHF", null, true, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
+                    ],
+                    [
+                        new MonthlyPayrollPreviewDerivationGroupDto(
+                            "Rechenschritte",
+                            [
+                                new MonthlyPayrollPreviewDerivationItemDto("STEP_BASE", "Schritt", "Grundlohn", "0.00 CHF", "0 h x 0.00 CHF", null, "BASE", "BAS", "#FFDCEBFF")
+                            ])
                     ],
                     ["Test-Lohnvorschau"]));
 
