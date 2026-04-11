@@ -53,7 +53,21 @@ public sealed record ImportPersonDataCommand(
     string Delimiter,
     bool FieldsEnclosed,
     string TextQualifier,
+    IReadOnlyCollection<ImportFieldMappingDto> Mappings,
+    IReadOnlyCollection<int>? SelectedRowNumbers = null);
+
+public sealed record PreviewPersonDataCommand(
+    string FilePath,
+    string Delimiter,
+    bool FieldsEnclosed,
+    string TextQualifier,
     IReadOnlyCollection<ImportFieldMappingDto> Mappings);
+
+public sealed record PersonImportPreviewItemDto(
+    int RowNumber,
+    string PersonnelNumber,
+    string FullName,
+    bool AlreadyExists);
 
 public sealed record PersonDataImportResultDto(
     int CreatedCount,

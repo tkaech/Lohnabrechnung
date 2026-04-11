@@ -213,10 +213,16 @@ public sealed class ImportService
         var updatedCount = 0;
         var errorMessages = new List<string>();
         var rowIndex = 1;
+        var selectedRowNumbers = command.SelectedRowNumbers?.ToHashSet() ?? [];
 
         foreach (var row in document.Rows)
         {
             rowIndex++;
+            if (selectedRowNumbers.Count > 0 && !selectedRowNumbers.Contains(rowIndex))
+            {
+                continue;
+            }
+
             if (IsEmptyRow(row))
             {
                 continue;
@@ -310,6 +316,60 @@ public sealed class ImportService
         messages.AddRange(errorMessages);
 
         return new PersonDataImportResultDto(createdCount, updatedCount, errorMessages.Count, messages);
+    }
+
+    public async Task<IReadOnlyCollection<PersonImportPreviewItemDto>> PreviewPersonDataAsync(PreviewPersonDataCommand command, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var document = await _csvImportFileReader.ReadAsync(
+            new ReadCsvImportDocumentCommand(
+                command.FilePath,
+                command.Delimiter,
+                command.FieldsEnclosed,
+                command.TextQualifier),
+            cancellationToken);
+
+        var mappingByField = command.Mappings
+            .Where(item => !string.IsNullOrWhiteSpace(item.CsvColumnName))
+            .GroupBy(item => item.FieldKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToDictionary(item => item.FieldKey, item => item, StringComparer.OrdinalIgnoreCase);
+
+        if (!mappingByField.ContainsKey(PersonFieldPersonnelNumber))
+        {
+            return [];
+        }
+
+        var previewItems = new List<PersonImportPreviewItemDto>();
+        var rowIndex = 1;
+        foreach (var row in document.Rows)
+        {
+            rowIndex++;
+            if (IsEmptyRow(row))
+            {
+                continue;
+            }
+
+            var personnelNumber = GetOptionalString(row, mappingByField, PersonFieldPersonnelNumber);
+            if (string.IsNullOrWhiteSpace(personnelNumber))
+            {
+                continue;
+            }
+
+            var firstName = GetOptionalString(row, mappingByField, PersonFieldFirstName);
+            var lastName = GetOptionalString(row, mappingByField, PersonFieldLastName);
+            var fullName = string.Join(" ", new[] { firstName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value))).Trim();
+            var existingEmployee = await _employeeRepository.GetByPersonnelNumberAsync(personnelNumber, cancellationToken);
+
+            previewItems.Add(new PersonImportPreviewItemDto(
+                rowIndex,
+                personnelNumber,
+                fullName,
+                existingEmployee is not null));
+        }
+
+        return previewItems;
     }
 
     private static bool IsEmptyRow(IReadOnlyDictionary<string, string> row)

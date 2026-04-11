@@ -165,6 +165,63 @@ public sealed class ImportServiceTests
     }
 
     [Fact]
+    public async Task PreviewPersonData_MarksExistingAndNewEmployees()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"person-import-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "PNr;Vorname;Nachname;Eintritt;Strasse;PLZ;Ort;Land\n1000;Anna;Alt;01.01.2025;Hauptstrasse;6000;Luzern;Schweiz\n2000;Mia;Neu;01.01.2025;Dorfweg;5000;Aarau;Schweiz\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(
+                null,
+                "1000",
+                "Anna",
+                "Bestehend",
+                "Bern"),
+                CancellationToken.None);
+
+            var service = new ImportService(
+                new InMemoryImportMappingConfigurationRepository(),
+                new CsvImportFileReader(),
+                employeeRepository);
+
+            var preview = await service.PreviewPersonDataAsync(new PreviewPersonDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                BuildMappings(
+                    ("personnel_number", "PNr", false),
+                    ("first_name", "Vorname", false),
+                    ("last_name", "Nachname", false),
+                    ("entry_date", "Eintritt", false),
+                    ("street", "Strasse", false),
+                    ("postal_code", "PLZ", false),
+                    ("city", "Ort", false),
+                    ("country", "Land", false))),
+                CancellationToken.None);
+
+            Assert.Collection(
+                preview.OrderBy(item => item.PersonnelNumber),
+                first =>
+                {
+                    Assert.Equal("1000", first.PersonnelNumber);
+                    Assert.True(first.AlreadyExists);
+                },
+                second =>
+                {
+                    Assert.Equal("2000", second.PersonnelNumber);
+                    Assert.False(second.AlreadyExists);
+                });
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public async Task ImportPersonData_CreatesNewEmployee_WhenPersonnelNumberDoesNotExist()
     {
         var filePath = Path.Combine(Path.GetTempPath(), $"person-import-{Guid.NewGuid():N}.csv");
@@ -193,6 +250,50 @@ public sealed class ImportServiceTests
             Assert.NotNull(created);
             Assert.Equal(EmployeeWageType.Monthly, created!.WageType);
             Assert.True(created.HourlyRateChf > 0m);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportPersonData_ImportsOnlySelectedRows()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"person-import-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "PNr;Vorname;Nachname;Eintritt;Strasse;PLZ;Ort;Land\n2000;Mia;Muster;2025-02-01;Dorfweg;5000;Aarau;Schweiz\n2001;Noah;NichtImportieren;2025-02-01;Dorfweg;5000;Aarau;Schweiz\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            var service = new ImportService(
+                new InMemoryImportMappingConfigurationRepository(),
+                new CsvImportFileReader(),
+                employeeRepository);
+
+            var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                BuildMappings(
+                    ("personnel_number", "PNr", false),
+                    ("first_name", "Vorname", false),
+                    ("last_name", "Nachname", false),
+                    ("entry_date", "Eintritt", false),
+                    ("street", "Strasse", false),
+                    ("postal_code", "PLZ", false),
+                    ("city", "Ort", false),
+                    ("country", "Land", false)),
+                [2]),
+                CancellationToken.None);
+
+            var imported = await employeeRepository.GetByPersonnelNumberAsync("2000", CancellationToken.None);
+            var skipped = await employeeRepository.GetByPersonnelNumberAsync("2001", CancellationToken.None);
+
+            Assert.Equal(1, result.CreatedCount);
+            Assert.NotNull(imported);
+            Assert.Null(skipped);
         }
         finally
         {

@@ -172,6 +172,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         PayrollPreviewHelpOptions = [];
         PersonImportConfigurations = [];
         PersonImportFieldMappings = [];
+        PersonImportPreviewItems = [];
         TimeImportFieldMappings = [];
         MonthCaptureOverviewRows = [];
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
@@ -264,6 +265,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<PayrollPreviewHelpToggleViewModel> PayrollPreviewHelpOptions { get; }
     public ObservableCollection<ImportConfigurationItemViewModel> PersonImportConfigurations { get; }
     public ObservableCollection<ImportFieldMappingRowViewModel> PersonImportFieldMappings { get; }
+    public ObservableCollection<PersonImportPreviewItemViewModel> PersonImportPreviewItems { get; }
     public ObservableCollection<ImportFieldMappingRowViewModel> TimeImportFieldMappings { get; }
     public ObservableCollection<MonthlyTimeCaptureOverviewRowDto> MonthCaptureOverviewRows { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
@@ -373,7 +375,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanLoadPersonImportCsv => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath);
     public bool CanSavePersonImportConfiguration => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportConfigurationName);
     public bool CanLoadPersonImportConfiguration => !IsBusy && IsSettingsWorkspace && SelectedPersonImportConfiguration is not null;
-    public bool CanImportPersonData => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath) && PersonImportValidationErrors.Count == 0 && PersonImportHasCsvHeaders;
+    public bool CanImportPersonData => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath) && PersonImportValidationErrors.Count == 0 && PersonImportHasCsvHeaders && PersonImportPreviewItems.Any(item => item.IsSelected);
     public bool CanCreateBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(BackupDirectoryPath) && !string.IsNullOrWhiteSpace(BackupFileName);
     public bool CanRestoreBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(RestoreFilePath);
     public bool CanCreatePayrollPdf => !IsBusy && IsPayrollRunsWorkspace && _currentEmployeeId.HasValue && MonthlyRecord.SelectedMonth.HasValue;
@@ -981,6 +983,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     public bool PersonImportHasCsvHeaders => PersonImportFieldMappings.Any(row => row.AvailableCsvColumns.Count > 1);
+    public bool HasPersonImportPreviewItems => PersonImportPreviewItems.Count > 0;
 
     public IReadOnlyCollection<string> PersonImportValidationErrors => _importService.ValidateMappings(
         Payroll.Domain.Imports.ImportConfigurationType.PersonData,
@@ -1372,6 +1375,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ResolvePersonImportTextQualifier()));
 
             ApplyPersonImportCsvHeaders(document.Headers);
+            await RefreshPersonImportPreviewAsync();
             PersonImportStatusMessage = $"Datei geladen: {document.Headers.Count} Spalten erkannt, {document.Rows.Count} Datenzeilen.";
             StatusMessage = PersonImportStatusMessage;
             RaiseImportCommandState();
@@ -1416,6 +1420,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
 
             ApplyPersonImportConfiguration(configuration);
+            await RefreshPersonImportPreviewAsync();
             PersonImportStatusMessage = $"Mapping `{configuration.Name}` geladen.";
             StatusMessage = PersonImportStatusMessage;
         });
@@ -1430,7 +1435,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ResolvePersonImportDelimiter(),
                 PersonImportFieldsEnclosed,
                 ResolvePersonImportTextQualifier(),
-                BuildPersonImportFieldMappings()));
+                BuildPersonImportFieldMappings(),
+                PersonImportPreviewItems.Where(item => item.IsSelected).Select(item => item.RowNumber).ToArray()));
 
             var summary = $"{result.CreatedCount} neu, {result.UpdatedCount} aktualisiert";
             PersonImportStatusMessage = result.ErrorCount > 0
@@ -2102,9 +2108,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void OnImportFieldMappingRowPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ImportFieldMappingRowViewModel.SelectedCsvColumn))
+        if (e.PropertyName is nameof(ImportFieldMappingRowViewModel.SelectedCsvColumn) or nameof(ImportFieldMappingRowViewModel.AllowEmpty))
         {
             RaiseImportCommandState();
+            _ = RefreshPersonImportPreviewAsync();
         }
     }
 
@@ -2115,11 +2122,55 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanLoadPersonImportConfiguration));
         RaisePropertyChanged(nameof(CanImportPersonData));
         RaisePropertyChanged(nameof(PersonImportHasCsvHeaders));
+        RaisePropertyChanged(nameof(HasPersonImportPreviewItems));
         RaisePropertyChanged(nameof(PersonImportValidationErrors));
         LoadPersonImportCsvCommand.RaiseCanExecuteChanged();
         SavePersonImportConfigurationCommand.RaiseCanExecuteChanged();
         LoadPersonImportConfigurationCommand.RaiseCanExecuteChanged();
         ImportPersonDataCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task RefreshPersonImportPreviewAsync()
+    {
+        if (string.IsNullOrWhiteSpace(PersonImportCsvFilePath) || PersonImportValidationErrors.Count > 0)
+        {
+            PersonImportPreviewItems.Clear();
+            RaiseImportCommandState();
+            return;
+        }
+
+        var preview = await _importService.PreviewPersonDataAsync(new PreviewPersonDataCommand(
+            PersonImportCsvFilePath,
+            ResolvePersonImportDelimiter(),
+            PersonImportFieldsEnclosed,
+            ResolvePersonImportTextQualifier(),
+            BuildPersonImportFieldMappings()));
+
+        var previousSelections = PersonImportPreviewItems.ToDictionary(item => item.RowNumber, item => item.IsSelected);
+        PersonImportPreviewItems.Clear();
+        foreach (var item in preview)
+        {
+            var viewModel = new PersonImportPreviewItemViewModel
+            {
+                RowNumber = item.RowNumber,
+                PersonnelNumber = item.PersonnelNumber,
+                FullName = item.FullName,
+                AlreadyExists = item.AlreadyExists,
+                IsSelected = previousSelections.TryGetValue(item.RowNumber, out var isSelected) ? isSelected : true
+            };
+            viewModel.PropertyChanged += OnPersonImportPreviewItemPropertyChanged;
+            PersonImportPreviewItems.Add(viewModel);
+        }
+
+        RaiseImportCommandState();
+    }
+
+    private void OnPersonImportPreviewItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PersonImportPreviewItemViewModel.IsSelected))
+        {
+            RaiseImportCommandState();
+        }
     }
 
     private string ResolvePersonImportTextQualifier()

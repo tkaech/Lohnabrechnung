@@ -611,6 +611,30 @@
                         </StackPanel>
                       </Border>
 
+                      <TextBlock FontWeight="SemiBold" Text="Import-Vorschau" IsVisible="{Binding HasPersonImportPreviewItems}" />
+                      <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12" IsVisible="{Binding HasPersonImportPreviewItems}">
+                        <StackPanel Spacing="8">
+                          <Grid ColumnDefinitions="Auto,Auto,1.1*,1.4*,Auto">
+                            <TextBlock FontWeight="SemiBold" Text="Import" />
+                            <TextBlock Grid.Column="1" FontWeight="SemiBold" Margin="12,0,0,0" Text="PNr" />
+                            <TextBlock Grid.Column="2" FontWeight="SemiBold" Margin="12,0,0,0" Text="Name" />
+                            <TextBlock Grid.Column="3" FontWeight="SemiBold" Margin="12,0,0,0" Text="Status" />
+                          </Grid>
+                          <ItemsControl ItemsSource="{Binding PersonImportPreviewItems}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <Grid ColumnDefinitions="Auto,Auto,1.1*,1.4*,Auto" Margin="0,0,0,6">
+                                  <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                  <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding PersonnelNumber}" />
+                                  <TextBlock Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding FullName}" />
+                                  <TextBlock Grid.Column="3" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding ImportStatus}" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+
                       <TextBlock Foreground="#FF5F6B7A" Text="{Binding PersonImportStatusMessage}" TextWrapping="Wrap" />
                       <Button HorizontalAlignment="Right" Classes="primary-action" Command="{Binding ImportPersonDataCommand}" Content="Personendaten importieren" />
                     </StackPanel>
