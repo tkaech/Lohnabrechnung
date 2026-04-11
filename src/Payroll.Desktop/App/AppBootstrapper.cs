@@ -3,12 +3,14 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
+using Payroll.Application.Imports;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Infrastructure.BackupRestore;
 using Payroll.Infrastructure.Employees;
+using Payroll.Infrastructure.Imports;
 using Payroll.Infrastructure.MonthlyRecords;
 using Payroll.Infrastructure.Persistence;
 using Payroll.Infrastructure.Reporting;
@@ -27,6 +29,9 @@ public sealed class AppBootstrapper
 
         var repository = new EmployeeRepository(dbContext);
         var employeeService = new EmployeeService(repository);
+        var importMappingConfigurationRepository = new ImportMappingConfigurationRepository(dbContext);
+        var csvImportFileReader = new CsvImportFileReader();
+        var importService = new ImportService(importMappingConfigurationRepository, csvImportFileReader, repository);
         var payrollSettingsRepository = new PayrollSettingsRepository(dbContext);
         var payrollSettingsService = new PayrollSettingsService(payrollSettingsRepository);
         EnsureConfigurationSeeded(payrollSettingsService);
@@ -42,6 +47,7 @@ public sealed class AppBootstrapper
 
         return new MainWindowViewModel(
             employeeService,
+            importService,
             backupRestoreService,
             payrollSettingsService,
             reportingService,
@@ -215,7 +221,8 @@ public sealed class AppBootstrapper
         {
             return TableExists(connection, "PayrollSettings")
                    && TableExists(connection, "Employees")
-                   && TableExists(connection, "EmployeeMonthlyRecords");
+                   && TableExists(connection, "EmployeeMonthlyRecords")
+                   && TableExists(connection, "ImportMappingConfigurations");
         }
         finally
         {
@@ -427,6 +434,27 @@ public sealed class AppBootstrapper
                 "EmployeeMonthlyRecords",
                 "EmploymentContractSnapshot_SpecialSupplementRateChf",
                 "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_SpecialSupplementRateChf\" TEXT NOT NULL DEFAULT 0;");
+
+            EnsureTable(
+                connection,
+                "ImportMappingConfigurations",
+                """
+                CREATE TABLE IF NOT EXISTS "ImportMappingConfigurations" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_ImportMappingConfigurations" PRIMARY KEY,
+                    "Type" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "Delimiter" TEXT NOT NULL,
+                    "FieldsEnclosed" INTEGER NOT NULL,
+                    "TextQualifier" TEXT NOT NULL,
+                    "FieldMappingsJson" TEXT NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NULL
+                );
+                """);
+            EnsureIndex(
+                connection,
+                "IX_ImportMappingConfigurations_Type_Name",
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ImportMappingConfigurations_Type_Name\" ON \"ImportMappingConfigurations\" (\"Type\", \"Name\");");
         }
         finally
         {
@@ -447,6 +475,38 @@ public sealed class AppBootstrapper
         using var command = connection.CreateCommand();
         command.CommandText = addColumnSql;
         command.ExecuteNonQuery();
+    }
+
+    private static void EnsureTable(DbConnection connection, string tableName, string createTableSql)
+    {
+        if (TableExists(connection, tableName))
+        {
+            return;
+        }
+
+        using var command = connection.CreateCommand();
+        command.CommandText = createTableSql;
+        command.ExecuteNonQuery();
+    }
+
+    private static void EnsureIndex(DbConnection connection, string indexName, string createIndexSql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = $indexName;";
+
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "$indexName";
+        parameter.Value = indexName;
+        command.Parameters.Add(parameter);
+
+        if (Convert.ToInt32(command.ExecuteScalar()) > 0)
+        {
+            return;
+        }
+
+        using var createCommand = connection.CreateCommand();
+        createCommand.CommandText = createIndexSql;
+        createCommand.ExecuteNonQuery();
     }
 
     private static bool ColumnExists(DbConnection connection, string tableName, string columnName)

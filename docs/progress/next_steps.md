@@ -11,3 +11,5 @@
 9. fuer bestehende Altmonate ohne Snapshot einen kleinen Hinweis oder gefuehrten Aktualisierungspfad vorsehen, damit klar bleibt, ab wann Monatsparameter historisch eingefroren sind
 10. auf Basis der neuen `Lohnart` im Mitarbeitendenstamm den ersten fachlich klar abgegrenzten Monatslohn-Schnitt definieren, z. B. separate Vertragsparameter und eine bewusste Payroll-Behandlung fuer `Monatslohn` statt stillschweigender Stundenlohn-Ableitung
 11. die neue Herleitungsansicht im Bereich `Lohnlaeufe` um gezielte Interaktion erweitern, z. B. Klick/Hover auf gemeinsame Kennungen, damit zusammengehoerige Eingaben, Rechenschritte und Ergebniszeilen direkt gemeinsam hervorgehoben werden
+12. den neuen Bereich `Einstellungen > Import > Stundendaten` auf denselben Mapping-/CSV-Mechanismus heben und danach die erste fachlich begrenzte Zeitimport-Logik implementieren
+13. den Personendaten-Import um manuelle Vorschau, Konfliktanzeige und optionales Validierungsprotokoll pro Zeile erweitern

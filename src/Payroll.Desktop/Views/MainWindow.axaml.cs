@@ -306,6 +306,46 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnBrowsePersonImportCsvClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null || !storageProvider.CanOpen)
+        {
+            return;
+        }
+
+        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "CSV-Datei fuer Personendaten waehlen",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("CSV-Dateien")
+                {
+                    Patterns = ["*.csv", "*.txt"]
+                },
+                FilePickerFileTypes.All
+            ]
+        });
+
+        var file = files.FirstOrDefault();
+        if (file is null)
+        {
+            return;
+        }
+
+        var localPath = file.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(localPath))
+        {
+            viewModel.PersonImportCsvFilePath = localPath;
+        }
+    }
+
     private static bool IsWithinPickerSurface(object? source)
     {
         var current = source as StyledElement;

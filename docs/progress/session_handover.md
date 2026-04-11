@@ -116,6 +116,8 @@ Als naechstes die Monatserfassung in Richtung echter excel-artiger Mehrpersonenl
 - fuer spaetere Bereiche ist nun auch die UI-Fuehrung klarer festgelegt: Navigation plus konsistente Aktionsleiste
 - der naechste groessere Bereich ist nicht mehr nur Sollbild, sondern ein implementierter Monatsanker mit erstem UI- und Service-Schnitt
 - die naechste Session sollte diesen Schnitt mit Vertragshistorie, Statusfluss und erster Payroll-Orchestrierung zusammenfuehren
+- in `Einstellungen` gibt es jetzt einen separaten Bereich `Import`; Personendaten koennen per CSV geladen, auf echte Mitarbeitendenfelder gemappt, als Mapping gespeichert und per Personalnummer importiert werden
+- die Persistenz fuer Import-Mappings ist als eigener, typisierter Konfigurationsspeicher vorbereitet; `Stundendaten` nutzt denselben Strukturansatz derzeit nur als Platzhalter
 
 ## Risiken
 - Spezialfälle aus einzelnen Excel-Blättern können noch zusätzliche Payroll-Line-Typen oder Regeln erfordern
@@ -133,6 +135,7 @@ Als naechstes die Monatserfassung in Richtung echter excel-artiger Mehrpersonenl
 - Die aktuelle Monatserfassung bleibt trotz stabilem Save-Flow noch eine Einzelperson-Sicht und noch keine echte Mehrpersonen-Monatstabelle
 - fuer produktive oder langfristig persistierte Datenbanken fehlt weiterhin eine explizite Migrationsstrategie jenseits des automatischen Development-Rebuilds
 - die Desktop-App verwendet weiterhin einen gemeinsam gehaltenen `DbContext`; die aktuelle Loesung entschärft das Monatsmodul, ersetzt aber noch keine grundsaetzliche Lifecycle-Bereinigung
+- der CSV-Reader ist fuer den ersten Schnitt bewusst einfach gehalten und unterstuetzt noch keine mehrzeiligen quoted Felder
 
 ## Bekannte Einschränkungen
 - Keine Payroll-Berechnungserweiterung ueber die bisher dokumentierte Ableitungslogik hinaus
@@ -140,8 +143,9 @@ Als naechstes die Monatserfassung in Richtung echter excel-artiger Mehrpersonenl
 - Vertragsverwaltung deckt weiterhin nur den aktuellen bzw. neuesten Vertragsstand ab
 - Vertragshistorie ist erst fachlich vorbereitet, noch nicht als eigener Bearbeitungsfluss umgesetzt
 - Die naechste UX-Stufe fuer den Bereich ist eine echte, excel-artige Monatsliste ueber mehrere Mitarbeitende
+- Der neue Import-Bereich ist fuer Personendaten funktional, fuer Stundendaten aber noch nicht fachlich durchimplementiert
 
 ## Naechste 3 Schritte
+- Den Stundendaten-Import auf Basis der vorhandenen Mapping-Struktur fachlich eingrenzen und als ersten Zeitimport-Schnitt umsetzen
 - Die Monatserfassung in eine echte, excel-artige Mehrpersonenliste pro Monat weiterentwickeln
 - Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln konkretisieren
-- danach den naechsten kleinen Payroll-Orchestrierungsschritt definieren, ohne offene Spezialfaelle zu automatisieren

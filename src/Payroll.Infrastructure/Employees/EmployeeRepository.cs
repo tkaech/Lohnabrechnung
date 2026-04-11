@@ -138,6 +138,20 @@ public sealed class EmployeeRepository : IEmployeeRepository
             contract?.SpecialSupplementRateChf ?? 0m);
     }
 
+    public async Task<EmployeeDetailsDto?> GetByPersonnelNumberAsync(string personnelNumber, CancellationToken cancellationToken)
+    {
+        var trimmedPersonnelNumber = personnelNumber.Trim();
+        var employeeId = await _dbContext.Employees
+            .AsNoTracking()
+            .Where(item => item.PersonnelNumber == trimmedPersonnelNumber)
+            .Select(item => (Guid?)item.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return employeeId.HasValue
+            ? await GetByIdAsync(employeeId.Value, cancellationToken)
+            : null;
+    }
+
     public Task<bool> PersonnelNumberExistsAsync(string personnelNumber, Guid? excludingEmployeeId, CancellationToken cancellationToken)
     {
         var trimmedPersonnelNumber = personnelNumber.Trim();

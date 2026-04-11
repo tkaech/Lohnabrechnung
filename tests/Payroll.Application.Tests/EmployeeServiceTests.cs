@@ -181,6 +181,13 @@ public sealed class EmployeeServiceTests
             return Task.FromResult(result);
         }
 
+        public Task<EmployeeDetailsDto?> GetByPersonnelNumberAsync(string personnelNumber, CancellationToken cancellationToken)
+        {
+            var trimmedPersonnelNumber = personnelNumber.Trim();
+            var result = _employees.Values.SingleOrDefault(item => item.PersonnelNumber == trimmedPersonnelNumber);
+            return Task.FromResult(result);
+        }
+
         public Task<bool> PersonnelNumberExistsAsync(string personnelNumber, Guid? excludingEmployeeId, CancellationToken cancellationToken)
         {
             var trimmedPersonnelNumber = personnelNumber.Trim();

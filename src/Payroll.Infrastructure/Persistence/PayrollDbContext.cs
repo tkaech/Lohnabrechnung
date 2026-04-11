@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Expenses;
+using Payroll.Domain.Imports;
 using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Settings;
 using Payroll.Domain.TimeTracking;
@@ -23,6 +24,7 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<EmploymentLocationOption> EmploymentLocationOptions => Set<EmploymentLocationOption>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
+    public DbSet<ImportMappingConfiguration> ImportMappingConfigurations => Set<ImportMappingConfiguration>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -152,6 +154,19 @@ public sealed class PayrollDbContext : DbContext
             builder.HasKey(option => option.Id);
             builder.Property(option => option.Name).HasMaxLength(200).IsRequired();
             builder.HasIndex(option => option.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ImportMappingConfiguration>(builder =>
+        {
+            builder.ToTable("ImportMappingConfigurations");
+            builder.HasKey(configuration => configuration.Id);
+            builder.Property(configuration => configuration.Type).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(configuration => configuration.Name).HasMaxLength(200).IsRequired();
+            builder.Property(configuration => configuration.Delimiter).HasMaxLength(1).IsRequired();
+            builder.Property(configuration => configuration.FieldsEnclosed).IsRequired();
+            builder.Property(configuration => configuration.TextQualifier).HasMaxLength(1).IsRequired();
+            builder.Property(configuration => configuration.FieldMappingsJson).HasMaxLength(20000).IsRequired();
+            builder.HasIndex(configuration => new { configuration.Type, configuration.Name }).IsUnique();
         });
 
         modelBuilder.Entity<EmployeeMonthlyRecord>(builder =>

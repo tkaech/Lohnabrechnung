@@ -159,6 +159,8 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Fahrzeugentschaedigung fachlich getrennt gehalten und im Monatskontext vorerst sichtbar gemacht
 - Fahrzeugentschaedigung im Monatskontext jetzt auch editierbar, selektierbar und loeschbar gemacht
 - voller `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false -v minimal` ausserhalb der Sandbox erfolgreich
+- neuer Bereich `Einstellungen > Import` als erster Schnitt umgesetzt; Personendaten-Import per CSV mit speicherbaren Mapping-Konfigurationen und vorbereiteter Stundendaten-Unterseite angebunden
+- Import-Mappings nun fachlich getrennt per persistentem `ImportConfigurationType` gespeichert; Personendaten-Import arbeitet per Personalnummer als Upsert statt Doppelanlage
 
 ## Offen
 - Vertragshistorie als historisierte `EmploymentContract`-Versionen fachlich konkretisieren
@@ -184,6 +186,7 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Die aktuelle SQLite-kompatible Lösung bevorzugt Robustheit vor maximaler Query-Kompaktheit und lädt Vertragsstände für Listen bewusst separat
 - Die neue Mitarbeitenden-Loeschaktion archiviert bewusst nur logisch; falls spaeter echte Archivierungsregeln je Datenabhaengigkeit noetig werden, muessen diese explizit erweitert werden
 - `dotnet test` bleibt in der Sandbox weiterhin durch eine Socket-Einschraenkung blockiert; neue ViewModel-Tests konnten deshalb lokal nur bis zum erfolgreichen Build verifiziert werden
+- der neue CSV-Import verarbeitet bewusst nur einfache Zeilen-CSV ohne mehrzeilige, quoted Felder; fuer komplexere Quelldateien braucht es spaeter einen robusteren Reader
 - bestehende lokale SQLite-Dateien ausserhalb des automatisch neu aufgebauten Development-Schemas koennen bei kuenftigen Modellwechseln weiterhin explizite Migrationsstrategie brauchen
 - der Desktop nutzt weiterhin einen gemeinsam gehaltenen `DbContext`; die Monatsoperationen sind jetzt defensiv abgesichert, langfristig waere ein klarer DbContext-per-Operation-Ansatz robuster
 
@@ -196,3 +199,4 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Noch keine vollstaendige Payroll-Orchestrierung auf Basis der vorhandenen Domainregeln
 - Vertragshistorie ist fachlich vorbereitet, aber noch nicht als eigener Bearbeitungsfluss umgesetzt
 - `dotnet test` ist in dieser Sandbox weiterhin nicht verlässlich lokal ausfuehrbar
+- der neue Stundendaten-Import ist bewusst nur als vorbereitete Struktur in `Einstellungen > Import` vorhanden; Importlogik fuer Zeitdaten fehlt noch

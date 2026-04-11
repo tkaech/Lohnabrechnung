@@ -526,6 +526,125 @@
                   </StackPanel>
                 </StackPanel>
               </TabItem>
+
+              <TabItem Header="Import">
+                <TabControl Margin="0,12,0,0">
+                  <TabItem Header="Personendaten">
+                    <StackPanel Spacing="12" Margin="0,12,0,0">
+                      <TextBlock FontWeight="SemiBold" Text="CSV-Datei laden" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="CSV-Datei waehlen, Aufbau pruefen und anschliessend die Spalten auf die Felder des Lohnprogramms abbilden." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="4">
+                          <TextBlock Classes="section-caption" Text="CSV-Datei" />
+                          <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Text="{Binding PersonImportCsvFilePath, Mode=TwoWay}" Watermark="/pfad/zur/personen.csv" />
+                            <Button Grid.Column="1" Margin="8,0,0,0" Content="Datei waehlen" Click="OnBrowsePersonImportCsvClick" />
+                            <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding LoadPersonImportCsvCommand}" Content="CSV laden" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,8,8,0">
+                          <TextBlock Classes="section-caption" Text="Trenner" />
+                          <ComboBox Width="160" ItemsSource="{Binding PersonImportDelimiterOptions}" SelectedItem="{Binding SelectedPersonImportDelimiter, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,8,0,0">
+                          <TextBlock Classes="section-caption" Text="Textqualifier" />
+                          <Grid ColumnDefinitions="Auto,*">
+                            <CheckBox Content="Felder ummantelt" IsChecked="{Binding PersonImportFieldsEnclosed, Mode=TwoWay}" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1" Width="240" Margin="12,0,0,0" ItemsSource="{Binding PersonImportTextQualifierOptions}" SelectedItem="{Binding SelectedPersonImportTextQualifier, Mode=TwoWay}" />
+                          </Grid>
+                        </StackPanel>
+                      </Grid>
+
+                      <TextBlock FontWeight="SemiBold" Text="Mapping speichern / laden" />
+                      <Grid ColumnDefinitions="*,Auto,*,Auto" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Konfigurationsname" />
+                          <TextBox Text="{Binding PersonImportConfigurationName, Mode=TwoWay}" Watermark="z. B. Personendaten Standard-CSV" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Margin="8,22,12,0" VerticalAlignment="Top" Command="{Binding SavePersonImportConfigurationCommand}" Content="Mapping speichern" />
+                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Gespeicherte Mappings" />
+                          <ComboBox ItemsSource="{Binding PersonImportConfigurations}" SelectedItem="{Binding SelectedPersonImportConfiguration, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                        <Button Grid.Column="3" Margin="8,22,0,0" VerticalAlignment="Top" Command="{Binding LoadPersonImportConfigurationCommand}" Content="Mapping laden" />
+                      </Grid>
+
+                      <TextBlock FontWeight="SemiBold" Text="Mapping-Tabelle" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Muss-Felder sind mit `*` markiert. Der Import bleibt gesperrt, bis alle Muss-Felder einer vorhandenen CSV-Spalte zugeordnet sind." TextWrapping="Wrap" />
+                      <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
+                        <StackPanel Spacing="8">
+                          <Grid ColumnDefinitions="1.1*,1.4*,Auto">
+                            <TextBlock FontWeight="SemiBold" Text="Feld des Lohnprogramms" />
+                            <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="CSV-Spalte" />
+                            <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="Leer erlaubt" />
+                          </Grid>
+                          <ItemsControl ItemsSource="{Binding PersonImportFieldMappings}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <Grid ColumnDefinitions="1.1*,1.4*,Auto" Margin="0,0,0,6">
+                                  <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Text="*" Foreground="#FFC95F36" Margin="0,0,6,0" IsVisible="{Binding IsRequired}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding FieldLabel}" />
+                                  </Grid>
+                                  <AutoCompleteBox Grid.Column="1"
+                                                   ItemsSource="{Binding AvailableCsvColumns}"
+                                                   SelectedItem="{Binding SelectedCsvColumn, Mode=TwoWay}"
+                                                   Text="{Binding CsvColumnSearchText, Mode=TwoWay}"
+                                                   MinimumPrefixLength="0"
+                                                   FilterMode="ContainsOrdinal"
+                                                   IsTextCompletionEnabled="False" />
+                                  <CheckBox Grid.Column="2"
+                                            Margin="12,0,0,0"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            IsChecked="{Binding AllowEmpty, Mode=TwoWay}" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+
+                      <TextBlock Foreground="#FF5F6B7A" Text="{Binding PersonImportStatusMessage}" TextWrapping="Wrap" />
+                      <Button HorizontalAlignment="Right" Classes="primary-action" Command="{Binding ImportPersonDataCommand}" Content="Personendaten importieren" />
+                    </StackPanel>
+                  </TabItem>
+
+                  <TabItem Header="Stundendaten">
+                    <StackPanel Spacing="12" Margin="0,12,0,0">
+                      <TextBlock FontWeight="SemiBold" Text="Vorbereitung Stundendaten-Import" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
+                      <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
+                        <StackPanel Spacing="8">
+                          <Grid ColumnDefinitions="1.1*,1.4*">
+                            <TextBlock FontWeight="SemiBold" Text="Vorbereitetes Feld" />
+                            <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="CSV-Spalte" />
+                          </Grid>
+                          <ItemsControl ItemsSource="{Binding TimeImportFieldMappings}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <Grid ColumnDefinitions="1.1*,1.4*" Margin="0,0,0,6">
+                                  <Grid ColumnDefinitions="Auto,*">
+                                    <TextBlock Text="*" Foreground="#FFC95F36" Margin="0,0,6,0" IsVisible="{Binding IsRequired}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding FieldLabel}" />
+                                  </Grid>
+                                  <ComboBox Grid.Column="1" IsEnabled="False" />
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </TabItem>
+                </TabControl>
+              </TabItem>
             </TabControl>
           </Border>
 

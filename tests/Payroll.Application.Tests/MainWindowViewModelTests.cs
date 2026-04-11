@@ -1,11 +1,13 @@
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
+using Payroll.Application.Imports;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.Employees;
+using Payroll.Domain.Imports;
 using Payroll.Domain.MonthlyRecords;
 
 namespace Payroll.Application.Tests;
@@ -309,8 +311,10 @@ public sealed class MainWindowViewModelTests
 
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
         var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
         var viewModel = new MainWindowViewModel(
             new EmployeeService(employeeRepository),
+            importService,
             new InMemoryBackupRestoreService(),
             new PayrollSettingsService(settingsRepository),
             new ReportingService(
@@ -342,8 +346,10 @@ public sealed class MainWindowViewModelTests
     {
         var employeeRepository = new TestEmployeeRepository();
         var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
         var viewModel = new MainWindowViewModel(
             new EmployeeService(employeeRepository),
+            importService,
             new InMemoryBackupRestoreService(),
             new PayrollSettingsService(settingsRepository),
             new ReportingService(
@@ -427,8 +433,10 @@ public sealed class MainWindowViewModelTests
         var employeeRepository = new TestEmployeeRepository();
         var settingsRepository = new InMemoryPayrollSettingsRepository();
         var backupRestoreService = new InMemoryBackupRestoreService();
+        var importService = CreateImportService(employeeRepository);
         var viewModel = new MainWindowViewModel(
             new EmployeeService(employeeRepository),
+            importService,
             backupRestoreService,
             new PayrollSettingsService(settingsRepository),
             new ReportingService(
@@ -462,13 +470,68 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(BackupContentType.Configuration, backupRestoreService.LastRestoreCommand?.ContentType);
     }
 
+    [Fact]
+    public async Task SelectingSavedPersonImportConfiguration_LoadsItImmediately()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var importRepository = new InMemoryImportMappingConfigurationRepository();
+        await importRepository.SaveAsync(
+            new SaveImportConfigurationCommand(
+                null,
+                ImportConfigurationType.PersonData,
+                "Personenstamm 2",
+                ";",
+                true,
+                "\"",
+                [
+                    new ImportFieldMappingDto("personnel_number", "Personalnummer", false),
+                    new ImportFieldMappingDto("first_name", "Vorname", true)
+                ]),
+            CancellationToken.None);
+
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = new ImportService(
+            importRepository,
+            new InMemoryCsvImportFileReader(),
+            employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+
+        var savedItem = viewModel.PersonImportConfigurations.Single(item => item.Name == "Personenstamm 2");
+        viewModel.PersonImportConfigurationName = string.Empty;
+        viewModel.SelectedPersonImportConfiguration = savedItem;
+
+        await WaitUntilAsync(() => viewModel.PersonImportConfigurationName == "Personenstamm 2");
+
+        Assert.Equal("Personenstamm 2", viewModel.PersonImportConfigurationName);
+        Assert.Contains("geladen", viewModel.PersonImportStatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Personalnummer", viewModel.PersonImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn);
+    }
+
     private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository)
     {
         var settingsRepository = new InMemoryPayrollSettingsRepository();
         var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(repository);
 
         return new MainWindowViewModel(
             new EmployeeService(repository),
+            importService,
             new InMemoryBackupRestoreService(),
             new PayrollSettingsService(settingsRepository),
             new ReportingService(
@@ -479,6 +542,14 @@ public sealed class MainWindowViewModelTests
             monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
             "Test");
+    }
+
+    private static ImportService CreateImportService(IEmployeeRepository employeeRepository)
+    {
+        return new ImportService(
+            new InMemoryImportMappingConfigurationRepository(),
+            new InMemoryCsvImportFileReader(),
+            employeeRepository);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
@@ -548,6 +619,13 @@ public sealed class MainWindowViewModelTests
 
             _employees.TryGetValue(employeeId, out var employee);
             return employee;
+        }
+
+        public Task<EmployeeDetailsDto?> GetByPersonnelNumberAsync(string personnelNumber, CancellationToken cancellationToken)
+        {
+            var trimmedPersonnelNumber = personnelNumber.Trim();
+            var employee = _employees.Values.SingleOrDefault(item => item.PersonnelNumber == trimmedPersonnelNumber);
+            return Task.FromResult(employee);
         }
 
         public Task<bool> PersonnelNumberExistsAsync(string personnelNumber, Guid? excludingEmployeeId, CancellationToken cancellationToken)
@@ -716,6 +794,50 @@ public sealed class MainWindowViewModelTests
                 employee.MonthlyBvgDeductionChf,
                 employee.ContractValidFrom,
                 employee.ContractValidTo);
+        }
+    }
+
+    private sealed class InMemoryImportMappingConfigurationRepository : IImportMappingConfigurationRepository
+    {
+        private readonly Dictionary<Guid, ImportConfigurationDto> _configurations = [];
+
+        public Task<IReadOnlyCollection<ImportConfigurationListItemDto>> ListAsync(ImportConfigurationType type, CancellationToken cancellationToken)
+        {
+            var items = _configurations.Values
+                .Where(item => item.Type == type)
+                .OrderBy(item => item.Name)
+                .Select(item => new ImportConfigurationListItemDto(item.ConfigurationId, item.Name))
+                .ToArray();
+            return Task.FromResult<IReadOnlyCollection<ImportConfigurationListItemDto>>(items);
+        }
+
+        public Task<ImportConfigurationDto?> GetByIdAsync(Guid configurationId, CancellationToken cancellationToken)
+        {
+            _configurations.TryGetValue(configurationId, out var configuration);
+            return Task.FromResult(configuration);
+        }
+
+        public Task<ImportConfigurationDto> SaveAsync(SaveImportConfigurationCommand command, CancellationToken cancellationToken)
+        {
+            var configurationId = command.ConfigurationId ?? Guid.NewGuid();
+            var configuration = new ImportConfigurationDto(
+                configurationId,
+                command.Type,
+                command.Name,
+                command.Delimiter,
+                command.FieldsEnclosed,
+                command.TextQualifier,
+                command.Mappings);
+            _configurations[configurationId] = configuration;
+            return Task.FromResult(configuration);
+        }
+    }
+
+    private sealed class InMemoryCsvImportFileReader : ICsvImportFileReader
+    {
+        public Task<CsvImportDocumentDto> ReadAsync(ReadCsvImportDocumentCommand command, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new CsvImportDocumentDto(["Personalnummer"], []));
         }
     }
 

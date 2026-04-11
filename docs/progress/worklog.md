@@ -139,3 +139,9 @@ Projekt neu strukturiert
 - Vorschau danach von Einzelmonat auf Mehrmonatsverlauf der selektierten Person erweitert
 - Repository liefert fuer die Monatsvorschau jetzt Tabellenzeilen ueber alle vorhandenen `EmployeeMonthlyRecord`-Monate derselben Person; Monate ohne Eintraege bleiben als Platzhalterzeile sichtbar
 - Vorschau-Tabelle um Monatsspalte erweitert; ViewModel- und Service-Tests fuer den Verlauf ueber mehrere Monate erfolgreich ausgeführt
+- neuer Bereich `Einstellungen > Import` eingefuehrt und als erster Schnitt fuer CSV-basierte Import-Konfiguration aufgebaut
+- persistente Mapping-Konfigurationen fuer `Personendaten` und vorbereitet fuer `Stundendaten` modelliert; Speicherung erfolgt nun getrennt ueber `ImportConfigurationType`
+- CSV-Reader mit konfigurierbarem Trenner, optionaler Feldummantelung und einfachem Textqualifier fuer `"` bzw. `'` ergänzt
+- Personendaten-Import ueber Application-/Infrastructure-Schicht umgesetzt; Pflichtfeldpruefung, Header-Erkennung, Mapping-Speichern/Laden und Upsert per Personalnummer ergänzt
+- neue Tests fuer Mapping-Persistenz, CSV-Header, Muss-Felder und Personendaten-Upsert ergänzt
+- `dotnet build Lohnabrechnung.sln -m:1` erfolgreich ausgeführt; `dotnet test` bleibt in der Sandbox weiterhin am VSTest-Socket blockiert
