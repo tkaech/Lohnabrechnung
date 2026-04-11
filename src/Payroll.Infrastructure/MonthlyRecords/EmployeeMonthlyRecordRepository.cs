@@ -473,6 +473,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             GetPreviewColorHint("SUBTOTAL")));
 
         var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, monthlyRecord.PeriodEnd);
+        var usesAge50PlusVacationCompensationRate = payrollSettings.UsesVacationCompensationRateAge50Plus(employeeBirthDate, monthlyRecord.PeriodEnd);
+        var age50PlusEffectiveDate = payrollSettings.GetVacationCompensationRateAge50PlusEffectiveDate(employeeBirthDate);
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.VacationCompensationCode,
@@ -480,11 +482,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             contract is null ? "-" : FormatPercentageRate(effectiveVacationCompensationRate, numberCulture),
             FormatAmount(contract is null ? null : vacationCompensationLine?.AmountChf ?? 0m, numberCulture, currencyCode),
-            contract is null
-                ? "Ohne gueltigen Vertrag nicht ableitbar."
-                : employeeBirthDate.HasValue
-                    ? "Automatisch nach Alter aus Geburtsdatum und gespeicherten Monatsparametern gewaehlt."
-                    : "Ohne Geburtsdatum wird der Standardsatz aus den gespeicherten Monatsparametern verwendet.",
+            BuildVacationCompensationPreviewDetail(contract is not null, employeeBirthDate, usesAge50PlusVacationCompensationRate, age50PlusEffectiveDate),
             false,
             "VACATION_COMP",
             "FER",
@@ -815,6 +813,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var vacationCompensationLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.VacationCompensation);
         var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
         var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, payrollReferenceDate);
+        var usesAge50PlusVacationCompensationRate = payrollSettings.UsesVacationCompensationRateAge50Plus(employeeBirthDate, payrollReferenceDate);
+        var age50PlusEffectiveDate = payrollSettings.GetVacationCompensationRateAge50PlusEffectiveDate(employeeBirthDate);
         var inputs = new List<MonthlyPayrollPreviewDerivationItemDto>
         {
             CreateDerivationItem("INPUT_BASE_HOURS", "Eingabe", "Arbeitsstunden", $"{FormatQuantity(workSummary.WorkHours, numberCulture)} h", null, "Aus den Zeiteintraegen des gewaelten Monats.", "BASE"),
@@ -834,7 +834,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("RULE_NIGHT_RATE", "Regel", "Nachtzuschlagssatz", FormatOptionalPercentageRate(payrollSettings.WorkTimeSupplementSettings.NightSupplementRate, numberCulture), null, "Gespeicherter Monatsparameter fuer Nachtzuschlag.", "TIME_SUPPLEMENTS"),
             CreateDerivationItem("RULE_SUNDAY_RATE", "Regel", "Sonntagszuschlagssatz", FormatOptionalPercentageRate(payrollSettings.WorkTimeSupplementSettings.SundaySupplementRate, numberCulture), null, "Gespeicherter Monatsparameter fuer Sonntagszuschlag.", "TIME_SUPPLEMENTS"),
             CreateDerivationItem("RULE_HOLIDAY_RATE", "Regel", "Feiertagszuschlagssatz", FormatOptionalPercentageRate(payrollSettings.WorkTimeSupplementSettings.HolidaySupplementRate, numberCulture), null, "Gespeicherter Monatsparameter fuer Feiertagszuschlag.", "TIME_SUPPLEMENTS"),
-            CreateDerivationItem("RULE_VACATION_RATE", "Regel", "Ferienentschaedigungssatz", FormatPercentageRate(effectiveVacationCompensationRate, numberCulture), null, employeeBirthDate.HasValue ? "Automatisch nach Alter und gespeichertem Monatsparameter gewaehlt." : "Standardsatz aus dem gespeicherten Monatsparameter-Snapshot.", "VACATION_COMP"),
+            CreateDerivationItem("RULE_VACATION_RATE", "Regel", "Ferienentschaedigungssatz", FormatPercentageRate(effectiveVacationCompensationRate, numberCulture), null, BuildVacationCompensationRuleDetail(employeeBirthDate, usesAge50PlusVacationCompensationRate, age50PlusEffectiveDate), "VACATION_COMP"),
             CreateDerivationItem("RULE_VEHICLE_P1_RATE", "Regel", "Pauschalzone 1 Ansatz", FormatMoney(payrollSettings.VehiclePauschalzone1RateChf, numberCulture, currencyCode), null, "Globaler CHF-Ansatz aus dem gespeicherten Monatsparameter-Snapshot.", "VEHICLE_P1"),
             CreateDerivationItem("RULE_VEHICLE_P2_RATE", "Regel", "Pauschalzone 2 Ansatz", FormatMoney(payrollSettings.VehiclePauschalzone2RateChf, numberCulture, currencyCode), null, "Globaler CHF-Ansatz aus dem gespeicherten Monatsparameter-Snapshot.", "VEHICLE_P2"),
             CreateDerivationItem("RULE_VEHICLE_R1_RATE", "Regel", "Regiezone 1 Ansatz", FormatMoney(payrollSettings.VehicleRegiezone1RateChf, numberCulture, currencyCode), null, "Globaler CHF-Ansatz aus dem gespeicherten Monatsparameter-Snapshot.", "VEHICLE_R1"),
@@ -877,7 +877,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("STEP_VEHICLE_P2", "Schritt", "Fahrzeitentschaedigung Pauschalzone 2", FormatMoney(GetVehicleAmount(derivationLines, "VEHICLE_P2"), numberCulture, currencyCode), $"{FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf), numberCulture)} x {FormatMoney(payrollSettings.VehiclePauschalzone2RateChf, numberCulture, currencyCode)}", null, "VEHICLE_P2"),
             CreateDerivationItem("STEP_VEHICLE_R1", "Schritt", "Fahrzeitentschaedigung Regiezone", FormatMoney(GetVehicleAmount(derivationLines, "VEHICLE_R1"), numberCulture, currencyCode), $"{FormatQuantity(timeEntries.Sum(entry => entry.VehicleRegiezone1Chf), numberCulture)} x {FormatMoney(payrollSettings.VehicleRegiezone1RateChf, numberCulture, currencyCode)}", null, "VEHICLE_R1"),
             CreateDerivationItem("STEP_SUBTOTAL", "Schritt", "Zwischentotal", FormatMoney(subtotalChf, numberCulture, currencyCode), "Basislohn + Zeitzuschlaege + Spezialzuschlag + Fahrzeugentschaedigungen", "Erstes lohnrelevantes Zwischentotal vor weiteren Abzuegen.", "SUBTOTAL"),
-            CreateDerivationItem("STEP_VACATION", "Schritt", "Ferienentschaedigung", vacationCompensationLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(vacationCompensationLine.AmountChf, numberCulture, currencyCode), $"{FormatPercentageRate(effectiveVacationCompensationRate, numberCulture)} x {FormatMoney(subtotalChf, numberCulture, currencyCode)}", "Altersabhaengiger Satz aus dem gespeicherten Monatsparameter-Snapshot.", "VACATION_COMP"),
+            CreateDerivationItem("STEP_VACATION", "Schritt", "Ferienentschaedigung", vacationCompensationLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(vacationCompensationLine.AmountChf, numberCulture, currencyCode), $"{FormatPercentageRate(effectiveVacationCompensationRate, numberCulture)} x {FormatMoney(subtotalChf, numberCulture, currencyCode)}", BuildVacationCompensationStepDetail(employeeBirthDate, usesAge50PlusVacationCompensationRate, age50PlusEffectiveDate), "VACATION_COMP"),
             CreateDerivationItem("STEP_AHV_GROSS", "Schritt", "AHV-pflichtiger Bruttolohn", FormatMoney(ahvGrossChf, numberCulture, currencyCode), "Basislohn + Zuschlaege + Fahrzeugentschaedigungen", "In der aktuellen Vorschau ohne separaten Ferienanteil ausgewiesen.", "AHV_GROSS"),
             BuildDeductionDerivationItem("STEP_AHV", "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, "AHV_IV_EO", numberCulture, currencyCode),
             BuildDeductionDerivationItem("STEP_ALV", "ALV", derivationLines, "ALV", payrollSettings.AlvRate, "ALV", numberCulture, currencyCode),
@@ -1036,6 +1036,66 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return string.Join(" | ", supplementLines.Select(line => $"{line.Description} {FormatMoney(line.AmountChf, numberCulture, currencyCode)}"));
     }
 
+    private static string BuildVacationCompensationPreviewDetail(
+        bool hasContract,
+        DateOnly? employeeBirthDate,
+        bool usesAge50PlusVacationCompensationRate,
+        DateOnly? age50PlusEffectiveDate)
+    {
+        if (!hasContract)
+        {
+            return "Ohne gueltigen Vertrag nicht ableitbar.";
+        }
+
+        if (!employeeBirthDate.HasValue)
+        {
+            return "Ohne Geburtsdatum wird der Standardsatz aus den gespeicherten Monatsparametern verwendet.";
+        }
+
+        if (usesAge50PlusVacationCompensationRate)
+        {
+            return $"Ferienentschaedigung ab 50 Jahren angewendet (gueltig ab {FormatDate(age50PlusEffectiveDate)}).";
+        }
+
+        return $"Standardsatz fuer Ferienentschaedigung angewendet. Erhoehter Satz gilt ab {FormatDate(age50PlusEffectiveDate)}.";
+    }
+
+    private static string BuildVacationCompensationRuleDetail(
+        DateOnly? employeeBirthDate,
+        bool usesAge50PlusVacationCompensationRate,
+        DateOnly? age50PlusEffectiveDate)
+    {
+        if (!employeeBirthDate.HasValue)
+        {
+            return "Standardsatz aus dem gespeicherten Monatsparameter-Snapshot, da kein Geburtsdatum vorliegt.";
+        }
+
+        if (usesAge50PlusVacationCompensationRate)
+        {
+            return $"Ferienentschaedigung ab 50 Jahren angewendet. Der erhoehte Satz gilt seit {FormatDate(age50PlusEffectiveDate)}.";
+        }
+
+        return $"Standardsatz angewendet. Der erhoehte Satz gilt ab {FormatDate(age50PlusEffectiveDate)}.";
+    }
+
+    private static string BuildVacationCompensationStepDetail(
+        DateOnly? employeeBirthDate,
+        bool usesAge50PlusVacationCompensationRate,
+        DateOnly? age50PlusEffectiveDate)
+    {
+        if (!employeeBirthDate.HasValue)
+        {
+            return "Ferienentschaedigung mit Standardsatz berechnet, da kein Geburtsdatum vorliegt.";
+        }
+
+        if (usesAge50PlusVacationCompensationRate)
+        {
+            return $"Ferienentschaedigung ab 50 Jahren angewendet. Berechnung mit dem erhoehten Satz seit {FormatDate(age50PlusEffectiveDate)}.";
+        }
+
+        return $"Ferienentschaedigung mit Standardsatz berechnet. Der erhoehte Satz gilt ab {FormatDate(age50PlusEffectiveDate)}.";
+    }
+
     private static string BuildSupplementStepFormula(
         IReadOnlyCollection<PayrollRunLine> supplementLines,
         decimal hourlyRateChf,
@@ -1122,6 +1182,11 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     private static string FormatMoney(decimal value, CultureInfo numberCulture, string currencyCode)
     {
         return $"{value.ToString("#,##0.00", numberCulture)} {NormalizeCurrencyCode(currencyCode)}";
+    }
+
+    private static string FormatDate(DateOnly? value)
+    {
+        return value?.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) ?? "-";
     }
 
     private static string FormatQuantity(decimal value, CultureInfo numberCulture)

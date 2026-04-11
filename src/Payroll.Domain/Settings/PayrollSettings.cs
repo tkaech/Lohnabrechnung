@@ -5,6 +5,7 @@ namespace Payroll.Domain.Settings;
 
 public sealed class PayrollSettings : AuditableEntity
 {
+    public const int VacationCompensationAge50ThresholdYears = 50;
     public const decimal DefaultAhvIvEoRate = 0.053m;
     public const decimal DefaultAlvRate = 0.011m;
     public const decimal DefaultSicknessAccidentInsuranceRate = 0.00821m;
@@ -214,20 +215,25 @@ public sealed class PayrollSettings : AuditableEntity
 
     public decimal GetVacationCompensationRate(DateOnly? birthDate, DateOnly payrollReferenceDate)
     {
-        if (!birthDate.HasValue)
-        {
-            return VacationCompensationRate;
-        }
-
-        var age = payrollReferenceDate.Year - birthDate.Value.Year;
-        if (new DateOnly(payrollReferenceDate.Year, birthDate.Value.Month, birthDate.Value.Day) > payrollReferenceDate)
-        {
-            age--;
-        }
-
-        return age >= 50
+        return UsesVacationCompensationRateAge50Plus(birthDate, payrollReferenceDate)
             ? VacationCompensationRateAge50Plus
             : VacationCompensationRate;
+    }
+
+    public bool UsesVacationCompensationRateAge50Plus(DateOnly? birthDate, DateOnly payrollReferenceDate)
+    {
+        var effectiveDate = GetVacationCompensationRateAge50PlusEffectiveDate(birthDate);
+        return effectiveDate.HasValue && payrollReferenceDate >= effectiveDate.Value;
+    }
+
+    public DateOnly? GetVacationCompensationRateAge50PlusEffectiveDate(DateOnly? birthDate)
+    {
+        if (!birthDate.HasValue)
+        {
+            return null;
+        }
+
+        return new DateOnly(birthDate.Value.Year + VacationCompensationAge50ThresholdYears, 1, 1);
     }
 
     public void UpdatePrintTemplate(string? printTemplate)

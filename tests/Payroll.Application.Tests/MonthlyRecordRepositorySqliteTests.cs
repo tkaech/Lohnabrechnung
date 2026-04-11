@@ -149,6 +149,49 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.RateDisplay == "Nacht 25 %");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672,00 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "10,64 %");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.Detail == "Standardsatz fuer Ferienentschaedigung angewendet. Erhoehter Satz gilt ab 01.01.2040.");
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_ShowsAge50PlusVacationCompensationHint_FromStartOfYearEmployeeTurns50()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee(birthDate: new DateOnly(1976, 11, 20));
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, 120m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "12,64 %");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.Detail == "Ferienentschaedigung ab 50 Jahren angewendet (gueltig ab 01.01.2026).");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Ferienentschaedigungssatz" && item.Detail == "Ferienentschaedigung ab 50 Jahren angewendet. Der erhoehte Satz gilt seit 01.01.2026.");
     }
 
     [Fact]
@@ -543,13 +586,17 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.Contains("Spesen 18,50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
-    private static global::Payroll.Domain.Employees.Employee CreateEmployee(string personnelNumber = "9000", string firstName = "Anna", string lastName = "Aktiv")
+    private static global::Payroll.Domain.Employees.Employee CreateEmployee(
+        string personnelNumber = "9000",
+        string firstName = "Anna",
+        string lastName = "Aktiv",
+        DateOnly? birthDate = null)
     {
         return new global::Payroll.Domain.Employees.Employee(
             personnelNumber,
             firstName,
             lastName,
-            new DateOnly(1990, 2, 1),
+            birthDate ?? new DateOnly(1990, 2, 1),
             new DateOnly(2025, 1, 1),
             null,
             true,
