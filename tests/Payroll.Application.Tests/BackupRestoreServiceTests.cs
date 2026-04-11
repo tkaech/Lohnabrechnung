@@ -3,6 +3,7 @@ using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Settings;
+using Payroll.Domain.Employees;
 using Payroll.Infrastructure.BackupRestore;
 using Payroll.Infrastructure.Employees;
 using Payroll.Infrastructure.MonthlyRecords;
@@ -105,6 +106,7 @@ public sealed class BackupRestoreServiceTests
                 departmentId,
                 categoryId,
                 locationId,
+                EmployeeWageType.Hourly,
                 new DateOnly(2025, 1, 1),
                 null,
                 33.50m,

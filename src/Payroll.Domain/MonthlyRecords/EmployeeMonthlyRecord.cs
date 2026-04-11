@@ -96,7 +96,7 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
     {
         EnsureDateInMonth(workDate, nameof(workDate));
 
-        var existingEntry = ResolveTimeEntry(timeEntryId, workDate);
+        var existingEntry = ResolveTimeEntry(timeEntryId);
         if (existingEntry is null)
         {
             var createdEntry = new TimeEntry(
@@ -115,7 +115,7 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
             return createdEntry;
         }
 
-        EnsureNoOtherTimeEntryUsesDate(existingEntry.Id, workDate);
+        EnsureNoOtherTimeEntryExists(existingEntry.Id);
         existingEntry.Update(
             workDate,
             hoursWorked,
@@ -150,7 +150,7 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         return ExpenseEntry;
     }
 
-    private TimeEntry? ResolveTimeEntry(Guid? timeEntryId, DateOnly workDate)
+    private TimeEntry? ResolveTimeEntry(Guid? timeEntryId)
     {
         if (timeEntryId.HasValue)
         {
@@ -158,14 +158,19 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
                 ?? throw new InvalidOperationException("Time entry was not found.");
         }
 
-        return _timeEntries.SingleOrDefault(item => item.WorkDate == workDate);
+        return _timeEntries.Count switch
+        {
+            0 => null,
+            1 => _timeEntries[0],
+            _ => throw new InvalidOperationException("Only one time entry per employee and month is allowed.")
+        };
     }
 
-    private void EnsureNoOtherTimeEntryUsesDate(Guid currentTimeEntryId, DateOnly workDate)
+    private void EnsureNoOtherTimeEntryExists(Guid currentTimeEntryId)
     {
-        if (_timeEntries.Any(item => item.Id != currentTimeEntryId && item.WorkDate == workDate))
+        if (_timeEntries.Any(item => item.Id != currentTimeEntryId))
         {
-            throw new InvalidOperationException("Only one time entry per employee, month and date is allowed.");
+            throw new InvalidOperationException("Only one time entry per employee and month is allowed.");
         }
     }
 

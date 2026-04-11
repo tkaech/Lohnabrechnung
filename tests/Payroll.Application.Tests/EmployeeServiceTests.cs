@@ -1,4 +1,5 @@
 using Payroll.Application.Employees;
+using Payroll.Domain.Employees;
 
 namespace Payroll.Application.Tests;
 
@@ -45,6 +46,7 @@ public sealed class EmployeeServiceTests
         Assert.Equal("Zuerich", employee.City);
         Assert.Equal("DE", employee.Nationality);
         Assert.True(employee.IsSubjectToWithholdingTax);
+        Assert.Equal(EmployeeWageType.Hourly, employee.WageType);
         Assert.Equal(34m, employee.HourlyRateChf);
         Assert.Equal(3.50m, employee.SpecialSupplementRateChf);
     }
@@ -81,6 +83,7 @@ public sealed class EmployeeServiceTests
                 city: "Basel",
                 isActive: false,
                 exitDate: new DateOnly(2026, 8, 31),
+                wageType: EmployeeWageType.Monthly,
                 hourlyRateChf: 36m,
                 monthlyBvgDeductionChf: 310m,
                 specialSupplementRateChf: 4.00m));
@@ -90,6 +93,7 @@ public sealed class EmployeeServiceTests
         Assert.Equal("Maxim", updated.FirstName);
         Assert.Equal("Basel", updated.City);
         Assert.False(updated.IsActive);
+        Assert.Equal(EmployeeWageType.Monthly, updated.WageType);
         Assert.Equal(36m, updated.HourlyRateChf);
         Assert.Equal(4.00m, updated.SpecialSupplementRateChf);
     }
@@ -234,6 +238,7 @@ public sealed class EmployeeServiceTests
                 command.EmploymentCategoryOptionId.HasValue ? "A" : null,
                 command.EmploymentLocationOptionId,
                 command.EmploymentLocationOptionId.HasValue ? "Schachenstr. 7, Emmenbruecke" : null,
+                command.WageType,
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
@@ -255,6 +260,7 @@ public sealed class EmployeeServiceTests
         string? nationality = "CH",
         bool isActive = true,
         bool? isSubjectToWithholdingTax = null,
+        EmployeeWageType wageType = EmployeeWageType.Hourly,
         string? email = null,
         DateOnly? exitDate = null,
         decimal hourlyRateChf = 32.5m,
@@ -288,6 +294,7 @@ public sealed class EmployeeServiceTests
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
             Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            wageType,
             new DateOnly(2026, 1, 1),
             null,
             hourlyRateChf,

@@ -187,6 +187,36 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task NewEmployee_DefaultsToHourlyWageType_AndPersistsSelectedValue()
+    {
+        var repository = new TestEmployeeRepository();
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+
+        viewModel.NewEmployeeCommand.Execute(null);
+
+        Assert.Equal("Stundenlohn", viewModel.SelectedWageType);
+
+        viewModel.PersonnelNumber = "3000";
+        viewModel.FirstName = "Mila";
+        viewModel.LastName = "Test";
+        viewModel.EntryDate = new DateTimeOffset(new DateTime(2026, 1, 1));
+        viewModel.ContractValidFrom = new DateTimeOffset(new DateTime(2026, 1, 1));
+        viewModel.Street = "Testweg";
+        viewModel.PostalCode = "6000";
+        viewModel.City = "Luzern";
+        viewModel.Country = "Schweiz";
+        viewModel.SelectedWageType = "Monatslohn";
+
+        viewModel.SaveCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Mitarbeitender 3000 gespeichert.");
+
+        Assert.Equal("Monatslohn", viewModel.SelectedWageType);
+        Assert.Equal(EmployeeWageType.Monthly, repository.LastSavedCommand?.WageType);
+    }
+
+    [Fact]
     public async Task ClearExitDateCommand_RemovesExitDateInEditMode()
     {
         var employee = TestEmployeeRepository.CreateInactiveDetails("1000", "Anna", "Archiv", "Bern");
@@ -478,6 +508,7 @@ public sealed class MainWindowViewModelTests
 
         public Func<Guid, Task>? GetByIdDelay { get; set; }
         public TaskCompletionSource FirstLoadRelease { get; }
+        public SaveEmployeeCommand? LastSavedCommand { get; private set; }
 
         public Task<IReadOnlyCollection<EmployeeListItemDto>> ListAsync(EmployeeListQuery query, CancellationToken cancellationToken)
         {
@@ -545,6 +576,7 @@ public sealed class MainWindowViewModelTests
 
         public Task<EmployeeDetailsDto> SaveAsync(SaveEmployeeCommand command, CancellationToken cancellationToken)
         {
+            LastSavedCommand = command;
             var employeeId = command.EmployeeId ?? Guid.NewGuid();
             var employee = new EmployeeDetailsDto(
                 employeeId,
@@ -576,6 +608,7 @@ public sealed class MainWindowViewModelTests
                 command.EmploymentCategoryOptionId.HasValue ? "A" : null,
                 command.EmploymentLocationOptionId,
                 command.EmploymentLocationOptionId.HasValue ? "Schachenstr. 7, Emmenbruecke" : null,
+                command.WageType,
                 command.ContractValidFrom,
                 command.ContractValidTo,
                 command.HourlyRateChf,
@@ -618,6 +651,7 @@ public sealed class MainWindowViewModelTests
                 "A",
                 Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 "Schachenstr. 7, Emmenbruecke",
+                EmployeeWageType.Hourly,
                 new DateOnly(2025, 1, 1),
                 null,
                 32.5m,
@@ -657,6 +691,7 @@ public sealed class MainWindowViewModelTests
                 "A",
                 Guid.Parse("33333333-3333-3333-3333-333333333333"),
                 "Schachenstr. 7, Emmenbruecke",
+                EmployeeWageType.Hourly,
                 new DateOnly(2025, 1, 1),
                 null,
                 32.5m,

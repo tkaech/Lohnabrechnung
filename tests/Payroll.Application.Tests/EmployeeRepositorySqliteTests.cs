@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.Employees;
+using Payroll.Domain.Employees;
 using Payroll.Infrastructure.Employees;
 using Payroll.Infrastructure.Persistence;
 
@@ -58,6 +59,7 @@ public sealed class EmployeeRepositorySqliteTests
                 department.Id,
                 category.Id,
                 location.Id,
+                EmployeeWageType.Monthly,
                 new DateOnly(2026, 1, 1),
                 null,
                 32.5m,
@@ -77,6 +79,7 @@ public sealed class EmployeeRepositorySqliteTests
         Assert.Equal("Sicherheit", saved.DepartmentName);
         Assert.Equal("A", saved.EmploymentCategoryName);
         Assert.Equal("Schachenstr. 7, Emmenbruecke", saved.EmploymentLocationName);
+        Assert.Equal(EmployeeWageType.Monthly, saved.WageType);
         Assert.Equal(3.00m, saved.SpecialSupplementRateChf);
     }
 }

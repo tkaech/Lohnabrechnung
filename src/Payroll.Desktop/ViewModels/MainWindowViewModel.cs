@@ -8,6 +8,7 @@ using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
 using Payroll.Desktop.Styles;
+using Payroll.Domain.Employees;
 
 namespace Payroll.Desktop.ViewModels;
 
@@ -32,6 +33,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string WithholdingTaxUnknown = "Ungeklaert";
     private const string WithholdingTaxYes = "Ja";
     private const string WithholdingTaxNo = "Nein";
+    private const string WageTypeHourlyLabel = "Stundenlohn";
+    private const string WageTypeMonthlyLabel = "Monatslohn";
     private const string BackupTypeConfigurationLabel = "Nur Konfiguration";
     private const string BackupTypeUserDataLabel = "Nur Nutzdaten";
     private const string BackupTypeBothLabel = "Beides";
@@ -78,6 +81,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private EditableSettingOptionViewModel? _selectedDepartmentOption;
     private EditableSettingOptionViewModel? _selectedEmploymentCategoryOption;
     private EditableSettingOptionViewModel? _selectedEmploymentLocationOption;
+    private string _selectedWageType = WageTypeHourlyLabel;
     private EditableSettingOptionViewModel? _selectedSettingsDepartment;
     private EditableSettingOptionViewModel? _selectedSettingsEmploymentCategory;
     private EditableSettingOptionViewModel? _selectedSettingsEmploymentLocation;
@@ -159,6 +163,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
         MonthCaptureFilters = [MonthCaptureFilterAll, MonthCaptureFilterWithoutMonth, MonthCaptureFilterWithMonth];
         WithholdingTaxOptions = [WithholdingTaxUnknown, WithholdingTaxYes, WithholdingTaxNo];
+        WageTypeOptions = [WageTypeHourlyLabel, WageTypeMonthlyLabel];
         BackupContentTypeOptions = [BackupTypeConfigurationLabel, BackupTypeUserDataLabel, BackupTypeBothLabel];
         DecimalSeparatorOptions = [",", "."];
         ThousandsSeparatorOptions = [ThousandsSeparatorApostropheLabel, ThousandsSeparatorSpaceLabel];
@@ -230,6 +235,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> MonthCaptureFilters { get; }
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
+    public IReadOnlyList<string> WageTypeOptions { get; }
     public IReadOnlyList<string> BackupContentTypeOptions { get; }
     public IReadOnlyList<string> DecimalSeparatorOptions { get; }
     public IReadOnlyList<string> ThousandsSeparatorOptions { get; }
@@ -273,6 +279,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool ShowHelpWorkspace => IsHelpWorkspace;
     public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace && !IsHelpWorkspace;
     public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace && !IsHelpWorkspace;
+    public bool ShowPrimaryWorkspaceHeader => !IsTimeAndExpensesWorkspace && !IsEmployeeWorkspace;
     public string MonthCaptureMonthLabel => MonthlyRecord.SelectedMonth.HasValue
         ? $"{MonthlyRecord.SelectedMonth.Value:MM/yyyy}"
         : "-";
@@ -552,6 +559,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _selectedEmploymentLocationOption;
         set => SetProperty(ref _selectedEmploymentLocationOption, value);
+    }
+
+    public string SelectedWageType
+    {
+        get => _selectedWageType;
+        set => SetProperty(ref _selectedWageType, value);
     }
 
     public EditableSettingOptionViewModel? SelectedSettingsDepartment
@@ -1038,6 +1051,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 SelectedDepartmentOption?.OptionId,
                 SelectedEmploymentCategoryOption?.OptionId,
                 SelectedEmploymentLocationOption?.OptionId,
+                MapSelectedWageType(),
                 DateOnly.FromDateTime(ContractValidFrom.Value.Date),
                 ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null,
                 ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
@@ -1393,6 +1407,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedDepartmentOption = FindOptionById(DepartmentOptions, employee.DepartmentOptionId);
         SelectedEmploymentCategoryOption = FindOptionById(EmploymentCategoryOptions, employee.EmploymentCategoryOptionId);
         SelectedEmploymentLocationOption = FindOptionById(EmploymentLocationOptions, employee.EmploymentLocationOptionId);
+        SelectedWageType = MapWageTypeToLabel(employee.WageType);
         ContractValidFrom = employee.ContractValidFrom == default
             ? null
             : new DateTimeOffset(employee.ContractValidFrom.ToDateTime(TimeOnly.MinValue));
@@ -1431,6 +1446,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedDepartmentOption = DepartmentOptions.FirstOrDefault();
         SelectedEmploymentCategoryOption = EmploymentCategoryOptions.FirstOrDefault();
         SelectedEmploymentLocationOption = EmploymentLocationOptions.FirstOrDefault();
+        SelectedWageType = WageTypeHourlyLabel;
         ContractValidFrom = new DateTimeOffset(DateTime.Today);
         ContractValidTo = null;
         HourlyRateChf = NumericFormatManager.FormatDecimal(0m, "0");
@@ -1466,6 +1482,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedDepartmentOption = null;
         SelectedEmploymentCategoryOption = null;
         SelectedEmploymentLocationOption = null;
+        SelectedWageType = WageTypeHourlyLabel;
         ContractValidFrom = null;
         ContractValidTo = null;
         HourlyRateChf = string.Empty;
@@ -1844,6 +1861,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             : ThousandsSeparatorApostropheLabel;
     }
 
+    private EmployeeWageType MapSelectedWageType()
+    {
+        return SelectedWageType == WageTypeMonthlyLabel
+            ? EmployeeWageType.Monthly
+            : EmployeeWageType.Hourly;
+    }
+
+    private static string MapWageTypeToLabel(EmployeeWageType wageType)
+    {
+        return wageType == EmployeeWageType.Monthly
+            ? WageTypeMonthlyLabel
+            : WageTypeHourlyLabel;
+    }
+
     private static IReadOnlyCollection<PayrollPreviewHelpOptionDto> BuildPayrollPreviewHelpOptionDtos(
         IEnumerable<PayrollPreviewHelpToggleViewModel> options)
     {
@@ -2000,6 +2031,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(ShowHelpWorkspace));
         RaisePropertyChanged(nameof(ShowEmployeeSelectionArea));
         RaisePropertyChanged(nameof(ShowPrimaryWorkspaceArea));
+        RaisePropertyChanged(nameof(ShowPrimaryWorkspaceHeader));
         RaisePropertyChanged(nameof(CanSaveSettings));
         RaisePropertyChanged(nameof(CanCreatePayrollPdf));
         RaiseActionStateChanged();

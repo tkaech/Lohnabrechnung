@@ -35,106 +35,89 @@
     </Border>
 
     <Border Grid.Row="1" Classes="surface-panel" Padding="12" Margin="0,0,0,16">
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button Classes="nav-active" Content="Mitarbeitende" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-        <Button Classes="nav-active" Content="Zeit- und Spesenerfassung" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-        <Button Classes="nav-active" Content="Lohnlaeufe" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-        <Button Classes="nav-placeholder" Content="AHV / Abzuege" IsEnabled="False" />
-        <Button Classes="nav-placeholder" Content="Quellensteuer" IsEnabled="False" />
-        <Button Classes="nav-active" Content="Reporting" IsVisible="{Binding IsReportingWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-        <Button Classes="nav-active" Content="Einstellungen" IsVisible="{Binding IsSettingsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-        <Button Classes="nav-active" Content="Hilfe" IsVisible="{Binding IsHelpWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-        <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-      </StackPanel>
+      <Grid ColumnDefinitions="Auto,*">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+          <Button Classes="nav-active" Content="Mitarbeitende" IsVisible="{Binding IsEmployeeWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsReportingWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+          <Button Classes="nav-active" Content="Zeit- und Spesenerfassung" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsReportingWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+          <Button Classes="nav-active" Content="Lohnlaeufe" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsReportingWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+          <Button Classes="nav-placeholder" Content="AHV / Abzuege" IsEnabled="False" />
+          <Button Classes="nav-placeholder" Content="Quellensteuer" IsEnabled="False" />
+          <Button Classes="nav-active" Content="Reporting" IsVisible="{Binding IsReportingWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+          <Button Classes="nav-active" Content="Einstellungen" IsVisible="{Binding IsSettingsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsReportingWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
+          <Button Classes="nav-active" Content="Hilfe" IsVisible="{Binding IsHelpWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsReportingWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
+          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
+        </StackPanel>
+        <Grid Grid.Column="1" ColumnDefinitions="210,92,34,34" HorizontalAlignment="Right" Margin="12,0,0,0" IsVisible="{Binding ShowEmployeeSelectionArea}">
+          <TextBox
+              IsEnabled="{Binding CanSearchEmployees}"
+              Watermark="Suche Mitarbeitende"
+              Text="{Binding SearchText, Mode=TwoWay}" />
+          <ComboBox
+              Grid.Column="1"
+              Margin="6,0,0,0"
+              IsEnabled="{Binding CanSearchEmployees}"
+              ItemsSource="{Binding ActivityFilters}"
+              SelectedItem="{Binding SelectedActivityFilter, Mode=TwoWay}" />
+          <Button
+              Grid.Column="2"
+              Width="34"
+              MinWidth="34"
+              Height="34"
+              Margin="6,0,0,0"
+              Command="{Binding SearchCommand}"
+              ToolTip.Tip="Suchen">
+            <PathIcon Width="16" Height="16" Data="M9.5,3A6.5,6.5 0,0 0 9.5,16A6.47,6.47 0,0 0 13.62,14.59L18.71,19.71L20.12,18.3L15.03,13.21A6.47,6.47 0,0 0 16,9.5A6.5,6.5 0,0 0 9.5,3M9.5,5A4.5,4.5 0,0 1 14,9.5A4.5,4.5 0,0 1 9.5,14A4.5,4.5 0,0 1 5,9.5A4.5,4.5 0,0 1 9.5,5Z" />
+          </Button>
+          <Button
+              Grid.Column="3"
+              Width="34"
+              MinWidth="34"
+              Height="34"
+              Margin="6,0,0,0"
+              Command="{Binding RefreshCommand}"
+              ToolTip.Tip="Aktualisieren">
+            <PathIcon Width="16" Height="16" Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0,0 0 4,12A8,8 0,0 0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.82,16.33 14.61,18 12,18A6,6 0,0 1 6,12A6,6 0,0 1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" />
+          </Button>
+        </Grid>
+      </Grid>
     </Border>
 
     <Grid Grid.Row="2" ColumnDefinitions="360,*" MinHeight="0">
       <controls:AppSectionCard Grid.Column="0" Header="Mitarbeitende" Margin="0,0,8,0" IsVisible="{Binding ShowEmployeeSelectionArea}">
-        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" MinHeight="0">
-          <Border Grid.Row="0" Background="#FFF8FAFC" CornerRadius="8" Padding="12" IsVisible="{Binding ShowTimeAndExpensesWorkspace}">
-            <StackPanel Spacing="8" DataContext="{Binding MonthlyRecord}">
-              <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Monat waehlen. Der Monatskontext wird anschliessend beim Mitarbeitendenwechsel automatisch geladen." TextWrapping="Wrap" />
-              <DatePicker DayVisible="False" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Row="0" Background="#FFF8FAFC" CornerRadius="8" Padding="12" IsVisible="{Binding ShowPayrollRunsWorkspace}">
-            <StackPanel Spacing="8" DataContext="{Binding MonthlyRecord}">
-              <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Monat waehlen und Mitarbeitenden selektieren, damit links die Lohn-Vorschau fuer genau diesen Monat geladen wird." TextWrapping="Wrap" />
-              <DatePicker DayVisible="False" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Row="0" Background="#FFF8FAFC" CornerRadius="8" Padding="12" IsVisible="{Binding ShowReportingWorkspace}">
-            <StackPanel Spacing="8" DataContext="{Binding MonthlyRecord}">
-              <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
-              <TextBlock Foreground="#FF5F6B7A" Text="Monat waehlen, damit rechts die tabellarische Monats-/Stundenerfassung fuer alle Mitarbeitenden geladen wird." TextWrapping="Wrap" />
-              <DatePicker DayVisible="False" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Row="0" Background="#FFF8FAFC" CornerRadius="8" Padding="12" IsVisible="{Binding ShowEmployeeWorkspace}">
-            <TextBlock Foreground="#FF5F6B7A" Text="Stammdaten werden separat gepflegt. Die gleiche Mitarbeitendenliste bleibt fuer beide Arbeitsbereiche erhalten." TextWrapping="Wrap" />
-          </Border>
-
-          <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
-            <TextBox
-                IsEnabled="{Binding CanSearchEmployees}"
-                Watermark="Suche nach Name, Personalnummer, Ort oder E-Mail"
-                Text="{Binding SearchText, Mode=TwoWay}" />
-            <ComboBox
-                Grid.Column="1"
-                Width="120"
-                Margin="8,0,0,0"
-                IsEnabled="{Binding CanSearchEmployees}"
-                ItemsSource="{Binding ActivityFilters}"
-                SelectedItem="{Binding SelectedActivityFilter, Mode=TwoWay}" />
-            <Button
-                Grid.Column="2"
-                Margin="8,0,0,0"
-                Command="{Binding SearchCommand}"
-                Content="Suchen" />
-          </Grid>
-
-          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
-            <Button Command="{Binding RefreshCommand}" Content="Aktualisieren" />
-          </StackPanel>
-
-          <TextBlock Grid.Row="3" Margin="0,12,0,0" Foreground="#FF5F6B7A" Text="{Binding EmployeeCountSummary}" />
+        <Grid RowDefinitions="Auto,*" MinHeight="0">
+          <TextBlock Grid.Row="0" Foreground="#FF5F6B7A" Text="{Binding EmployeeCountSummary}" />
 
           <ListBox
-              Grid.Row="4"
+              Grid.Row="1"
               MinHeight="0"
               Margin="0,12,0,0"
               IsEnabled="{Binding CanSelectEmployees}"
@@ -287,139 +270,164 @@
               </TabItem>
 
               <TabItem Header="Berechnung">
-                <StackPanel Spacing="12" Margin="0,12,0,0">
-                  <TextBlock FontWeight="SemiBold" Text="Zahlenformat" />
-                  <Grid ColumnDefinitions="220,220,220">
-                    <StackPanel Spacing="4">
-                      <TextBlock Classes="section-caption" Text="Dezimaltrennzeichen" />
-                      <ComboBox ItemsSource="{Binding DecimalSeparatorOptions}"
-                                SelectedItem="{Binding SettingsDecimalSeparator, Mode=TwoWay}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
-                      <TextBlock Classes="section-caption" Text="Tausendertrennzeichen" />
-                      <ComboBox ItemsSource="{Binding ThousandsSeparatorOptions}"
-                                SelectedItem="{Binding SettingsThousandsSeparator, Mode=TwoWay}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0">
-                      <TextBlock Classes="section-caption" Text="Waehrung" />
-                      <TextBox Text="{Binding SettingsCurrencyCode, Mode=TwoWay}" Watermark="CHF" />
-                    </StackPanel>
-                  </Grid>
-                  <TextBlock Foreground="#FF5F6B7A"
-                             Text="Intern wird kulturunabhaengig mit Dezimalwerten gerechnet. Die UI zeigt Zahlen mit dem hier gewaehlten Trennzeichen."
-                             TextWrapping="Wrap" />
-                  <TextBlock FontWeight="SemiBold" Text="Arbeitszeitzuschlaege" />
-                  <TextBlock Foreground="#FF5F6B7A" Text="Prozentsaetze als echte Prozentwerte pflegen, zum Beispiel `25` oder `25,5` fuer 25 bzw. 25,5 Prozent." TextWrapping="Wrap" />
-                  <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
-                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
-                      <TextBlock Classes="section-caption" Text="Nachtzuschlag" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsNightSupplementRate, Mode=TwoWay}" Watermark="z. B. 25" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                <TabControl Margin="0,12,0,0">
+                  <TabItem Header="Allgemein">
+                    <StackPanel Spacing="12" Margin="0,12,0,0">
+                      <TextBlock FontWeight="SemiBold" Text="Zahlenformat" />
+                      <Grid ColumnDefinitions="220,220,220">
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="section-caption" Text="Dezimaltrennzeichen" />
+                          <ComboBox ItemsSource="{Binding DecimalSeparatorOptions}"
+                                    SelectedItem="{Binding SettingsDecimalSeparator, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4" Margin="12,0,0,0">
+                          <TextBlock Classes="section-caption" Text="Tausendertrennzeichen" />
+                          <ComboBox ItemsSource="{Binding ThousandsSeparatorOptions}"
+                                    SelectedItem="{Binding SettingsThousandsSeparator, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4" Margin="12,0,0,0">
+                          <TextBlock Classes="section-caption" Text="Waehrung" />
+                          <TextBox Text="{Binding SettingsCurrencyCode, Mode=TwoWay}" Watermark="CHF" />
+                        </StackPanel>
                       </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
-                      <TextBlock Classes="section-caption" Text="Sonntagszuschlag" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsSundaySupplementRate, Mode=TwoWay}" Watermark="z. B. 50" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                      <TextBlock Classes="section-caption" Text="Feiertagszuschlag" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsHolidaySupplementRate, Mode=TwoWay}" Watermark="z. B. 100" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                  </Grid>
+                      <TextBlock Foreground="#FF5F6B7A"
+                                 Text="Intern wird kulturunabhaengig mit Dezimalwerten gerechnet. Die UI zeigt Zahlen mit dem hier gewaehlten Trennzeichen."
+                                 TextWrapping="Wrap" />
 
-                  <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
-                  <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden als echte Prozentangaben erfasst und intern fuer die Berechnung automatisch in Dezimalwerte umgerechnet." TextWrapping="Wrap" />
-                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
-                    <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
-                      <TextBlock Classes="section-caption" Text="AHV/IV/EO" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsAhvIvEoRate, Mode=TwoWay}" Watermark="5.3" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                      <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden als echte Prozentangaben erfasst und intern fuer die Berechnung automatisch in Dezimalwerte umgerechnet." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                          <TextBlock Classes="section-caption" Text="AHV/IV/EO" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsAhvIvEoRate, Mode=TwoWay}" Watermark="5.3" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                          <TextBlock Classes="section-caption" Text="ALV" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsAlvRate, Mode=TwoWay}" Watermark="1.1" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                          <TextBlock Classes="section-caption" Text="Krankentaggeld/UVG" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsSicknessAccidentInsuranceRate, Mode=TwoWay}" Watermark="0.821" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                          <TextBlock Classes="section-caption" Text="Aus- und Weiterbildung inkl. Ferien" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsTrainingAndHolidayRate, Mode=TwoWay}" Watermark="0.015" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
                       </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
-                      <TextBlock Classes="section-caption" Text="ALV" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsAlvRate, Mode=TwoWay}" Watermark="1.1" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
-                      <TextBlock Classes="section-caption" Text="Krankentaggeld/UVG" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsSicknessAccidentInsuranceRate, Mode=TwoWay}" Watermark="0.821" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
-                      <TextBlock Classes="section-caption" Text="Aus- und Weiterbildung inkl. Ferien" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsTrainingAndHolidayRate, Mode=TwoWay}" Watermark="0.015" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
-                      <TextBlock Classes="section-caption" Text="Ferienentschaedigung" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsVacationCompensationRate, Mode=TwoWay}" Watermark="10.64" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
-                      <TextBlock Classes="section-caption" Text="Ferienentschaedigung ab 50 Jahren" />
-                      <Grid>
-                        <TextBox Padding="8,6,28,6" Text="{Binding SettingsVacationCompensationRateAge50Plus, Mode=TwoWay}" Watermark="10.64" />
-                        <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
-                      </Grid>
-                    </StackPanel>
-                  </Grid>
 
-                  <TextBlock FontWeight="SemiBold" Text="Fahrzeugansaetze" />
-                  <TextBlock Foreground="#FF5F6B7A" Text="Die Waehrungswerte werden mit den in der Monatserfassung erfassten Mengen multipliziert." TextWrapping="Wrap" />
-                  <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
-                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
-                      <TextBlock Classes="section-caption" Text="Pauschalzone 1" />
-                      <Grid>
-                        <TextBox Padding="54,6,8,6" Text="{Binding SettingsVehiclePauschalzone1RateChf, Mode=TwoWay}" />
-                        <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
-                      </Grid>
+                      <TextBlock FontWeight="SemiBold" Text="Hilfetexte im Lohnlauf" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Nur die wichtigsten Hilfetexte sind hier konfigurierbar. Checkbox steuert die Anzeige, das Textfeld ueberschreibt optional den bestehenden Text in Lohnlauf und PDF." TextWrapping="Wrap" />
+                      <ItemsControl ItemsSource="{Binding PayrollPreviewHelpOptions}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Grid ColumnDefinitions="260,*" RowDefinitions="Auto" Margin="0,2,0,6">
+                              <CheckBox Margin="0,2,12,0" Content="{Binding Label}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
+                              <TextBox Grid.Column="1" Text="{Binding HelpText, Mode=TwoWay}" AcceptsReturn="False" TextWrapping="NoWrap" Watermark="Leer lassen = bestehenden Text verwenden" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
-                      <TextBlock Classes="section-caption" Text="Pauschalzone 2" />
-                      <Grid>
-                        <TextBox Padding="54,6,8,6" Text="{Binding SettingsVehiclePauschalzone2RateChf, Mode=TwoWay}" />
-                        <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
-                      </Grid>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                      <TextBlock Classes="section-caption" Text="Regiezone 1" />
-                      <Grid>
-                        <TextBox Padding="54,6,8,6" Text="{Binding SettingsVehicleRegiezone1RateChf, Mode=TwoWay}" />
-                        <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
-                      </Grid>
-                    </StackPanel>
-                  </Grid>
+                  </TabItem>
 
-                  <TextBlock FontWeight="SemiBold" Text="Hilfetexte im Lohnlauf" />
-                  <TextBlock Foreground="#FF5F6B7A" Text="Nur die wichtigsten Hilfetexte sind hier konfigurierbar. Checkbox steuert die Anzeige, das Textfeld ueberschreibt optional den bestehenden Text in Lohnlauf und PDF." TextWrapping="Wrap" />
-                  <ItemsControl ItemsSource="{Binding PayrollPreviewHelpOptions}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate>
-                        <Grid ColumnDefinitions="260,*" RowDefinitions="Auto" Margin="0,2,0,6">
-                          <CheckBox Margin="0,2,12,0" Content="{Binding Label}" IsChecked="{Binding IsEnabled, Mode=TwoWay}" />
-                          <TextBox Grid.Column="1" Text="{Binding HelpText, Mode=TwoWay}" AcceptsReturn="False" TextWrapping="NoWrap" Watermark="Leer lassen = bestehenden Text verwenden" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
+                  <TabItem Header="Stundenlohn">
+                    <StackPanel Spacing="12" Margin="0,12,0,0">
+                      <TextBlock FontWeight="SemiBold" Text="Arbeitszeitzuschlaege" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Prozentsaetze als echte Prozentwerte pflegen, zum Beispiel `25` oder `25,5` fuer 25 bzw. 25,5 Prozent." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Nachtzuschlag" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsNightSupplementRate, Mode=TwoWay}" Watermark="z. B. 25" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Sonntagszuschlag" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsSundaySupplementRate, Mode=TwoWay}" Watermark="z. B. 50" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4">
+                          <TextBlock Classes="section-caption" Text="Feiertagszuschlag" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsHolidaySupplementRate, Mode=TwoWay}" Watermark="z. B. 100" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                      </Grid>
+
+                      <TextBlock FontWeight="SemiBold" Text="Stundenlohn-spezifische Ansaetze" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Diese Parameter werden weiterhin fuer die bestehende Stundenlohn-Berechnung verwendet." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                          <TextBlock Classes="section-caption" Text="Ferienentschaedigung" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsVacationCompensationRate, Mode=TwoWay}" Watermark="10.64" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                          <TextBlock Classes="section-caption" Text="Ferienentschaedigung ab 50 Jahren" />
+                          <Grid>
+                            <TextBox Padding="8,6,28,6" Text="{Binding SettingsVacationCompensationRateAge50Plus, Mode=TwoWay}" Watermark="10.64" />
+                            <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
+                          </Grid>
+                        </StackPanel>
+                      </Grid>
+
+                      <TextBlock FontWeight="SemiBold" Text="Fahrzeugansaetze" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Die Waehrungswerte werden mit den in der Monatserfassung erfassten Mengen multipliziert." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Pauschalzone 1" />
+                          <Grid>
+                            <TextBox Padding="54,6,8,6" Text="{Binding SettingsVehiclePauschalzone1RateChf, Mode=TwoWay}" />
+                            <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Pauschalzone 2" />
+                          <Grid>
+                            <TextBox Padding="54,6,8,6" Text="{Binding SettingsVehiclePauschalzone2RateChf, Mode=TwoWay}" />
+                            <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4">
+                          <TextBlock Classes="section-caption" Text="Regiezone 1" />
+                          <Grid>
+                            <TextBox Padding="54,6,8,6" Text="{Binding SettingsVehicleRegiezone1RateChf, Mode=TwoWay}" />
+                            <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
+                          </Grid>
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
+                  </TabItem>
+
+                  <TabItem Header="Monatslohn">
+                    <StackPanel Spacing="12" Margin="0,12,0,0">
+                      <TextBlock FontWeight="SemiBold" Text="Vorbereitung Monatslohn" />
+                      <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12">
+                        <TextBlock Foreground="#FF5F6B7A"
+                                   Text="Dieser Bereich ist als Grundlage fuer spaetere Monatslohn-Parameter vorbereitet. Die aktuelle Payroll-Logik bleibt bewusst auf Stundenlohn fokussiert."
+                                   TextWrapping="Wrap" />
+                      </Border>
+                    </StackPanel>
+                  </TabItem>
+                </TabControl>
               </TabItem>
 
               <TabItem Header="Druck / PDF">
@@ -678,15 +686,21 @@
         </ScrollViewer>
       </controls:AppSectionCard>
 
-      <controls:AppSectionCard Grid.Column="1" Header="Arbeitsbereich" Margin="8,0,0,0" IsVisible="{Binding ShowPrimaryWorkspaceArea}">
+      <Border
+          Grid.Column="1"
+          Margin="8,0,0,0"
+          Background="{DynamicResource Theme.Color.Surface}"
+          BorderBrush="{DynamicResource Theme.Color.Border}"
+          BorderThickness="1"
+          CornerRadius="10"
+          Padding="{DynamicResource Theme.Spacing.CardPadding}"
+          IsVisible="{Binding ShowPrimaryWorkspaceArea}">
         <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
-          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12">
+          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
-              <StackPanel Spacing="4" IsVisible="{Binding ShowTimeAndExpensesWorkspace}">
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Zeit- und Spesenerfassung" />
-              </StackPanel>
-              <StackPanel Spacing="4" IsVisible="{Binding ShowPayrollRunsWorkspace}">
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Lohnlaeufe" />
+              <StackPanel Spacing="8" IsVisible="{Binding ShowPayrollRunsWorkspace}" DataContext="{Binding MonthlyRecord}">
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
+                <DatePicker DayVisible="False" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
               </StackPanel>
               <StackPanel Spacing="4" IsVisible="{Binding ShowReportingWorkspace}">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="Reporting" />
@@ -714,12 +728,11 @@
                 <TabItem Header="Zeiten">
                   <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12" Margin="0,10,0,0">
-                      <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto" HorizontalAlignment="Left">
-                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,10">
+                      <Grid ColumnDefinitions="1.25*,8,1.2*,8,*,8,*,8,*,8,*,8,*,8,*,8,*" RowDefinitions="Auto,Auto" HorizontalAlignment="Stretch">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
                           <Grid x:Name="TimeMonthFieldHost">
                             <TextBox x:Name="TimeMonthInput"
-                                     Width="118"
                                      Text="{Binding SelectedMonthText, Mode=TwoWay}"
                                      Watermark="MM/YYYY"
                                      GotFocus="OnTimeMonthInputGotFocus"
@@ -735,11 +748,10 @@
                             </Popup>
                           </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,8,10">
+                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Datum" />
                           <Grid x:Name="TimeDateFieldHost">
                             <TextBox x:Name="TimeDateInput"
-                                     Width="124"
                                      Text="{Binding TimeDate, Mode=TwoWay}"
                                      Watermark="DD.MM.YYYY"
                                      GotFocus="OnTimeDateInputGotFocus"
@@ -755,36 +767,36 @@
                             </Popup>
                           </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,8,10" Width="92">
+                        <StackPanel Grid.Column="4" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Arbeitsstunden" />
                           <TextBox Text="{Binding HoursWorked, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="3" Spacing="4" Margin="0,0,8,10" Width="92">
+                        <StackPanel Grid.Column="6" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Nachtstunden" />
                           <TextBox Text="{Binding NightHours, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="4" Spacing="4" Margin="0,0,8,10" Width="92">
+                        <StackPanel Grid.Column="8" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Sonntagsstunden" />
                           <TextBox Text="{Binding SundayHours, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="5" Spacing="4" Margin="0,0,8,10" Width="92">
+                        <StackPanel Grid.Column="10" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Feiertagsstunden" />
                           <TextBox Text="{Binding HolidayHours, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="6" Spacing="4" Margin="0,0,8,10" Width="92">
+                        <StackPanel Grid.Column="12" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Pauschalzone 1" />
                           <TextBox Text="{Binding VehiclePauschalzone1, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="7" Spacing="4" Margin="0,0,8,10" Width="92">
+                        <StackPanel Grid.Column="14" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Pauschalzone 2" />
                           <TextBox Text="{Binding VehiclePauschalzone2, Mode=TwoWay}" />
                         </StackPanel>
-                        <StackPanel Grid.Column="8" Spacing="4" Margin="0,0,0,10" Width="92">
+                        <StackPanel Grid.Column="16" Spacing="4" Margin="0,0,0,10">
                           <TextBlock Classes="section-caption" Text="Regiezone 1" />
                           <TextBox Text="{Binding VehicleRegiezone1, Mode=TwoWay}" />
                         </StackPanel>
 
-                        <StackPanel Grid.Row="1" Grid.ColumnSpan="9" Spacing="4">
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="17" Spacing="4">
                           <TextBlock Classes="section-caption" Text="Bemerkung" />
                           <TextBox Text="{Binding TimeNote, Mode=TwoWay}" />
                         </StackPanel>
@@ -879,28 +891,8 @@
                   <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="12" Margin="0,10,0,0">
                       <TextBlock Foreground="#FF5F6B7A" Text="Pro Mitarbeitendem und Monat wird im Spesenbereich nur noch das Total fuer Diverse Spesen gepflegt." TextWrapping="Wrap" />
-                      <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto" HorizontalAlignment="Left">
+                      <Grid ColumnDefinitions="Auto" RowDefinitions="Auto" HorizontalAlignment="Left">
                         <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
-                          <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
-                          <Grid x:Name="ExpenseMonthFieldHost">
-                            <TextBox x:Name="ExpenseMonthInput"
-                                     Width="118"
-                                     Text="{Binding SelectedMonthText, Mode=TwoWay}"
-                                     Watermark="MM/YYYY"
-                                     GotFocus="OnExpenseMonthInputGotFocus"
-                                     PointerPressed="OnExpenseMonthInputPointerPressed" />
-                            <Popup x:Name="ExpenseMonthPopup"
-                                   IsOpen="{Binding IsExpenseMonthPickerOpen, Mode=TwoWay}"
-                                   Placement="Bottom"
-                                   PlacementTarget="{Binding #ExpenseMonthInput}">
-                              <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="10">
-                                <DatePicker DayVisible="False"
-                                            SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" />
-                              </Border>
-                            </Popup>
-                          </Grid>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Spacing="4" Width="120">
                           <TextBlock Classes="section-caption" Text="Spesen" />
                           <Grid>
                             <TextBox Padding="54,6,8,6" Text="{Binding ExpensesTotal, Mode=TwoWay}" />
@@ -1114,7 +1106,7 @@
           </ScrollViewer>
 
           <ScrollViewer Grid.Row="1" Margin="0,12,0,0" MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowEmployeeWorkspace}">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,*">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,*">
               <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Classes="section-caption" Text="Stammdaten" />
 
               <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
@@ -1268,13 +1260,18 @@
               </StackPanel>
 
               <StackPanel Grid.Row="20" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+                <TextBlock Classes="section-caption" Text="Lohnart" />
+                <ComboBox IsEnabled="{Binding CanEditFields}" ItemsSource="{Binding WageTypeOptions}" SelectedItem="{Binding SelectedWageType, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Row="20" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
                 <TextBlock Classes="section-caption" Text="Stundenlohn" />
                 <Grid>
                   <TextBox Padding="54,6,8,6" IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding HourlyRateChf, Mode=TwoWay}" />
                   <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
                 </Grid>
               </StackPanel>
-              <StackPanel Grid.Row="20" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+
+              <StackPanel Grid.Row="21" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="BVG pro Monat" />
                 <Grid>
                   <TextBox Padding="54,6,8,6" IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding MonthlyBvgDeductionChf, Mode=TwoWay}" />
@@ -1282,7 +1279,7 @@
                 </Grid>
               </StackPanel>
 
-              <StackPanel Grid.Row="21" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
+              <StackPanel Grid.Row="22" Grid.Column="0" Spacing="4" Margin="0,10,6,0">
                 <TextBlock Classes="section-caption" Text="Spezialzuschlag gemaess Vertrag" />
                 <Grid>
                   <TextBox Padding="54,6,8,6" IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding SpecialSupplementRateChf, Mode=TwoWay}" />
@@ -1290,8 +1287,8 @@
                 </Grid>
               </StackPanel>
 
-              <TextBlock Grid.Row="22" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Zuschlagssaetze" />
-              <Border Grid.Row="23" Grid.ColumnSpan="2" Margin="0,10,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="12">
+              <TextBlock Grid.Row="23" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Zuschlagssaetze" />
+              <Border Grid.Row="24" Grid.ColumnSpan="2" Margin="0,10,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="12">
                 <TextBlock Foreground="#FF5F6B7A" Text="Nacht-, Sonntags- und Feiertagszuschlaege werden zentral im Bereich Einstellungen gepflegt und nicht mehr pro Mitarbeitendem." TextWrapping="Wrap" />
               </Border>
             </Grid>
@@ -1326,7 +1323,7 @@
           </Grid>
 
         </Grid>
-      </controls:AppSectionCard>
+      </Border>
     </Grid>
 
     <TextBlock Grid.Row="3" Foreground="#FF5F6B7A" Text="{Binding WorkspaceLabel}" />

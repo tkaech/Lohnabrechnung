@@ -59,7 +59,8 @@ public static class EmployeeDevelopmentDataSeeder
                 seed.Email,
                 departments[seed.DepartmentName],
                 categories[seed.EmploymentCategoryName],
-                locations[seed.EmploymentLocationName]);
+                locations[seed.EmploymentLocationName],
+                EmployeeWageType.Hourly);
 
             var contract = new EmploymentContract(
                 employee.Id,

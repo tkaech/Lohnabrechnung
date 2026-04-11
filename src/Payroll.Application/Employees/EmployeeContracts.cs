@@ -1,3 +1,5 @@
+using Payroll.Domain.Employees;
+
 namespace Payroll.Application.Employees;
 
 public sealed record EmployeeListQuery(
@@ -50,6 +52,7 @@ public sealed record EmployeeDetailsDto(
     string? EmploymentCategoryName,
     Guid? EmploymentLocationOptionId,
     string? EmploymentLocationName,
+    EmployeeWageType WageType,
     DateOnly ContractValidFrom,
     DateOnly? ContractValidTo,
     decimal HourlyRateChf,
@@ -83,6 +86,7 @@ public sealed record SaveEmployeeCommand(
     Guid? DepartmentOptionId,
     Guid? EmploymentCategoryOptionId,
     Guid? EmploymentLocationOptionId,
+    EmployeeWageType WageType,
     DateOnly ContractValidFrom,
     DateOnly? ContractValidTo,
     decimal HourlyRateChf,

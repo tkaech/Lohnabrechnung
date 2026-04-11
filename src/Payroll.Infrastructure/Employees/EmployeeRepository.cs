@@ -130,6 +130,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
             categoryName,
             employee.EmploymentLocationOptionId,
             locationName,
+            employee.WageType,
             contract?.ValidFrom ?? default,
             contract?.ValidTo,
             contract?.HourlyRateChf ?? 0m,
@@ -182,7 +183,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.Email,
                 command.DepartmentOptionId,
                 command.EmploymentCategoryOptionId,
-                command.EmploymentLocationOptionId);
+                command.EmploymentLocationOptionId,
+                command.WageType);
 
             contract = await LoadLatestContractAsync(employee.Id, asNoTracking: false, cancellationToken)
                 ?? new EmploymentContract(
@@ -229,7 +231,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.Email,
                 command.DepartmentOptionId,
                 command.EmploymentCategoryOptionId,
-                command.EmploymentLocationOptionId);
+                command.EmploymentLocationOptionId,
+                command.WageType);
             contract = new EmploymentContract(
                 employee.Id,
                 command.ContractValidFrom,

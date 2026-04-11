@@ -9,3 +9,4 @@
 7. Vertragshistorie als historisierte `EmploymentContract`-Versionen mit klaren Gueltigkeitsregeln konkretisieren und sauber an den Monatskontext anschliessen
 8. Naechsten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren: gueltigen Vertrag, zentrale Zuschlags-, Abzugs-, altersabhaengige Ferienentschaedigungs- und Fahrzeugsettings, WorkSummary und Spesen aus `EmployeeMonthlyRecord` zusammenfuehren, ohne offene Spezialfaelle zu automatisieren
 9. fuer bestehende Altmonate ohne Snapshot einen kleinen Hinweis oder gefuehrten Aktualisierungspfad vorsehen, damit klar bleibt, ab wann Monatsparameter historisch eingefroren sind
+10. auf Basis der neuen `Lohnart` im Mitarbeitendenstamm den ersten fachlich klar abgegrenzten Monatslohn-Schnitt definieren, z. B. separate Vertragsparameter und eine bewusste Payroll-Behandlung fuer `Monatslohn` statt stillschweigender Stundenlohn-Ableitung

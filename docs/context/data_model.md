@@ -64,6 +64,7 @@
 
 - `PayrollSettings`
   - zentrale mehrzeilige `Firmenadresse` fuer PDF-/Lohnblatt-Kopf
+  - Bereich `Berechnung` ist strukturell in `Allgemein`, `Stundenlohn` und vorbereitend `Monatslohn` gegliedert
   - zentrale Zuschlagssaetze fuer Nacht, Sonntag und Feiertag
   - zentrale pflegbare Listen fuer:
     - `Abteilung`
@@ -110,6 +111,9 @@
   - Ort
   - Land
 - vorbereitete payroll-relevante Stammdaten:
+  - `Lohnart`
+    - `Stundenlohn`
+    - `Monatslohn`
   - referenzielle Zuordnung zu:
     - `Abteilung`
     - `Anstellungskategorie`

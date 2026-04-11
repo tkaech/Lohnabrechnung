@@ -562,6 +562,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
             "anna.aktiv@example.ch",
             null,
             null,
-            null);
+            null,
+            global::Payroll.Domain.Employees.EmployeeWageType.Hourly);
     }
 }

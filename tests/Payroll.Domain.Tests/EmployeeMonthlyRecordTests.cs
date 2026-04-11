@@ -32,15 +32,16 @@ public sealed class EmployeeMonthlyRecordTests
     }
 
     [Fact]
-    public void SaveTimeEntry_UpdatesExistingDayInsteadOfCreatingDuplicate()
+    public void SaveTimeEntry_UpdatesExistingMonthlyEntryInsteadOfCreatingDuplicate()
     {
         var record = new EmployeeMonthlyRecord(Guid.NewGuid(), 2026, 4);
 
         var created = record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, 10m, 11m, 12m, "Erster Stand");
-        var updated = record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 7.5m, 0.5m, 0m, 0m, 20m, 21m, 22m, "Aktualisiert");
+        var updated = record.SaveTimeEntry(null, new DateOnly(2026, 4, 18), 7.5m, 0.5m, 0m, 0m, 20m, 21m, 22m, "Aktualisiert");
 
         Assert.Single(record.TimeEntries);
         Assert.Equal(created.Id, updated.Id);
+        Assert.Equal(new DateOnly(2026, 4, 18), updated.WorkDate);
         Assert.Equal(7.5m, updated.HoursWorked);
         Assert.Equal(20m, updated.VehiclePauschalzone1Chf);
         Assert.Equal("Aktualisiert", updated.Note);

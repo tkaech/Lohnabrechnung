@@ -30,6 +30,7 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("LastName").IsRequired().HasMaxLength(100).HasColumnType("TEXT");
             b.Property<string>("PersonnelNumber").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
             b.Property<bool>("IsActive").HasColumnType("INTEGER");
+            b.Property<string>("WageType").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
             b.Property<DateOnly>("EntryDate").HasColumnType("TEXT");
             b.Property<DateOnly?>("ExitDate").HasColumnType("TEXT");
             b.Property<Guid?>("EmploymentCategoryOptionId").HasColumnType("TEXT");

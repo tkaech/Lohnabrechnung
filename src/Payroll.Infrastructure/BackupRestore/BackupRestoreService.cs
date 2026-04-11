@@ -186,6 +186,7 @@ public sealed class BackupRestoreService : IBackupRestoreService
                     employee.EmploymentCategoryOptionId.HasValue && categoryOptions.TryGetValue(employee.EmploymentCategoryOptionId.Value, out var categoryName) ? categoryName : null,
                     employee.EmploymentLocationOptionId,
                     employee.EmploymentLocationOptionId.HasValue && locationOptions.TryGetValue(employee.EmploymentLocationOptionId.Value, out var locationName) ? locationName : null,
+                    employee.WageType,
                     contract?.ValidFrom ?? employee.EntryDate,
                     contract?.ValidTo,
                     contract?.HourlyRateChf ?? 0m,
@@ -308,7 +309,8 @@ public sealed class BackupRestoreService : IBackupRestoreService
                 employee.Email,
                 ResolveOptionId(settings.Departments, employee.DepartmentOptionId, employee.DepartmentName, employee.FirstName + " " + employee.LastName, "Abteilung"),
                 ResolveOptionId(settings.EmploymentCategories, employee.EmploymentCategoryOptionId, employee.EmploymentCategoryName, employee.FirstName + " " + employee.LastName, "Anstellungskategorie"),
-                ResolveOptionId(settings.EmploymentLocations, employee.EmploymentLocationOptionId, employee.EmploymentLocationName, employee.FirstName + " " + employee.LastName, "Anstellungsort"));
+                ResolveOptionId(settings.EmploymentLocations, employee.EmploymentLocationOptionId, employee.EmploymentLocationName, employee.FirstName + " " + employee.LastName, "Anstellungsort"),
+                employee.WageType);
 
             SetEntityId(restoredEmployee, employee.EmployeeId);
             dbContext.Employees.Add(restoredEmployee);

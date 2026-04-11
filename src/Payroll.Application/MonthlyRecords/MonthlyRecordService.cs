@@ -32,7 +32,7 @@ public sealed class MonthlyRecordService
         _repository.ClearTracking();
         var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
         var isNewEntry = !command.TimeEntryId.HasValue
-            && monthlyRecord.TimeEntries.All(item => item.WorkDate != command.WorkDate);
+            && monthlyRecord.TimeEntries.Count == 0;
 
         var timeEntry = monthlyRecord.SaveTimeEntry(
             command.TimeEntryId,

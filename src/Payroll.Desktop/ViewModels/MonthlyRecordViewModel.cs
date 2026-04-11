@@ -584,7 +584,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private void PrepareNewTimeEntry()
     {
         SelectedTimeEntry = null;
-        TimeDate = DateOnly.FromDateTime(DateTime.Today).ToString("dd.MM.yyyy");
+        TimeDate = GetDefaultTimeEntryDate().ToString("dd.MM.yyyy");
         HoursWorked = "0";
         NightHours = "0";
         SundayHours = "0";
@@ -593,6 +593,19 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         VehiclePauschalzone2 = "0";
         VehicleRegiezone1 = "0";
         TimeNote = null;
+    }
+
+    private DateOnly GetDefaultTimeEntryDate()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        if (!SelectedMonth.HasValue)
+        {
+            return today;
+        }
+
+        return SelectedMonth.Value.Year == today.Year && SelectedMonth.Value.Month == today.Month
+            ? today
+            : new DateOnly(SelectedMonth.Value.Year, SelectedMonth.Value.Month, 1);
     }
 
     private void PrepareNewExpenseEntry()

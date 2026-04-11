@@ -288,6 +288,12 @@ public sealed class AppBootstrapper
         {
             EnsureTableColumn(
                 connection,
+                "Employees",
+                "WageType",
+                "ALTER TABLE \"Employees\" ADD COLUMN \"WageType\" TEXT NOT NULL DEFAULT 'Hourly';");
+
+            EnsureTableColumn(
+                connection,
                 "PayrollSettings",
                 "DecimalSeparator",
                 "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"DecimalSeparator\" TEXT NOT NULL DEFAULT ',';");

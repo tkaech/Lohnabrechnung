@@ -48,6 +48,7 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(employee => employee.DepartmentOptionId);
             builder.Property(employee => employee.EmploymentCategoryOptionId);
             builder.Property(employee => employee.EmploymentLocationOptionId);
+            builder.Property(employee => employee.WageType).HasConversion<string>().HasMaxLength(50).IsRequired();
             builder.OwnsOne(employee => employee.Address, addressBuilder =>
             {
                 addressBuilder.Property(address => address.Street).HasColumnName("Street").HasMaxLength(150).IsRequired();

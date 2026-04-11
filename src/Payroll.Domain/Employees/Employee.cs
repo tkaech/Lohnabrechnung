@@ -12,6 +12,7 @@ public sealed class Employee : AuditableEntity
         Address = new EmployeeAddress();
         EntryDate = default;
         IsActive = true;
+        WageType = EmployeeWageType.Hourly;
     }
 
     public string PersonnelNumber { get; private set; } = string.Empty;
@@ -35,6 +36,7 @@ public sealed class Employee : AuditableEntity
     public Guid? DepartmentOptionId { get; private set; }
     public Guid? EmploymentCategoryOptionId { get; private set; }
     public Guid? EmploymentLocationOptionId { get; private set; }
+    public EmployeeWageType WageType { get; private set; }
 
     public Employee(
         string personnelNumber,
@@ -56,7 +58,8 @@ public sealed class Employee : AuditableEntity
         string? email,
         Guid? departmentOptionId,
         Guid? employmentCategoryOptionId,
-        Guid? employmentLocationOptionId)
+        Guid? employmentLocationOptionId,
+        EmployeeWageType wageType)
     {
         ApplyCoreData(
             personnelNumber,
@@ -78,7 +81,8 @@ public sealed class Employee : AuditableEntity
             email,
             departmentOptionId,
             employmentCategoryOptionId,
-            employmentLocationOptionId);
+            employmentLocationOptionId,
+            wageType);
     }
 
     public void Rename(string firstName, string lastName)
@@ -114,7 +118,8 @@ public sealed class Employee : AuditableEntity
         string? email,
         Guid? departmentOptionId,
         Guid? employmentCategoryOptionId,
-        Guid? employmentLocationOptionId)
+        Guid? employmentLocationOptionId,
+        EmployeeWageType wageType)
     {
         ApplyCoreData(
             personnelNumber,
@@ -136,7 +141,8 @@ public sealed class Employee : AuditableEntity
             email,
             departmentOptionId,
             employmentCategoryOptionId,
-            employmentLocationOptionId);
+            employmentLocationOptionId,
+            wageType);
         Touch();
     }
 
@@ -174,7 +180,8 @@ public sealed class Employee : AuditableEntity
         string? email,
         Guid? departmentOptionId,
         Guid? employmentCategoryOptionId,
-        Guid? employmentLocationOptionId)
+        Guid? employmentLocationOptionId,
+        EmployeeWageType wageType)
     {
         ArgumentNullException.ThrowIfNull(address);
         var normalizedExitDate = isActive ? null : exitDate;
@@ -200,6 +207,7 @@ public sealed class Employee : AuditableEntity
         DepartmentOptionId = departmentOptionId;
         EmploymentCategoryOptionId = employmentCategoryOptionId;
         EmploymentLocationOptionId = employmentLocationOptionId;
+        WageType = wageType;
     }
 
     private static void ValidateDates(DateOnly? birthDate, DateOnly entryDate, DateOnly? exitDate)

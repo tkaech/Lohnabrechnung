@@ -64,7 +64,8 @@ public sealed class EmployeeTests
             "mia@example.ch",
             Guid.NewGuid(),
             Guid.NewGuid(),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            EmployeeWageType.Monthly);
 
         Assert.Equal("1001", employee.PersonnelNumber);
         Assert.Equal("Mia Muster", employee.FullName);
@@ -73,6 +74,7 @@ public sealed class EmployeeTests
         Assert.Equal("Seestrasse", employee.Address.Street);
         Assert.Equal("Deutschland", employee.ResidenceCountry);
         Assert.True(employee.IsSubjectToWithholdingTax);
+        Assert.Equal(EmployeeWageType.Monthly, employee.WageType);
         Assert.NotNull(employee.UpdatedAtUtc);
     }
 
@@ -101,7 +103,8 @@ public sealed class EmployeeTests
             null,
             null,
             null,
-            null));
+            null,
+            EmployeeWageType.Hourly));
     }
 
     [Fact]
@@ -142,7 +145,8 @@ public sealed class EmployeeTests
             "max@example.ch",
             null,
             null,
-            null);
+            null,
+            EmployeeWageType.Hourly);
 
         Assert.True(employee.IsActive);
         Assert.Null(employee.ExitDate);
@@ -175,6 +179,7 @@ public sealed class EmployeeTests
             email,
             null,
             null,
-            null);
+            null,
+            EmployeeWageType.Hourly);
     }
 }

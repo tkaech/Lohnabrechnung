@@ -163,6 +163,28 @@ public sealed class MonthlyRecordViewModelTests
     }
 
     [Fact]
+    public async Task SelectedMonth_SetsDefaultTimeDateInsidePayrollMonth()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Fred Formular");
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        await viewModel.SetEmployeeAsync(employeeId, "Fred Formular");
+        viewModel.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await WaitUntilAsync(() => viewModel.CanSaveTimeEntry && viewModel.TimePayrollMonth == "03/2026");
+
+        Assert.Equal("01.03.2026", viewModel.TimeDate);
+
+        viewModel.HoursWorked = "4";
+        viewModel.SaveTimeEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
+
+        Assert.Equal(new DateOnly(2026, 3, 1), viewModel.TimeEntries[0].WorkDate);
+        Assert.Equal("Zeiteintrag gespeichert.", viewModel.ActionMessage);
+    }
+
+    [Fact]
     public async Task HistoryLists_LoadEntriesFromPreviousMonthsChronologically()
     {
         var employeeId = Guid.NewGuid();

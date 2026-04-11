@@ -48,7 +48,8 @@ public sealed class ReportingServiceTests
             null,
             null,
             null,
-            null);
+            null,
+            EmployeeWageType.Hourly);
         dbContext.Employees.Add(employee);
         dbContext.EmploymentContracts.Add(new EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 33m, 0m, 3m));
         dbContext.PayrollSettings.Add(new PayrollSettings(
