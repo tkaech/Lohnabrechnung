@@ -346,6 +346,121 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnBrowseTimeImportCsvClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null || !storageProvider.CanOpen)
+        {
+            return;
+        }
+
+        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "CSV-Datei fuer Stundendaten waehlen",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("CSV-Dateien")
+                {
+                    Patterns = ["*.csv", "*.txt"]
+                },
+                FilePickerFileTypes.All
+            ]
+        });
+
+        var file = files.FirstOrDefault();
+        if (file is null)
+        {
+            return;
+        }
+
+        var localPath = file.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(localPath))
+        {
+            viewModel.TimeImportCsvFilePath = localPath;
+        }
+    }
+
+    private async void OnOpenPersonImportPreviewClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var prepared = await viewModel.PreparePersonImportPreviewAsync();
+        if (!prepared || viewModel.PersonImportPreviewItems.Count == 0)
+        {
+            return;
+        }
+
+        var previewWindow = new PersonImportPreviewWindow
+        {
+            DataContext = viewModel
+        };
+
+        await previewWindow.ShowDialog<bool?>(this);
+    }
+
+    private async void OnImportTimeDataClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var alreadyImported = await viewModel.IsSelectedTimeImportMonthAlreadyImportedAsync();
+        if (alreadyImported)
+        {
+            var shouldOverwrite = await ShowConfirmationDialogAsync(
+                "Stundendaten ueberschreiben",
+                "Fuer den gewaelten Monat wurden bereits Stundendaten importiert. Soll der bestehende Monatsimport vollstaendig ersetzt werden?",
+                "Ueberschreiben");
+
+            if (!shouldOverwrite)
+            {
+                return;
+            }
+
+            await viewModel.ImportTimeDataAsync(true);
+            return;
+        }
+
+        await viewModel.ImportTimeDataAsync();
+    }
+
+    private async void OnDeleteImportedTimeMonthClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel || viewModel.SelectedImportedTimeMonth is null)
+        {
+            return;
+        }
+
+        var shouldDelete = await ShowConfirmationDialogAsync(
+            "Importmonat loeschen",
+            $"Der importierte Monat {viewModel.SelectedImportedTimeMonth.DisplayName} und alle dazugehoerigen importierten Stundendaten werden entfernt. Fortfahren?",
+            "Monat loeschen");
+
+        if (!shouldDelete)
+        {
+            return;
+        }
+
+        await viewModel.DeleteImportedTimeMonthAsync();
+    }
+
+    private async Task<bool> ShowConfirmationDialogAsync(string title, string message, string confirmButtonText)
+    {
+        var dialog = new ConfirmationDialogWindow(title, message, confirmButtonText);
+        var result = await dialog.ShowDialog<bool?>(this);
+        return result == true;
+    }
+
     private static bool IsWithinPickerSurface(object? source)
     {
         var current = source as StyledElement;

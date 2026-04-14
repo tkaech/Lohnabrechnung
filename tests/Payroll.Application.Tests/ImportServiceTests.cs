@@ -2,8 +2,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.Employees;
 using Payroll.Application.Imports;
+using Payroll.Application.MonthlyRecords;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Imports;
+using Payroll.Domain.MonthlyRecords;
 using Payroll.Infrastructure.Imports;
 using Payroll.Infrastructure.Persistence;
 
@@ -54,10 +56,7 @@ public sealed class ImportServiceTests
     [Fact]
     public void ValidateMappings_RejectsMissingRequiredFields()
     {
-        var service = new ImportService(
-            new InMemoryImportMappingConfigurationRepository(),
-            new CsvImportFileReader(),
-            new InMemoryEmployeeRepository());
+        var service = CreateImportService(new InMemoryEmployeeRepository());
 
         var result = service.ValidateMappings(
             ImportConfigurationType.PersonData,
@@ -135,10 +134,7 @@ public sealed class ImportServiceTests
                 phoneNumber: "+41 79 111 00 00"),
                 CancellationToken.None);
 
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -181,10 +177,7 @@ public sealed class ImportServiceTests
                 "Bern"),
                 CancellationToken.None);
 
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var preview = await service.PreviewPersonDataAsync(new PreviewPersonDataCommand(
                 filePath,
@@ -230,10 +223,7 @@ public sealed class ImportServiceTests
         try
         {
             var employeeRepository = new InMemoryEmployeeRepository();
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -266,10 +256,7 @@ public sealed class ImportServiceTests
         try
         {
             var employeeRepository = new InMemoryEmployeeRepository();
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -310,10 +297,7 @@ public sealed class ImportServiceTests
         try
         {
             var employeeRepository = new InMemoryEmployeeRepository();
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -353,10 +337,7 @@ public sealed class ImportServiceTests
 
         try
         {
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                new InMemoryEmployeeRepository());
+            var service = CreateImportService(new InMemoryEmployeeRepository());
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -395,10 +376,7 @@ public sealed class ImportServiceTests
         try
         {
             var employeeRepository = new InMemoryEmployeeRepository();
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -435,10 +413,7 @@ public sealed class ImportServiceTests
         try
         {
             var employeeRepository = new InMemoryEmployeeRepository();
-            var service = new ImportService(
-                new InMemoryImportMappingConfigurationRepository(),
-                new CsvImportFileReader(),
-                employeeRepository);
+            var service = CreateImportService(employeeRepository);
 
             var result = await service.ImportPersonDataAsync(new ImportPersonDataCommand(
                 filePath,
@@ -467,6 +442,182 @@ public sealed class ImportServiceTests
         {
             File.Delete(filePath);
         }
+    }
+
+    [Fact]
+    public async Task ImportTimeData_RequiresSelectedMonthInCommand()
+    {
+        var employeeRepository = new InMemoryEmployeeRepository();
+        await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "1000", "Anna", "Aktiv", "Bern"), CancellationToken.None);
+        var service = CreateImportService(employeeRepository);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+            await service.ImportTimeDataAsync(new ImportTimeDataCommand(
+                "irrelevant.csv",
+                ";",
+                true,
+                "\"",
+                2026,
+                13,
+                false,
+                BuildMappings(
+                    ("personnel_number", "Personalnummer", false),
+                    ("hours_worked", "Stunden", false))),
+                CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ImportTimeData_UsesSelectedMonthAsImportContext()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-import-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "Personalnummer;Stunden;Nacht\n1000;12.5;2\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "1000", "Anna", "Aktiv", "Bern"), CancellationToken.None);
+            var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+            var statusRepository = new InMemoryImportExecutionStatusRepository();
+            var service = CreateImportService(employeeRepository, monthlyRecordRepository, statusRepository);
+
+            var result = await service.ImportTimeDataAsync(new ImportTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                4,
+                false,
+                BuildMappings(
+                    ("personnel_number", "Personalnummer", false),
+                    ("hours_worked", "Stunden", false),
+                    ("night_hours", "Nacht", true))),
+                CancellationToken.None);
+
+            var employee = await employeeRepository.GetByPersonnelNumberAsync("1000", CancellationToken.None);
+            var monthlyRecord = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 4, CancellationToken.None);
+            var entry = Assert.Single(monthlyRecord.TimeEntries);
+
+            Assert.Equal(1, result.ImportedCount);
+            Assert.Equal(new DateOnly(2026, 4, 1), entry.WorkDate);
+            Assert.Equal(12.5m, entry.HoursWorked);
+            Assert.Equal(2m, entry.NightHours);
+            Assert.True(await statusRepository.ExistsAsync(ImportConfigurationType.TimeData, 2026, 4, CancellationToken.None));
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task IsMonthImported_RecognizesAlreadyImportedMonth()
+    {
+        var service = CreateImportService(
+            new InMemoryEmployeeRepository(),
+            new InMemoryEmployeeMonthlyRecordRepository(),
+            new InMemoryImportExecutionStatusRepository(
+                new ImportedMonthStatusDto(2026, 4, DateTimeOffset.UtcNow)));
+
+        var exists = await service.IsMonthImportedAsync(ImportConfigurationType.TimeData, 2026, 4, CancellationToken.None);
+
+        Assert.True(exists);
+    }
+
+    [Fact]
+    public async Task ImportTimeData_Overwrite_ReplacesExistingMonthData()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-import-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "Personalnummer;Stunden\n1000;8\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "1000", "Anna", "Aktiv", "Bern"), CancellationToken.None);
+            var employee = await employeeRepository.GetByPersonnelNumberAsync("1000", CancellationToken.None);
+            var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+            var existingRecord = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 5, CancellationToken.None);
+            existingRecord.SaveTimeEntry(null, new DateOnly(2026, 5, 1), 3m, 0m, 0m, 0m, 0m, 0m, 0m, "alt");
+            await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
+
+            var statusRepository = new InMemoryImportExecutionStatusRepository(
+                new ImportedMonthStatusDto(2026, 5, DateTimeOffset.UtcNow.AddDays(-2)));
+            var service = CreateImportService(employeeRepository, monthlyRecordRepository, statusRepository);
+
+            var result = await service.ImportTimeDataAsync(new ImportTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                5,
+                true,
+                BuildMappings(
+                    ("personnel_number", "Personalnummer", false),
+                    ("hours_worked", "Stunden", false))),
+                CancellationToken.None);
+
+            var updatedRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.EmployeeId, 2026, 5, CancellationToken.None);
+            var entry = Assert.Single(updatedRecord.TimeEntries);
+
+            Assert.Equal(1, result.ImportedCount);
+            Assert.Equal(8m, entry.HoursWorked);
+            Assert.Null(entry.Note);
+            Assert.True(await statusRepository.ExistsAsync(ImportConfigurationType.TimeData, 2026, 5, CancellationToken.None));
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteImportedTimeMonth_RemovesTimeEntriesAndImportStatus()
+    {
+        var employeeRepository = new InMemoryEmployeeRepository();
+        await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "1000", "Anna", "Aktiv", "Bern"), CancellationToken.None);
+        var employee = await employeeRepository.GetByPersonnelNumberAsync("1000", CancellationToken.None);
+        var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+        var record = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 6, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 6, 1), 7m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        var statusRepository = new InMemoryImportExecutionStatusRepository(
+            new ImportedMonthStatusDto(2026, 6, DateTimeOffset.UtcNow));
+        var service = CreateImportService(employeeRepository, monthlyRecordRepository, statusRepository);
+
+        await service.DeleteImportedTimeMonthAsync(2026, 6, CancellationToken.None);
+
+        var updatedRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.EmployeeId, 2026, 6, CancellationToken.None);
+        Assert.Empty(updatedRecord.TimeEntries);
+        Assert.False(await statusRepository.ExistsAsync(ImportConfigurationType.TimeData, 2026, 6, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ListImportedMonths_ReturnsSavedImportStatus()
+    {
+        var service = CreateImportService(
+            new InMemoryEmployeeRepository(),
+            new InMemoryEmployeeMonthlyRecordRepository(),
+            new InMemoryImportExecutionStatusRepository(
+                new ImportedMonthStatusDto(2026, 7, DateTimeOffset.UtcNow)));
+
+        var months = await service.ListImportedMonthsAsync(ImportConfigurationType.TimeData, CancellationToken.None);
+
+        var month = Assert.Single(months);
+        Assert.Equal(2026, month.Year);
+        Assert.Equal(7, month.Month);
+    }
+
+    private static ImportService CreateImportService(
+        IEmployeeRepository employeeRepository,
+        IEmployeeMonthlyRecordRepository? monthlyRecordRepository = null,
+        IImportExecutionStatusRepository? importExecutionStatusRepository = null)
+    {
+        return new ImportService(
+            new InMemoryImportMappingConfigurationRepository(),
+            new CsvImportFileReader(),
+            employeeRepository,
+            monthlyRecordRepository ?? new InMemoryEmployeeMonthlyRecordRepository(),
+            importExecutionStatusRepository ?? new InMemoryImportExecutionStatusRepository());
     }
 
     private static IReadOnlyCollection<ImportFieldMappingDto> BuildMappings(params (string FieldKey, string CsvColumnName, bool AllowEmpty)[] items)
@@ -650,6 +801,106 @@ public sealed class ImportServiceTests
         public Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    private sealed class InMemoryEmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
+    {
+        private readonly Dictionary<(Guid EmployeeId, int Year, int Month), EmployeeMonthlyRecord> _records = [];
+
+        public Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            var key = (employeeId, year, month);
+            if (!_records.TryGetValue(key, out var record))
+            {
+                record = new EmployeeMonthlyRecord(employeeId, year, month);
+                _records[key] = record;
+            }
+
+            return Task.FromResult(record);
+        }
+
+        public Task<EmployeeMonthlyRecord?> GetByIdAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
+        {
+            var record = _records.Values.SingleOrDefault(item => item.Id == monthlyRecordId);
+            return Task.FromResult<EmployeeMonthlyRecord?>(record);
+        }
+
+        public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<MonthlyRecordDetailsDto?>(null);
+        }
+
+        public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>>([]);
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteTimeEntriesForMonthAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            foreach (var record in _records.Values.Where(item => item.Year == year && item.Month == month).ToArray())
+            {
+                foreach (var timeEntry in record.TimeEntries.ToArray())
+                {
+                    record.RemoveTimeEntry(timeEntry.Id);
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public void ClearTracking()
+        {
+        }
+
+        public void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class
+        {
+        }
+    }
+
+    private sealed class InMemoryImportExecutionStatusRepository : IImportExecutionStatusRepository
+    {
+        private readonly Dictionary<(ImportConfigurationType Type, int Year, int Month), ImportedMonthStatusDto> _items = [];
+
+        public InMemoryImportExecutionStatusRepository(params ImportedMonthStatusDto[] items)
+        {
+            foreach (var item in items)
+            {
+                _items[(ImportConfigurationType.TimeData, item.Year, item.Month)] = item;
+            }
+        }
+
+        public Task<bool> ExistsAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_items.ContainsKey((type, year, month)));
+        }
+
+        public Task MarkImportedAsync(ImportConfigurationType type, int year, int month, DateTimeOffset importedAtUtc, CancellationToken cancellationToken)
+        {
+            _items[(type, year, month)] = new ImportedMonthStatusDto(year, month, importedAtUtc);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken)
+        {
+            _items.Remove((type, year, month));
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyCollection<ImportedMonthStatusDto>> ListAsync(ImportConfigurationType type, CancellationToken cancellationToken)
+        {
+            var items = _items
+                .Where(item => item.Key.Type == type)
+                .Select(item => item.Value)
+                .OrderByDescending(item => item.Year)
+                .ThenByDescending(item => item.Month)
+                .ToArray();
+            return Task.FromResult<IReadOnlyCollection<ImportedMonthStatusDto>>(items);
         }
     }
 }

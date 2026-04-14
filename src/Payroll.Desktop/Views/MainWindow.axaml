@@ -655,60 +655,118 @@
                         </StackPanel>
                       </Border>
 
-                      <TextBlock FontWeight="SemiBold" Text="Import-Vorschau" IsVisible="{Binding HasPersonImportPreviewItems}" />
-                      <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12" IsVisible="{Binding HasPersonImportPreviewItems}">
-                        <StackPanel Spacing="8">
-                          <Grid ColumnDefinitions="Auto,Auto,1.1*,1.4*,Auto">
-                            <TextBlock FontWeight="SemiBold" Text="Import" />
-                            <TextBlock Grid.Column="1" FontWeight="SemiBold" Margin="12,0,0,0" Text="PNr" />
-                            <TextBlock Grid.Column="2" FontWeight="SemiBold" Margin="12,0,0,0" Text="Name" />
-                            <TextBlock Grid.Column="3" FontWeight="SemiBold" Margin="12,0,0,0" Text="Status" />
-                          </Grid>
-                          <ItemsControl ItemsSource="{Binding PersonImportPreviewItems}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate>
-                                <Grid ColumnDefinitions="Auto,Auto,1.1*,1.4*,Auto" Margin="0,0,0,6">
-                                  <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
-                                  <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding PersonnelNumber}" />
-                                  <TextBlock Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding FullName}" />
-                                  <TextBlock Grid.Column="3" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding ImportStatus}" />
-                                </Grid>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </StackPanel>
-                      </Border>
-
                       <TextBlock Foreground="#FF5F6B7A" Text="{Binding PersonImportStatusMessage}" TextWrapping="Wrap" />
-                      <Button HorizontalAlignment="Right" Classes="primary-action" Command="{Binding ImportPersonDataCommand}" Content="Personendaten importieren" />
+                      <Button HorizontalAlignment="Right" Classes="primary-action" Content="Personendaten importieren" Click="OnOpenPersonImportPreviewClick" />
                     </StackPanel>
                   </TabItem>
 
                   <TabItem Header="Stundendaten">
                     <StackPanel Spacing="12" Margin="0,12,0,0">
-                      <TextBlock FontWeight="SemiBold" Text="Vorbereitung Stundendaten-Import" />
-                      <TextBlock Foreground="#FF5F6B7A" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
+                      <TextBlock FontWeight="SemiBold" Text="CSV-Datei laden" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="CSV-Datei waehlen, Spalten fuer den Stundenimport zuordnen und den Importmonat explizit festlegen. Das Datum kommt nicht aus der CSV, sondern aus dem Importkontext." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="4">
+                          <TextBlock Classes="section-caption" Text="CSV-Datei" />
+                          <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox Text="{Binding TimeImportCsvFilePath, Mode=TwoWay}" Watermark="/pfad/zur/stunden.csv" />
+                            <Button Grid.Column="1" Margin="8,0,0,0" Content="Datei waehlen" Click="OnBrowseTimeImportCsvClick" />
+                            <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding LoadTimeImportCsvCommand}" Content="CSV laden" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,8,8,0">
+                          <TextBlock Classes="section-caption" Text="Trenner" />
+                          <ComboBox Width="160" ItemsSource="{Binding PersonImportDelimiterOptions}" SelectedItem="{Binding SelectedTimeImportDelimiter, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,8,0,0">
+                          <TextBlock Classes="section-caption" Text="Textqualifier" />
+                          <Grid ColumnDefinitions="Auto,*">
+                            <CheckBox Content="Felder ummantelt" IsChecked="{Binding TimeImportFieldsEnclosed, Mode=TwoWay}" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1" Width="240" Margin="12,0,0,0" ItemsSource="{Binding PersonImportTextQualifierOptions}" SelectedItem="{Binding SelectedTimeImportTextQualifier, Mode=TwoWay}" />
+                          </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="4" Margin="0,8,0,0">
+                          <TextBlock Classes="section-caption" Text="Importmonat" />
+                          <DatePicker SelectedDate="{Binding TimeImportMonth, Mode=TwoWay}" />
+                        </StackPanel>
+                      </Grid>
+
+                      <TextBlock FontWeight="SemiBold" Text="Mapping speichern / laden" />
+                      <Grid ColumnDefinitions="*,Auto,*,Auto" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Konfigurationsname" />
+                          <TextBox Text="{Binding TimeImportConfigurationName, Mode=TwoWay}" Watermark="z. B. Stundendaten Standard-CSV" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Margin="8,22,12,0" VerticalAlignment="Top" Command="{Binding SaveTimeImportConfigurationCommand}" Content="Mapping speichern" />
+                        <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Gespeicherte Mappings" />
+                          <ComboBox ItemsSource="{Binding TimeImportConfigurations}" SelectedItem="{Binding SelectedTimeImportConfiguration, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                        </StackPanel>
+                        <Button Grid.Column="3" Margin="8,22,0,0" VerticalAlignment="Top" Command="{Binding LoadTimeImportConfigurationCommand}" Content="Mapping laden" />
+                      </Grid>
+
+                      <TextBlock FontWeight="SemiBold" Text="Mapping-Tabelle" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Muss-Felder sind mit `*` markiert. Der Import bleibt gesperrt, bis CSV geladen, Muss-Felder zugeordnet und der Importmonat gesetzt ist." TextWrapping="Wrap" />
                       <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
                         <StackPanel Spacing="8">
-                          <Grid ColumnDefinitions="1.1*,1.4*">
-                            <TextBlock FontWeight="SemiBold" Text="Vorbereitetes Feld" />
+                          <Grid ColumnDefinitions="1.1*,1.4*,Auto">
+                            <TextBlock FontWeight="SemiBold" Text="Feld des Lohnprogramms" />
                             <TextBlock Grid.Column="1" FontWeight="SemiBold" Text="CSV-Spalte" />
+                            <TextBlock Grid.Column="2" FontWeight="SemiBold" Text="Leer erlaubt" />
                           </Grid>
                           <ItemsControl ItemsSource="{Binding TimeImportFieldMappings}">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate>
-                                <Grid ColumnDefinitions="1.1*,1.4*" Margin="0,0,0,6">
+                                <Grid ColumnDefinitions="1.1*,1.4*,Auto" Margin="0,0,0,6">
                                   <Grid ColumnDefinitions="Auto,*">
                                     <TextBlock Text="*" Foreground="#FFC95F36" Margin="0,0,6,0" IsVisible="{Binding IsRequired}" />
                                     <TextBlock Grid.Column="1" Text="{Binding FieldLabel}" />
                                   </Grid>
-                                  <ComboBox Grid.Column="1" IsEnabled="False" />
+                                  <AutoCompleteBox Grid.Column="1"
+                                                   ItemsSource="{Binding AvailableCsvColumns}"
+                                                   SelectedItem="{Binding SelectedCsvColumn, Mode=TwoWay}"
+                                                   Text="{Binding CsvColumnSearchText, Mode=TwoWay}"
+                                                   MinimumPrefixLength="0"
+                                                   FilterMode="ContainsOrdinal"
+                                                   IsTextCompletionEnabled="False" />
+                                  <CheckBox Grid.Column="2"
+                                            Margin="12,0,0,0"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            IsChecked="{Binding AllowEmpty, Mode=TwoWay}" />
                                 </Grid>
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                         </StackPanel>
                       </Border>
+
+                      <TextBlock FontWeight="SemiBold" Text="Importierte Monate" />
+                      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
+                        <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
+                          <ScrollViewer MaxHeight="180" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <ListBox ItemsSource="{Binding ImportedTimeMonths}" SelectedItem="{Binding SelectedImportedTimeMonth, Mode=TwoWay}" BorderThickness="0" Background="Transparent">
+                              <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                  <Grid ColumnDefinitions="160,*" Margin="0,0,0,6">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                    <TextBlock Grid.Column="1" Foreground="#FF5F6B7A" Text="{Binding ImportedAtUtc}" />
+                                  </Grid>
+                                </DataTemplate>
+                              </ListBox.ItemTemplate>
+                            </ListBox>
+                          </ScrollViewer>
+                        </Border>
+                        <Button Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top" Content="Monat loeschen" Click="OnDeleteImportedTimeMonthClick" IsEnabled="{Binding CanDeleteImportedTimeMonth}" />
+                      </Grid>
+
+                      <TextBlock Foreground="#FF5F6B7A" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
+                      <Button HorizontalAlignment="Right" Classes="primary-action" Content="Stundendaten importieren" Click="OnImportTimeDataClick" IsEnabled="{Binding CanImportTimeData}" />
                     </StackPanel>
                   </TabItem>
                 </TabControl>

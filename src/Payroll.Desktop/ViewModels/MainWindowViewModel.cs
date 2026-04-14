@@ -141,7 +141,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _personImportConfigurationName = string.Empty;
     private ImportConfigurationItemViewModel? _selectedPersonImportConfiguration;
     private string _personImportStatusMessage = "CSV-Datei laden, Mapping zuordnen und danach importieren.";
-    private string _timeImportStatusMessage = "Stundendaten-Import ist vorbereitet, die eigentliche Importlogik folgt in einem spaeteren Schritt.";
+    private string _timeImportCsvFilePath = string.Empty;
+    private string _selectedTimeImportDelimiter = "Semikolon (;)";
+    private bool _timeImportFieldsEnclosed = true;
+    private string _selectedTimeImportTextQualifier = "Doppelte Anfuehrungszeichen (\")";
+    private string _timeImportConfigurationName = string.Empty;
+    private ImportConfigurationItemViewModel? _selectedTimeImportConfiguration;
+    private DateTimeOffset? _timeImportMonth = new(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1));
+    private ImportedMonthStatusItemViewModel? _selectedImportedTimeMonth;
+    private string _timeImportStatusMessage = "CSV-Datei laden, Mapping zuordnen, Importmonat waehlen und danach importieren.";
     private string _appLogoText = ThemeTokens.BrandLogoText;
     private Bitmap? _appLogoImage;
     private string _statusMessage = "Mitarbeitende koennen links ausgewaehlt werden.";
@@ -208,9 +216,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractHistory = [];
         CalculationSettingsVersions = [];
         PersonImportConfigurations = [];
+        TimeImportConfigurations = [];
         PersonImportFieldMappings = [];
         PersonImportPreviewItems = [];
         TimeImportFieldMappings = [];
+        ImportedTimeMonths = [];
         MonthCaptureOverviewRows = [];
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
         MonthCaptureFilters = [MonthCaptureFilterAll, MonthCaptureFilterWithoutMonth, MonthCaptureFilterWithMonth];
@@ -261,7 +271,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         LoadPersonImportCsvCommand = new DelegateCommand(LoadPersonImportCsvAsync, () => CanLoadPersonImportCsv);
         SavePersonImportConfigurationCommand = new DelegateCommand(SavePersonImportConfigurationAsync, () => CanSavePersonImportConfiguration);
         LoadPersonImportConfigurationCommand = new DelegateCommand(LoadSelectedPersonImportConfigurationAsync, () => CanLoadPersonImportConfiguration);
-        ImportPersonDataCommand = new DelegateCommand(ImportPersonDataAsync, () => CanImportPersonData);
+        ImportPersonDataCommand = new DelegateCommand(async () => await PreparePersonImportPreviewAsync(), () => CanImportPersonData);
+        LoadTimeImportCsvCommand = new DelegateCommand(LoadTimeImportCsvAsync, () => CanLoadTimeImportCsv);
+        SaveTimeImportConfigurationCommand = new DelegateCommand(SaveTimeImportConfigurationAsync, () => CanSaveTimeImportConfiguration);
+        LoadTimeImportConfigurationCommand = new DelegateCommand(LoadSelectedTimeImportConfigurationAsync, () => CanLoadTimeImportConfiguration);
+        ImportTimeDataCommand = new DelegateCommand(async () => await ImportTimeDataAsync(), () => CanImportTimeData);
+        DeleteImportedTimeMonthCommand = new DelegateCommand(DeleteImportedTimeMonthAsync, () => CanDeleteImportedTimeMonth);
         CreateBackupCommand = new DelegateCommand(CreateBackupAsync, () => CanCreateBackup);
         RestoreBackupCommand = new DelegateCommand(RestoreBackupAsync, () => CanRestoreBackup);
         CreatePayrollPdfCommand = new DelegateCommand(CreatePayrollPdfAsync, () => CanCreatePayrollPdf);
@@ -313,9 +328,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<EmploymentContractHistoryItemViewModel> ContractHistory { get; }
     public ObservableCollection<PayrollCalculationSettingsVersionItemViewModel> CalculationSettingsVersions { get; }
     public ObservableCollection<ImportConfigurationItemViewModel> PersonImportConfigurations { get; }
+    public ObservableCollection<ImportConfigurationItemViewModel> TimeImportConfigurations { get; }
     public ObservableCollection<ImportFieldMappingRowViewModel> PersonImportFieldMappings { get; }
     public ObservableCollection<PersonImportPreviewItemViewModel> PersonImportPreviewItems { get; }
     public ObservableCollection<ImportFieldMappingRowViewModel> TimeImportFieldMappings { get; }
+    public ObservableCollection<ImportedMonthStatusItemViewModel> ImportedTimeMonths { get; }
     public ObservableCollection<MonthlyTimeCaptureOverviewRowDto> MonthCaptureOverviewRows { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> MonthCaptureFilters { get; }
@@ -357,6 +374,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand SavePersonImportConfigurationCommand { get; }
     public DelegateCommand LoadPersonImportConfigurationCommand { get; }
     public DelegateCommand ImportPersonDataCommand { get; }
+    public DelegateCommand LoadTimeImportCsvCommand { get; }
+    public DelegateCommand SaveTimeImportConfigurationCommand { get; }
+    public DelegateCommand LoadTimeImportConfigurationCommand { get; }
+    public DelegateCommand ImportTimeDataCommand { get; }
+    public DelegateCommand DeleteImportedTimeMonthCommand { get; }
     public DelegateCommand CreateBackupCommand { get; }
     public DelegateCommand RestoreBackupCommand { get; }
     public DelegateCommand CreatePayrollPdfCommand { get; }
@@ -444,7 +466,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanLoadPersonImportCsv => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath);
     public bool CanSavePersonImportConfiguration => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportConfigurationName);
     public bool CanLoadPersonImportConfiguration => !IsBusy && IsSettingsWorkspace && SelectedPersonImportConfiguration is not null;
-    public bool CanImportPersonData => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath) && PersonImportValidationErrors.Count == 0 && PersonImportHasCsvHeaders && PersonImportPreviewItems.Any(item => item.IsSelected);
+    public bool CanImportPersonData => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath) && PersonImportValidationErrors.Count == 0 && PersonImportHasCsvHeaders;
+    public bool CanLoadTimeImportCsv => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(TimeImportCsvFilePath);
+    public bool CanSaveTimeImportConfiguration => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(TimeImportConfigurationName);
+    public bool CanLoadTimeImportConfiguration => !IsBusy && IsSettingsWorkspace && SelectedTimeImportConfiguration is not null;
+    public bool CanImportTimeData => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(TimeImportCsvFilePath) && TimeImportValidationErrors.Count == 0 && TimeImportHasCsvHeaders && TimeImportMonth.HasValue;
+    public bool CanDeleteImportedTimeMonth => !IsBusy && IsSettingsWorkspace && SelectedImportedTimeMonth is not null;
     public bool CanCreateBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(BackupDirectoryPath) && !string.IsNullOrWhiteSpace(BackupFileName);
     public bool CanRestoreBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(RestoreFilePath);
     public bool CanCreatePayrollPdf => !IsBusy && IsPayrollRunsWorkspace && _currentEmployeeId.HasValue && MonthlyRecord.SelectedMonth.HasValue;
@@ -1189,6 +1216,101 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _personImportStatusMessage, value);
     }
 
+    public string TimeImportCsvFilePath
+    {
+        get => _timeImportCsvFilePath;
+        set
+        {
+            if (SetProperty(ref _timeImportCsvFilePath, value))
+            {
+                RaiseImportCommandState();
+            }
+        }
+    }
+
+    public string SelectedTimeImportDelimiter
+    {
+        get => _selectedTimeImportDelimiter;
+        set
+        {
+            if (SetProperty(ref _selectedTimeImportDelimiter, string.IsNullOrWhiteSpace(value) ? "Semikolon (;)" : value))
+            {
+                RaiseImportCommandState();
+            }
+        }
+    }
+
+    public bool TimeImportFieldsEnclosed
+    {
+        get => _timeImportFieldsEnclosed;
+        set => SetProperty(ref _timeImportFieldsEnclosed, value);
+    }
+
+    public string SelectedTimeImportTextQualifier
+    {
+        get => _selectedTimeImportTextQualifier;
+        set => SetProperty(ref _selectedTimeImportTextQualifier, value);
+    }
+
+    public string TimeImportConfigurationName
+    {
+        get => _timeImportConfigurationName;
+        set
+        {
+            if (SetProperty(ref _timeImportConfigurationName, value))
+            {
+                RaisePropertyChanged(nameof(CanSaveTimeImportConfiguration));
+                SaveTimeImportConfigurationCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public ImportConfigurationItemViewModel? SelectedTimeImportConfiguration
+    {
+        get => _selectedTimeImportConfiguration;
+        set
+        {
+            if (SetProperty(ref _selectedTimeImportConfiguration, value))
+            {
+                RaisePropertyChanged(nameof(CanLoadTimeImportConfiguration));
+                LoadTimeImportConfigurationCommand.RaiseCanExecuteChanged();
+
+                if (value is not null && IsSettingsWorkspace && !IsBusy)
+                {
+                    _ = LoadSelectedTimeImportConfigurationAsync();
+                }
+            }
+        }
+    }
+
+    public DateTimeOffset? TimeImportMonth
+    {
+        get => _timeImportMonth;
+        set
+        {
+            var normalized = value.HasValue
+                ? new DateTimeOffset(new DateTime(value.Value.Year, value.Value.Month, 1))
+                : (DateTimeOffset?)null;
+            if (SetProperty(ref _timeImportMonth, normalized))
+            {
+                RaiseImportCommandState();
+            }
+        }
+    }
+
+    public ImportedMonthStatusItemViewModel? SelectedImportedTimeMonth
+    {
+        get => _selectedImportedTimeMonth;
+        set
+        {
+            if (SetProperty(ref _selectedImportedTimeMonth, value))
+            {
+                RaisePropertyChanged(nameof(CanDeleteImportedTimeMonth));
+                DeleteImportedTimeMonthCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public string TimeImportStatusMessage
     {
         get => _timeImportStatusMessage;
@@ -1196,12 +1318,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     public bool PersonImportHasCsvHeaders => PersonImportFieldMappings.Any(row => row.AvailableCsvColumns.Count > 1);
+    public bool TimeImportHasCsvHeaders => TimeImportFieldMappings.Any(row => row.AvailableCsvColumns.Count > 1);
     public bool HasPersonImportPreviewItems => PersonImportPreviewItems.Count > 0;
 
     public IReadOnlyCollection<string> PersonImportValidationErrors => _importService.ValidateMappings(
         Payroll.Domain.Imports.ImportConfigurationType.PersonData,
         PersonImportFieldMappings.SelectMany(row => row.AvailableCsvColumns).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
         BuildPersonImportFieldMappings()).Errors;
+
+    public IReadOnlyCollection<string> TimeImportValidationErrors => _importService.ValidateMappings(
+        Payroll.Domain.Imports.ImportConfigurationType.TimeData,
+        TimeImportFieldMappings.SelectMany(row => row.AvailableCsvColumns).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+        BuildTimeImportFieldMappings()).Errors;
 
     public string BackupDirectoryPath
     {
@@ -1298,6 +1426,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await LoadSettingsAsync();
         await LoadImportConfigurationsAsync();
+        await LoadImportedTimeMonthsAsync();
         await RefreshAsync();
         await LoadMonthCaptureOverviewAsync();
 
@@ -1763,7 +1892,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ResolvePersonImportTextQualifier()));
 
             ApplyPersonImportCsvHeaders(document.Headers);
-            await RefreshPersonImportPreviewAsync();
+            ClearPersonImportPreview();
             PersonImportStatusMessage = $"Datei geladen: {document.Headers.Count} Spalten erkannt, {document.Rows.Count} Datenzeilen.";
             StatusMessage = PersonImportStatusMessage;
             RaiseImportCommandState();
@@ -1808,23 +1937,47 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
 
             ApplyPersonImportConfiguration(configuration);
-            await RefreshPersonImportPreviewAsync();
+            ClearPersonImportPreview();
             PersonImportStatusMessage = $"Mapping `{configuration.Name}` geladen.";
             StatusMessage = PersonImportStatusMessage;
         });
     }
 
-    private async Task ImportPersonDataAsync()
+    public async Task<bool> PreparePersonImportPreviewAsync()
+    {
+        var prepared = false;
+        await ExecuteBusyAsync(async () =>
+        {
+            await RefreshPersonImportPreviewAsync();
+            if (PersonImportPreviewItems.Count == 0)
+            {
+                PersonImportStatusMessage = "Keine importierbaren Personendaten in der CSV gefunden.";
+                StatusMessage = PersonImportStatusMessage;
+                return;
+            }
+
+            prepared = true;
+        });
+
+        return prepared;
+    }
+
+    public async Task ImportSelectedPersonDataAsync()
     {
         await ExecuteBusyAsync(async () =>
         {
+            var selectedRowNumbers = PersonImportPreviewItems
+                .Where(item => item.IsSelected)
+                .Select(item => item.RowNumber)
+                .ToArray();
+
             var result = await _importService.ImportPersonDataAsync(new ImportPersonDataCommand(
                 PersonImportCsvFilePath,
                 ResolvePersonImportDelimiter(),
                 PersonImportFieldsEnclosed,
                 ResolvePersonImportTextQualifier(),
                 BuildPersonImportFieldMappings(),
-                PersonImportPreviewItems.Where(item => item.IsSelected).Select(item => item.RowNumber).ToArray()));
+                selectedRowNumbers));
 
             var summary = $"{result.CreatedCount} neu, {result.UpdatedCount} aktualisiert";
             PersonImportStatusMessage = result.ErrorCount > 0
@@ -1836,6 +1989,125 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 await ReloadEmployeesAsync();
             }
+
+            ClearPersonImportPreview();
+        });
+    }
+
+    private async Task LoadTimeImportCsvAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            var document = await _importService.ReadCsvDocumentAsync(new ReadCsvImportDocumentCommand(
+                TimeImportCsvFilePath,
+                ResolveTimeImportDelimiter(),
+                TimeImportFieldsEnclosed,
+                ResolveTimeImportTextQualifier()));
+
+            ApplyTimeImportCsvHeaders(document.Headers);
+            TimeImportStatusMessage = $"Datei geladen: {document.Headers.Count} Spalten erkannt, {document.Rows.Count} Datenzeilen.";
+            StatusMessage = TimeImportStatusMessage;
+            RaiseImportCommandState();
+        });
+    }
+
+    private async Task SaveTimeImportConfigurationAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            var saved = await _importService.SaveConfigurationAsync(new SaveImportConfigurationCommand(
+                SelectedTimeImportConfiguration?.ConfigurationId,
+                Payroll.Domain.Imports.ImportConfigurationType.TimeData,
+                TimeImportConfigurationName,
+                ResolveTimeImportDelimiter(),
+                TimeImportFieldsEnclosed,
+                ResolveTimeImportTextQualifier(),
+                BuildTimeImportFieldMappings()));
+
+            await LoadImportConfigurationsAsync();
+            SelectedTimeImportConfiguration = TimeImportConfigurations.FirstOrDefault(item => item.ConfigurationId == saved.ConfigurationId);
+            TimeImportConfigurationName = saved.Name;
+            TimeImportStatusMessage = $"Mapping `{saved.Name}` gespeichert.";
+            StatusMessage = TimeImportStatusMessage;
+        });
+    }
+
+    private async Task LoadSelectedTimeImportConfigurationAsync()
+    {
+        if (SelectedTimeImportConfiguration is null)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var configuration = await _importService.GetConfigurationAsync(SelectedTimeImportConfiguration.ConfigurationId);
+            if (configuration is null)
+            {
+                TimeImportStatusMessage = "Mapping-Konfiguration wurde nicht gefunden.";
+                return;
+            }
+
+            ApplyTimeImportConfiguration(configuration);
+            TimeImportStatusMessage = $"Mapping `{configuration.Name}` geladen.";
+            StatusMessage = TimeImportStatusMessage;
+        });
+    }
+
+    public async Task ImportTimeDataAsync(bool overwriteExistingMonth = false)
+    {
+        if (!TimeImportMonth.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var month = TimeImportMonth.Value;
+            var result = await _importService.ImportTimeDataAsync(new ImportTimeDataCommand(
+                TimeImportCsvFilePath,
+                ResolveTimeImportDelimiter(),
+                TimeImportFieldsEnclosed,
+                ResolveTimeImportTextQualifier(),
+                month.Year,
+                month.Month,
+                overwriteExistingMonth,
+                BuildTimeImportFieldMappings()));
+
+            TimeImportStatusMessage = result.ErrorCount > 0
+                ? BuildTimeImportStatusMessage(result)
+                : $"{result.ImportedCount} importiert.";
+            StatusMessage = TimeImportStatusMessage;
+            await LoadImportedTimeMonthsAsync();
+            await LoadMonthCaptureOverviewAsync();
+        });
+    }
+
+    public async Task<bool> IsSelectedTimeImportMonthAlreadyImportedAsync()
+    {
+        if (!TimeImportMonth.HasValue)
+        {
+            return false;
+        }
+
+        var month = TimeImportMonth.Value;
+        return await _importService.IsMonthImportedAsync(Payroll.Domain.Imports.ImportConfigurationType.TimeData, month.Year, month.Month);
+    }
+
+    public async Task DeleteImportedTimeMonthAsync()
+    {
+        if (SelectedImportedTimeMonth is null)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            await _importService.DeleteImportedTimeMonthAsync(SelectedImportedTimeMonth.Year, SelectedImportedTimeMonth.Month);
+            TimeImportStatusMessage = $"Importierter Monat {SelectedImportedTimeMonth.DisplayName} geloescht.";
+            StatusMessage = TimeImportStatusMessage;
+            await LoadImportedTimeMonthsAsync();
+            await LoadMonthCaptureOverviewAsync();
         });
     }
 
@@ -2192,6 +2464,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         SavePersonImportConfigurationCommand.RaiseCanExecuteChanged();
         LoadPersonImportConfigurationCommand.RaiseCanExecuteChanged();
         ImportPersonDataCommand.RaiseCanExecuteChanged();
+        LoadTimeImportCsvCommand.RaiseCanExecuteChanged();
+        SaveTimeImportConfigurationCommand.RaiseCanExecuteChanged();
+        LoadTimeImportConfigurationCommand.RaiseCanExecuteChanged();
+        ImportTimeDataCommand.RaiseCanExecuteChanged();
+        DeleteImportedTimeMonthCommand.RaiseCanExecuteChanged();
         CreateBackupCommand.RaiseCanExecuteChanged();
         RestoreBackupCommand.RaiseCanExecuteChanged();
         CreatePayrollPdfCommand.RaiseCanExecuteChanged();
@@ -2215,6 +2492,41 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ConfigurationId = configuration.ConfigurationId,
                 Name = configuration.Name
             });
+        }
+
+        var timeConfigurations = await _importService.ListConfigurationsAsync(Payroll.Domain.Imports.ImportConfigurationType.TimeData);
+        TimeImportConfigurations.Clear();
+
+        foreach (var configuration in timeConfigurations)
+        {
+            TimeImportConfigurations.Add(new ImportConfigurationItemViewModel
+            {
+                ConfigurationId = configuration.ConfigurationId,
+                Name = configuration.Name
+            });
+        }
+    }
+
+    private async Task LoadImportedTimeMonthsAsync()
+    {
+        var importedMonths = await _importService.ListImportedMonthsAsync(Payroll.Domain.Imports.ImportConfigurationType.TimeData);
+        ImportedTimeMonths.Clear();
+
+        foreach (var month in importedMonths)
+        {
+            ImportedTimeMonths.Add(new ImportedMonthStatusItemViewModel
+            {
+                Year = month.Year,
+                Month = month.Month,
+                ImportedAtUtc = month.ImportedAtUtc
+            });
+        }
+
+        if (SelectedImportedTimeMonth is not null)
+        {
+            SelectedImportedTimeMonth = ImportedTimeMonths.FirstOrDefault(item =>
+                item.Year == SelectedImportedTimeMonth.Year
+                && item.Month == SelectedImportedTimeMonth.Month);
         }
     }
 
@@ -2482,13 +2794,15 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         foreach (var field in _importService.GetFieldDefinitions(Payroll.Domain.Imports.ImportConfigurationType.TimeData))
         {
-            TimeImportFieldMappings.Add(new ImportFieldMappingRowViewModel
+            var row = new ImportFieldMappingRowViewModel
             {
                 FieldKey = field.FieldKey,
                 FieldLabel = field.Label,
                 IsRequired = field.IsRequired,
                 AllowEmpty = false
-            });
+            };
+            row.PropertyChanged += OnImportFieldMappingRowPropertyChanged;
+            TimeImportFieldMappings.Add(row);
         }
     }
 
@@ -2525,9 +2839,49 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaiseImportCommandState();
     }
 
+    private void ApplyTimeImportCsvHeaders(IReadOnlyCollection<string> headers)
+    {
+        foreach (var row in TimeImportFieldMappings)
+        {
+            row.ApplyAvailableCsvColumns(headers);
+        }
+
+        RaiseImportCommandState();
+    }
+
+    private void ApplyTimeImportConfiguration(ImportConfigurationDto configuration)
+    {
+        TimeImportConfigurationName = configuration.Name;
+        SelectedTimeImportDelimiter = ToPersonImportDelimiterOption(configuration.Delimiter);
+        TimeImportFieldsEnclosed = configuration.FieldsEnclosed;
+        SelectedTimeImportTextQualifier = configuration.TextQualifier == "'"
+            ? "Einfache Anfuehrungszeichen (')"
+            : "Doppelte Anfuehrungszeichen (\")";
+
+        var mappingsByField = configuration.Mappings.ToDictionary(item => item.FieldKey, item => item.CsvColumnName, StringComparer.OrdinalIgnoreCase);
+        var allowEmptyByField = configuration.Mappings.ToDictionary(item => item.FieldKey, item => item.AllowEmpty, StringComparer.OrdinalIgnoreCase);
+        foreach (var row in TimeImportFieldMappings)
+        {
+            row.SelectedCsvColumn = mappingsByField.TryGetValue(row.FieldKey, out var mappedColumn)
+                ? mappedColumn
+                : string.Empty;
+            row.AllowEmpty = allowEmptyByField.TryGetValue(row.FieldKey, out var allowEmpty) && allowEmpty;
+            row.SetSearchTextFromSelection(row.SelectedCsvColumn);
+        }
+
+        RaiseImportCommandState();
+    }
+
     private IReadOnlyCollection<ImportFieldMappingDto> BuildPersonImportFieldMappings()
     {
         return PersonImportFieldMappings
+            .Select(row => new ImportFieldMappingDto(row.FieldKey, row.SelectedCsvColumn ?? string.Empty, row.AllowEmpty))
+            .ToArray();
+    }
+
+    private IReadOnlyCollection<ImportFieldMappingDto> BuildTimeImportFieldMappings()
+    {
+        return TimeImportFieldMappings
             .Select(row => new ImportFieldMappingDto(row.FieldKey, row.SelectedCsvColumn ?? string.Empty, row.AllowEmpty))
             .ToArray();
     }
@@ -2537,7 +2891,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (e.PropertyName is nameof(ImportFieldMappingRowViewModel.SelectedCsvColumn) or nameof(ImportFieldMappingRowViewModel.AllowEmpty))
         {
             RaiseImportCommandState();
-            _ = RefreshPersonImportPreviewAsync();
+            if (sender is ImportFieldMappingRowViewModel row && PersonImportFieldMappings.Contains(row))
+            {
+                ClearPersonImportPreview();
+            }
         }
     }
 
@@ -2550,17 +2907,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(PersonImportHasCsvHeaders));
         RaisePropertyChanged(nameof(HasPersonImportPreviewItems));
         RaisePropertyChanged(nameof(PersonImportValidationErrors));
+        RaisePropertyChanged(nameof(CanLoadTimeImportCsv));
+        RaisePropertyChanged(nameof(CanSaveTimeImportConfiguration));
+        RaisePropertyChanged(nameof(CanLoadTimeImportConfiguration));
+        RaisePropertyChanged(nameof(CanImportTimeData));
+        RaisePropertyChanged(nameof(CanDeleteImportedTimeMonth));
+        RaisePropertyChanged(nameof(TimeImportHasCsvHeaders));
+        RaisePropertyChanged(nameof(TimeImportValidationErrors));
         LoadPersonImportCsvCommand.RaiseCanExecuteChanged();
         SavePersonImportConfigurationCommand.RaiseCanExecuteChanged();
         LoadPersonImportConfigurationCommand.RaiseCanExecuteChanged();
         ImportPersonDataCommand.RaiseCanExecuteChanged();
+        LoadTimeImportCsvCommand.RaiseCanExecuteChanged();
+        SaveTimeImportConfigurationCommand.RaiseCanExecuteChanged();
+        LoadTimeImportConfigurationCommand.RaiseCanExecuteChanged();
+        ImportTimeDataCommand.RaiseCanExecuteChanged();
+        DeleteImportedTimeMonthCommand.RaiseCanExecuteChanged();
     }
 
     private async Task RefreshPersonImportPreviewAsync()
     {
         if (string.IsNullOrWhiteSpace(PersonImportCsvFilePath) || PersonImportValidationErrors.Count > 0)
         {
-            PersonImportPreviewItems.Clear();
+            ClearPersonImportPreview();
             RaiseImportCommandState();
             return;
         }
@@ -2591,6 +2960,17 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaiseImportCommandState();
     }
 
+    private void ClearPersonImportPreview()
+    {
+        foreach (var item in PersonImportPreviewItems)
+        {
+            item.PropertyChanged -= OnPersonImportPreviewItemPropertyChanged;
+        }
+
+        PersonImportPreviewItems.Clear();
+        RaiseImportCommandState();
+    }
+
     private void OnPersonImportPreviewItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(PersonImportPreviewItemViewModel.IsSelected))
@@ -2606,9 +2986,27 @@ public sealed class MainWindowViewModel : ViewModelBase
             : "\"";
     }
 
+    private string ResolveTimeImportTextQualifier()
+    {
+        return SelectedTimeImportTextQualifier.StartsWith("Einfache", StringComparison.Ordinal)
+            ? "'"
+            : "\"";
+    }
+
     private string ResolvePersonImportDelimiter()
     {
         return SelectedPersonImportDelimiter switch
+        {
+            "Komma (,)" => ",",
+            "Tabulator" => "\t",
+            "Pipe (|)" => "|",
+            _ => ";"
+        };
+    }
+
+    private string ResolveTimeImportDelimiter()
+    {
+        return SelectedTimeImportDelimiter switch
         {
             "Komma (,)" => ",",
             "Tabulator" => "\t",
@@ -2639,6 +3037,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         return details.Length == 0
             ? $"{summary}. Fehler: {result.ErrorCount}."
             : $"{summary}. Fehler: {result.ErrorCount}.{Environment.NewLine}{string.Join(Environment.NewLine, details)}";
+    }
+
+    private static string BuildTimeImportStatusMessage(TimeDataImportResultDto result)
+    {
+        var details = result.Messages
+            .Skip(1)
+            .Take(3)
+            .ToArray();
+
+        return details.Length == 0
+            ? $"{result.ImportedCount} importiert. Fehler: {result.ErrorCount}."
+            : $"{result.ImportedCount} importiert. Fehler: {result.ErrorCount}.{Environment.NewLine}{string.Join(Environment.NewLine, details)}";
     }
 
     private void ApplySettings(PayrollSettingsDto settings)

@@ -74,3 +74,26 @@ public sealed record PersonDataImportResultDto(
     int UpdatedCount,
     int ErrorCount,
     IReadOnlyCollection<string> Messages);
+
+public sealed record ImportTimeDataCommand(
+    string FilePath,
+    string Delimiter,
+    bool FieldsEnclosed,
+    string TextQualifier,
+    int Year,
+    int Month,
+    bool OverwriteExistingMonth,
+    IReadOnlyCollection<ImportFieldMappingDto> Mappings);
+
+public sealed record TimeDataImportResultDto(
+    int ImportedCount,
+    int ErrorCount,
+    IReadOnlyCollection<string> Messages);
+
+public sealed record ImportedMonthStatusDto(
+    int Year,
+    int Month,
+    DateTimeOffset ImportedAtUtc)
+{
+    public string MonthKey => $"{Year:D4}-{Month:D2}";
+}

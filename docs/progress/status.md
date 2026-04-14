@@ -161,6 +161,11 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - voller `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false -v minimal` ausserhalb der Sandbox erfolgreich
 - neuer Bereich `Einstellungen > Import` als erster Schnitt umgesetzt; Personendaten-Import per CSV mit speicherbaren Mapping-Konfigurationen und vorbereiteter Stundendaten-Unterseite angebunden
 - Import-Mappings nun fachlich getrennt per persistentem `ImportConfigurationType` gespeichert; Personendaten-Import arbeitet per Personalnummer als Upsert statt Doppelanlage
+- `Einstellungen > Import > Stundendaten` auf denselben CSV-/Mapping-Mechanismus wie der Personenimport gehoben und fuer den ersten funktionalen Stundenimport vervollstaendigt
+- Stundendaten-Import verwendet einen explizit gewaelten Importmonat als Kontext statt eines Datums aus der CSV; importierte Stunden werden diesem Monat zugeordnet
+- eigene Persistenz fuer Importstatus pro Monat eingefuehrt; bereits importierte Monate koennen erkannt, ueberschrieben und samt importierten Stundendaten wieder geloescht werden
+- Avalonia-UI fuer Stundendaten-Import mit CSV-Laden, Mapping speichern/laden, Importmonat, Monatsliste und Ueberschreiben-/Loeschen-Bestaetigung erweitert
+- gezielte Application- und ViewModel-Tests fuer Importmonat, Monatsstatus, Ueberschreiben, Loeschen und Mapping-Ladefluss ergänzt; Solution-Build erfolgreich, `dotnet test` in der Sandbox weiter socket-limitiert
 
 ## Offen
 - Vertragshistorie als historisierte `EmploymentContract`-Versionen fachlich konkretisieren
@@ -185,14 +190,14 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Demo-Daten werden absichtlich nur im lokalen Development-Modus gesät; für andere Umgebungen braucht es weiterhin echte oder separat bereitgestellte Daten
 - Die aktuelle SQLite-kompatible Lösung bevorzugt Robustheit vor maximaler Query-Kompaktheit und lädt Vertragsstände für Listen bewusst separat
 - Die neue Mitarbeitenden-Loeschaktion archiviert bewusst nur logisch; falls spaeter echte Archivierungsregeln je Datenabhaengigkeit noetig werden, muessen diese explizit erweitert werden
-- `dotnet test` bleibt in der Sandbox weiterhin durch eine Socket-Einschraenkung blockiert; neue ViewModel-Tests konnten deshalb lokal nur bis zum erfolgreichen Build verifiziert werden
+- `dotnet test` bleibt in der Sandbox weiterhin durch eine Socket-Einschraenkung blockiert; auch die neuen Stundenimport-Tests konnten hier nur bis zum erfolgreichen Build verifiziert werden
 - der neue CSV-Import verarbeitet bewusst nur einfache Zeilen-CSV ohne mehrzeilige, quoted Felder; fuer komplexere Quelldateien braucht es spaeter einen robusteren Reader
 - bestehende lokale SQLite-Dateien ausserhalb des automatisch neu aufgebauten Development-Schemas koennen bei kuenftigen Modellwechseln weiterhin explizite Migrationsstrategie brauchen
 - der Desktop nutzt weiterhin einen gemeinsam gehaltenen `DbContext`; die Monatsoperationen sind jetzt defensiv abgesichert, langfristig waere ein klarer DbContext-per-Operation-Ansatz robuster
 
 ## Bekannte Einschränkungen
 - Mitarbeitendenverwaltung deckt aktuell Stammdaten, Kontakt, Adresse und einen bearbeitbaren Vertragsstand ab
-- gemeinsame Monatserfassung fuer Zeiten und Spesen ist als erster Vertikalschnitt umgesetzt, aber noch ohne Import, Monatsabschluss und tiefe Payroll-Orchestrierung
+- gemeinsame Monatserfassung fuer Zeiten und Spesen ist als erster Vertikalschnitt umgesetzt; fuer Stundendaten existiert jetzt zusaetzlich ein erster CSV-Import mit Monatskontext, aber noch ohne Monatsabschluss und tiefe Payroll-Orchestrierung
 - die aktuelle Monatserfassung ist jetzt als eigener Erfassungsbereich fuer Zeiten, Spesen und Fahrzeugentschaedigung benutzbar und speicherbar, arbeitet aber noch pro selektierter Person und noch nicht als echte tabellarische Mehrpersonen-Erfassung
 - die aktuelle Monatserfassung fuehrt Spesen wieder als reines Monatstotal; die drei Fahrzeugwerte werden in derselben Zeile wie Stunden und Zuschlagsstunden erfasst
 - die Monatsvorschau zeigt jetzt die Eintraege aller vorhandenen Monate der aktuell selektierten Person tabellarisch untereinander

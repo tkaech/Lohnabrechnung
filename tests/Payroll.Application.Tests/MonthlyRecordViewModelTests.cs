@@ -462,6 +462,19 @@ public sealed class MonthlyRecordViewModelTests
             return Task.CompletedTask;
         }
 
+        public Task DeleteTimeEntriesForMonthAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            foreach (var record in _records.Values.Where(item => item.Year == year && item.Month == month))
+            {
+                foreach (var timeEntry in record.TimeEntries.ToArray())
+                {
+                    record.RemoveTimeEntry(timeEntry.Id);
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
         public void ClearTracking()
         {
         }
