@@ -19,8 +19,13 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _contextDescription = "Zuerst eine Person auswaehlen, dann den Monat laden.";
     private string _statusSummary = "Kein Monatskontext aktiv.";
     private string _contractSummary = "Kein Vertragsstand geladen.";
+    private string _monthlyHourlyRateSummary = "-";
+    private string _monthlySpecialSupplementSummary = "-";
+    private string _monthlyBvgSummary = "-";
     private string _totalsSummary = "Noch keine Monatssummen vorhanden.";
     private string _actionMessage = "Noch keine Aktion ausgefuehrt.";
+    private bool _showOverwriteConfirmation;
+    private string _overwriteConfirmationText = "Bereits gespeicherter Monatsstand vorhanden.";
     private string _timeDate = DateTime.Today.ToString("dd.MM.yyyy");
     private string _hoursWorked = "0";
     private string _nightHours = "0";
@@ -46,6 +51,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private bool _isTimeDatePickerOpen;
     private IReadOnlyCollection<MonthlyPayrollPreviewLineDto> _rawPayrollPreviewLines = [];
     private IReadOnlyDictionary<string, PayrollPreviewHelpOptionDto> _payrollPreviewHelpOptions = new Dictionary<string, PayrollPreviewHelpOptionDto>(StringComparer.Ordinal);
+    private Func<Task>? _pendingOverwriteAction;
     public event EventHandler? TimeCaptureChanged;
 
     public MonthlyRecordViewModel(MonthlyRecordService monthlyRecordService)
@@ -77,6 +83,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         DeleteTimeEntryCommand = new DelegateCommand(DeleteTimeEntryAsync, () => CanDeleteTimeEntry);
         ResetExpenseValuesCommand = new DelegateCommand(PrepareNewExpenseEntry, () => CanManageRecord);
         SaveExpenseEntryCommand = new DelegateCommand(SaveExpenseEntryAsync, () => CanSaveExpenseEntry);
+        ConfirmOverwriteCommand = new DelegateCommand(ConfirmOverwriteAsync, () => CanConfirmOverwrite);
+        DismissOverwriteCommand = new DelegateCommand(DismissOverwriteConfirmation, () => CanDismissOverwrite);
+        RefreshSaveAvailabilityFeedback();
     }
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
@@ -94,6 +103,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public DelegateCommand DeleteTimeEntryCommand { get; }
     public DelegateCommand ResetExpenseValuesCommand { get; }
     public DelegateCommand SaveExpenseEntryCommand { get; }
+    public DelegateCommand ConfirmOverwriteCommand { get; }
+    public DelegateCommand DismissOverwriteCommand { get; }
 
     public bool IsBusy
     {
@@ -106,7 +117,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaisePropertyChanged(nameof(CanConfirmOverwrite));
+                RaisePropertyChanged(nameof(CanDismissOverwrite));
                 RaiseActionStateChanged();
+                RefreshSaveAvailabilityFeedback();
             }
         }
     }
@@ -123,6 +137,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaiseActionStateChanged();
+                RefreshSaveAvailabilityFeedback();
             }
         }
     }
@@ -131,6 +146,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public bool CanSaveTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
     public bool CanDeleteTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedTimeEntry is { IsCurrentMonth: true };
     public bool CanSaveExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
+    public string CurrentSaveBlockReason => BuildSaveBlockReason();
 
     public DateTimeOffset? SelectedMonth
     {
@@ -302,6 +318,24 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         private set => SetProperty(ref _contractSummary, value);
     }
 
+    public string MonthlyHourlyRateSummary
+    {
+        get => _monthlyHourlyRateSummary;
+        private set => SetProperty(ref _monthlyHourlyRateSummary, value);
+    }
+
+    public string MonthlySpecialSupplementSummary
+    {
+        get => _monthlySpecialSupplementSummary;
+        private set => SetProperty(ref _monthlySpecialSupplementSummary, value);
+    }
+
+    public string MonthlyBvgSummary
+    {
+        get => _monthlyBvgSummary;
+        private set => SetProperty(ref _monthlyBvgSummary, value);
+    }
+
     public string TotalsSummary
     {
         get => _totalsSummary;
@@ -313,6 +347,30 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         get => _actionMessage;
         private set => SetProperty(ref _actionMessage, value);
     }
+
+    public bool ShowOverwriteConfirmation
+    {
+        get => _showOverwriteConfirmation;
+        private set
+        {
+            if (SetProperty(ref _showOverwriteConfirmation, value))
+            {
+                RaisePropertyChanged(nameof(CanConfirmOverwrite));
+                RaisePropertyChanged(nameof(CanDismissOverwrite));
+                ConfirmOverwriteCommand.RaiseCanExecuteChanged();
+                DismissOverwriteCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string OverwriteConfirmationText
+    {
+        get => _overwriteConfirmationText;
+        private set => SetProperty(ref _overwriteConfirmationText, value);
+    }
+
+    public bool CanConfirmOverwrite => !IsBusy && ShowOverwriteConfirmation && _pendingOverwriteAction is not null;
+    public bool CanDismissOverwrite => !IsBusy && ShowOverwriteConfirmation;
 
     public string PreviewSummary
     {
@@ -523,8 +581,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         ContextDescription = "Zuerst Monat und Mitarbeitenden waehlen.";
         StatusSummary = "Kein Monatskontext aktiv.";
         ContractSummary = "Kein Vertragsstand geladen.";
+        MonthlyHourlyRateSummary = "-";
+        MonthlySpecialSupplementSummary = "-";
+        MonthlyBvgSummary = "-";
         TotalsSummary = "Noch keine Monatssummen vorhanden.";
         ActionMessage = "Noch keine Aktion ausgefuehrt.";
+        DismissOverwriteConfirmation();
         PreviewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
         PreviewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
@@ -549,6 +611,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(ShowPayrollPreviewSplitView));
         PrepareNewTimeEntry();
         PrepareNewExpenseEntry();
+        RefreshSaveAvailabilityFeedback();
     }
 
     private async Task LoadAsync()
@@ -646,30 +709,13 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
         if (!_currentMonthlyRecordId.HasValue)
         {
+            RefreshSaveAvailabilityFeedback();
             return;
         }
 
         await ExecuteBusyAsync(async () =>
         {
-            var details = await _monthlyRecordService.SaveTimeEntryAsync(
-                new SaveMonthlyTimeEntryCommand(
-                    _currentMonthlyRecordId.Value,
-                    SelectedTimeEntry?.TimeEntryId,
-                    ParseRequiredDate(TimeDate, nameof(TimeDate)),
-                    ParseRequiredDecimal(HoursWorked, nameof(HoursWorked)),
-                    ParseRequiredDecimal(NightHours, nameof(NightHours)),
-                    ParseRequiredDecimal(SundayHours, nameof(SundayHours)),
-                    ParseRequiredDecimal(HolidayHours, nameof(HolidayHours)),
-                    ParseRequiredDecimal(VehiclePauschalzone1, nameof(VehiclePauschalzone1)),
-                    ParseRequiredDecimal(VehiclePauschalzone2, nameof(VehiclePauschalzone2)),
-                    ParseRequiredDecimal(VehicleRegiezone1, nameof(VehicleRegiezone1)),
-                    TimeNote));
-
-            ApplyDetails(details);
-            ActionMessage = SelectedTimeEntry is null
-                ? "Zeiteintrag gespeichert."
-                : "Zeiteintrag aktualisiert.";
-            PrepareNewTimeEntry();
+            await SaveTimeEntryCoreAsync(overwriteExistingMonth: false);
         });
     }
 
@@ -698,19 +744,87 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
         if (!_currentMonthlyRecordId.HasValue)
         {
+            RefreshSaveAvailabilityFeedback();
             return;
         }
 
         await ExecuteBusyAsync(async () =>
         {
+            await SaveExpenseEntryCoreAsync(overwriteExistingMonth: false);
+        });
+    }
+
+    private async Task SaveTimeEntryCoreAsync(bool overwriteExistingMonth)
+    {
+        try
+        {
+            var details = await _monthlyRecordService.SaveTimeEntryAsync(
+                new SaveMonthlyTimeEntryCommand(
+                    _currentMonthlyRecordId!.Value,
+                    SelectedTimeEntry?.TimeEntryId,
+                    ParseRequiredDate(TimeDate, nameof(TimeDate)),
+                    ParseRequiredDecimal(HoursWorked, nameof(HoursWorked)),
+                    ParseRequiredDecimal(NightHours, nameof(NightHours)),
+                    ParseRequiredDecimal(SundayHours, nameof(SundayHours)),
+                    ParseRequiredDecimal(HolidayHours, nameof(HolidayHours)),
+                    ParseRequiredDecimal(VehiclePauschalzone1, nameof(VehiclePauschalzone1)),
+                    ParseRequiredDecimal(VehiclePauschalzone2, nameof(VehiclePauschalzone2)),
+                    ParseRequiredDecimal(VehicleRegiezone1, nameof(VehicleRegiezone1)),
+                    TimeNote,
+                    overwriteExistingMonth));
+
+            DismissOverwriteConfirmation();
+            ApplyDetails(details);
+            ActionMessage = SelectedTimeEntry is null
+                ? "Zeiteintrag gespeichert."
+                : "Zeiteintrag aktualisiert.";
+            PrepareNewTimeEntry();
+        }
+        catch (MonthlyRecordOverwriteRequiredException)
+        {
+            OverwriteConfirmationText = "Der Monat verwendet inzwischen andere Vertrags- oder Einstellungswerte. Soll der gespeicherte Monatsstand mit den aktuell gueltigen Saetzen ueberschrieben werden?";
+            _pendingOverwriteAction = () => SaveTimeEntryCoreAsync(overwriteExistingMonth: true);
+            ShowOverwriteConfirmation = true;
+        }
+    }
+
+    private async Task SaveExpenseEntryCoreAsync(bool overwriteExistingMonth)
+    {
+        try
+        {
             var details = await _monthlyRecordService.SaveExpenseEntryAsync(
                 new SaveMonthlyExpenseEntryCommand(
-                    _currentMonthlyRecordId.Value,
-                    ParseRequiredDecimal(ExpensesTotal, nameof(ExpensesTotal))));
+                    _currentMonthlyRecordId!.Value,
+                    ParseRequiredDecimal(ExpensesTotal, nameof(ExpensesTotal)),
+                    overwriteExistingMonth));
 
+            DismissOverwriteConfirmation();
             ApplyDetails(details);
             ActionMessage = "Spesen gespeichert.";
-        });
+        }
+        catch (MonthlyRecordOverwriteRequiredException)
+        {
+            OverwriteConfirmationText = "Der Monat verwendet inzwischen andere Vertrags- oder Einstellungswerte. Soll der gespeicherte Monatsstand mit den aktuell gueltigen Saetzen ueberschrieben werden?";
+            _pendingOverwriteAction = () => SaveExpenseEntryCoreAsync(overwriteExistingMonth: true);
+            ShowOverwriteConfirmation = true;
+        }
+    }
+
+    private async Task ConfirmOverwriteAsync()
+    {
+        if (_pendingOverwriteAction is null)
+        {
+            return;
+        }
+
+        var action = _pendingOverwriteAction;
+        await ExecuteBusyAsync(async () => await action());
+    }
+
+    private void DismissOverwriteConfirmation()
+    {
+        _pendingOverwriteAction = null;
+        ShowOverwriteConfirmation = false;
     }
 
     private void ApplyDetails(MonthlyRecordDetailsDto details)
@@ -720,8 +834,17 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         ContextDescription = $"{details.Header.Month:00}/{details.Header.Year} | Monatserfassung fuer Zeiten und Spesen.";
         StatusSummary = $"Status: {FormatStatus(details.Header.Status)}";
         ContractSummary = details.Header.ContractValidFrom.HasValue
-            ? $"Vertragsstand: {details.Header.ContractValidFrom:dd.MM.yyyy} bis {FormatDate(details.Header.ContractValidTo)} | {details.Header.HourlyRateChf:0.00} CHF/h | BVG {details.Header.MonthlyBvgDeductionChf:0.00} CHF"
+            ? $"Vertragsstand: {details.Header.ContractValidFrom:dd.MM.yyyy} bis {FormatDate(details.Header.ContractValidTo)}"
             : "Vertragsstand: kein passender Vertrag fuer den Monat gefunden.";
+        MonthlyHourlyRateSummary = details.Header.HourlyRateChf.HasValue
+            ? $"{details.Header.HourlyRateChf.Value:0.00} CHF/h"
+            : "-";
+        MonthlySpecialSupplementSummary = details.Header.SpecialSupplementRateChf.HasValue
+            ? $"{details.Header.SpecialSupplementRateChf.Value:0.00} CHF/h"
+            : "-";
+        MonthlyBvgSummary = details.Header.MonthlyBvgDeductionChf.HasValue
+            ? $"{details.Header.MonthlyBvgDeductionChf.Value:0.00} CHF"
+            : "-";
         TotalsSummary = $"Stunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
         PreviewSummary = "Monatsvorschau zeigt alle vorhandenen Monate der selektierten Person tabellarisch untereinander.";
         PreviewTotals = $"Arbeitsstunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
@@ -858,6 +981,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
         RaiseActionStateChanged();
+        RefreshSaveAvailabilityFeedback();
     }
 
     private void PopulateTimeEntryForm(MonthlyTimeEntryItemViewModel entry)
@@ -914,6 +1038,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
 
         await LoadCurrentRecordAsync();
+        RefreshSaveAvailabilityFeedback();
     }
 
     private void ResetLoadedRecordState(bool preservePendingSelection = false)
@@ -921,8 +1046,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         _currentMonthlyRecordId = null;
         StatusSummary = "Kein Monatskontext aktiv.";
         ContractSummary = "Kein Vertragsstand geladen.";
+        MonthlyHourlyRateSummary = "-";
+        MonthlySpecialSupplementSummary = "-";
+        MonthlyBvgSummary = "-";
         TotalsSummary = "Noch keine Monatssummen vorhanden.";
         ActionMessage = "Noch keine Aktion ausgefuehrt.";
+        DismissOverwriteConfirmation();
         PreviewSummary = "Monatsvorschau wird nach dem Laden des Monats angezeigt.";
         PreviewTotals = "Noch keine verdichteten Monatswerte vorhanden.";
         PreviewEntryCounts = "Noch keine Eintraege im aktuellen Monat vorhanden.";
@@ -952,6 +1081,55 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
         RaiseActionStateChanged();
+        RefreshSaveAvailabilityFeedback();
+    }
+
+    private string BuildSaveBlockReason()
+    {
+        if (IsBusy)
+        {
+            return "Speichern blockiert: Monatsdaten werden gerade geladen oder gespeichert.";
+        }
+
+        if (!_currentEmployeeId.HasValue)
+        {
+            return "Speichern blockiert: Es ist noch kein Mitarbeitender fuer die Monatserfassung ausgewaehlt.";
+        }
+
+        if (!SelectedMonth.HasValue)
+        {
+            return "Speichern blockiert: Es ist noch kein Monat fuer die Monatserfassung ausgewaehlt.";
+        }
+
+        if (IsLocked)
+        {
+            return "Speichern blockiert: Die Monatserfassung ist gesperrt, solange im Mitarbeitendenbereich eine Bearbeitung offen ist.";
+        }
+
+        if (!_currentMonthlyRecordId.HasValue)
+        {
+            return $"Speichern blockiert: Die Monatsdaten fuer {SelectedMonth.Value:MM/yyyy} konnten noch nicht geladen werden.";
+        }
+
+        return string.Empty;
+    }
+
+    private void RefreshSaveAvailabilityFeedback()
+    {
+        RaisePropertyChanged(nameof(CurrentSaveBlockReason));
+
+        var blockReason = CurrentSaveBlockReason;
+        if (!string.IsNullOrWhiteSpace(blockReason))
+        {
+            ActionMessage = blockReason;
+            return;
+        }
+
+        if (ActionMessage == "Noch keine Aktion ausgefuehrt."
+            || ActionMessage.StartsWith("Speichern blockiert:", StringComparison.Ordinal))
+        {
+            ActionMessage = "Bereit zum Speichern.";
+        }
     }
 
     private void RaiseActionStateChanged()
@@ -962,6 +1140,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         DeleteTimeEntryCommand.RaiseCanExecuteChanged();
         ResetExpenseValuesCommand.RaiseCanExecuteChanged();
         SaveExpenseEntryCommand.RaiseCanExecuteChanged();
+        ConfirmOverwriteCommand.RaiseCanExecuteChanged();
+        DismissOverwriteCommand.RaiseCanExecuteChanged();
     }
 
     private void RefreshVisiblePayrollPreviewLines()

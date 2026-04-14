@@ -34,6 +34,7 @@ public sealed class EmployeeRepositorySqliteTests
         var saved = await repository.SaveAsync(
             new SaveEmployeeCommand(
                 null,
+                null,
                 "2000",
                 "Demo",
                 "Person",
@@ -81,5 +82,244 @@ public sealed class EmployeeRepositorySqliteTests
         Assert.Equal("Schachenstr. 7, Emmenbruecke", saved.EmploymentLocationName);
         Assert.Equal(EmployeeWageType.Monthly, saved.WageType);
         Assert.Equal(3.00m, saved.SpecialSupplementRateChf);
+    }
+
+    [Fact]
+    public async Task SaveAsync_RejectsContractPeriodsThatOverlapWithLaterVersion()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new EmployeeRepository(dbContext);
+        var employee = await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                null,
+                null,
+                "3000",
+                "Nina",
+                "Vertrag",
+                null,
+                new DateOnly(2026, 1, 1),
+                null,
+                true,
+                "Teststrasse",
+                "1",
+                null,
+                "6000",
+                "Luzern",
+                "Schweiz",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                EmployeeWageType.Hourly,
+                new DateOnly(2026, 1, 1),
+                null,
+                30m,
+                250m,
+                2.50m),
+            CancellationToken.None);
+
+        await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                employee.EmployeeId,
+                null,
+                employee.PersonnelNumber,
+                employee.FirstName,
+                employee.LastName,
+                employee.BirthDate,
+                employee.EntryDate,
+                employee.ExitDate,
+                employee.IsActive,
+                employee.Street,
+                employee.HouseNumber,
+                employee.AddressLine2,
+                employee.PostalCode,
+                employee.City,
+                employee.Country,
+                employee.ResidenceCountry,
+                employee.Nationality,
+                employee.PermitCode,
+                employee.TaxStatus,
+                employee.IsSubjectToWithholdingTax,
+                employee.AhvNumber,
+                employee.Iban,
+                employee.PhoneNumber,
+                employee.Email,
+                employee.DepartmentOptionId,
+                employee.EmploymentCategoryOptionId,
+                employee.EmploymentLocationOptionId,
+                employee.WageType,
+                new DateOnly(2026, 3, 1),
+                null,
+                31m,
+                255m,
+                2.75m),
+            CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.SaveAsync(
+                new SaveEmployeeCommand(
+                    employee.EmployeeId,
+                    null,
+                    employee.PersonnelNumber,
+                    employee.FirstName,
+                    employee.LastName,
+                    employee.BirthDate,
+                    employee.EntryDate,
+                    employee.ExitDate,
+                    employee.IsActive,
+                    employee.Street,
+                    employee.HouseNumber,
+                    employee.AddressLine2,
+                    employee.PostalCode,
+                    employee.City,
+                    employee.Country,
+                    employee.ResidenceCountry,
+                    employee.Nationality,
+                    employee.PermitCode,
+                    employee.TaxStatus,
+                    employee.IsSubjectToWithholdingTax,
+                    employee.AhvNumber,
+                    employee.Iban,
+                    employee.PhoneNumber,
+                    employee.Email,
+                    employee.DepartmentOptionId,
+                    employee.EmploymentCategoryOptionId,
+                    employee.EmploymentLocationOptionId,
+                    employee.WageType,
+                    new DateOnly(2026, 2, 1),
+                    new DateOnly(2026, 3, 31),
+                    32m,
+                    260m,
+                    3.00m),
+                CancellationToken.None));
+
+        Assert.Contains("ueberlappt", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task DeleteContractVersionAsync_RejectsActiveVersion()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new EmployeeRepository(dbContext);
+        var employee = await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                null, null, "4000", "Mia", "Test", null, new DateOnly(2026, 1, 1), null, true,
+                "Teststrasse", "1", null, "6000", "Luzern", "Schweiz",
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                EmployeeWageType.Hourly, new DateOnly(2026, 1, 1), null, 30m, 250m, 2.5m),
+            CancellationToken.None);
+
+        var activeVersion = Assert.Single(employee.ContractHistory);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.DeleteContractVersionAsync(employee.EmployeeId, activeVersion.ContractId, CancellationToken.None));
+
+        Assert.Contains("aktive", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithSingleVersion_AllowsBackwardAdjustmentOfCurrentContract()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new EmployeeRepository(dbContext);
+        var employee = await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                null, null, "5000", "Ella", "Rueck", null, new DateOnly(2026, 1, 1), null, true,
+                "Teststrasse", "1", null, "6000", "Luzern", "Schweiz",
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                EmployeeWageType.Hourly, new DateOnly(2026, 4, 1), null, 30m, 250m, 2.5m),
+            CancellationToken.None);
+
+        var currentContract = Assert.Single(employee.ContractHistory);
+
+        var updated = await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                employee.EmployeeId, currentContract.ContractId, employee.PersonnelNumber, employee.FirstName, employee.LastName,
+                employee.BirthDate, employee.EntryDate, employee.ExitDate, employee.IsActive,
+                employee.Street, employee.HouseNumber, employee.AddressLine2, employee.PostalCode, employee.City, employee.Country,
+                employee.ResidenceCountry, employee.Nationality, employee.PermitCode, employee.TaxStatus, employee.IsSubjectToWithholdingTax,
+                employee.AhvNumber, employee.Iban, employee.PhoneNumber, employee.Email, employee.DepartmentOptionId,
+                employee.EmploymentCategoryOptionId, employee.EmploymentLocationOptionId, employee.WageType,
+                new DateOnly(2026, 2, 1), null, 30m, 250m, 2.5m),
+            CancellationToken.None);
+
+        var history = Assert.Single(updated.ContractHistory);
+        Assert.Equal(currentContract.ContractId, history.ContractId);
+        Assert.Equal(new DateOnly(2026, 2, 1), history.ValidFrom);
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithNullEditingContractId_CreatesSecondVersionWithoutOverwritingFirst()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new EmployeeRepository(dbContext);
+        var employee = await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                null, null, "6000", "Nora", "Neu", null, new DateOnly(2026, 1, 1), null, true,
+                "Teststrasse", "1", null, "6000", "Luzern", "Schweiz",
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                EmployeeWageType.Hourly, new DateOnly(2026, 4, 1), null, 30m, 250m, 2.5m),
+            CancellationToken.None);
+
+        var firstContract = Assert.Single(employee.ContractHistory);
+
+        var updated = await repository.SaveAsync(
+            new SaveEmployeeCommand(
+                employee.EmployeeId, null, employee.PersonnelNumber, employee.FirstName, employee.LastName,
+                employee.BirthDate, employee.EntryDate, employee.ExitDate, employee.IsActive,
+                employee.Street, employee.HouseNumber, employee.AddressLine2, employee.PostalCode, employee.City, employee.Country,
+                employee.ResidenceCountry, employee.Nationality, employee.PermitCode, employee.TaxStatus, employee.IsSubjectToWithholdingTax,
+                employee.AhvNumber, employee.Iban, employee.PhoneNumber, employee.Email, employee.DepartmentOptionId,
+                employee.EmploymentCategoryOptionId, employee.EmploymentLocationOptionId, employee.WageType,
+                new DateOnly(2026, 5, 1), null, 31m, 255m, 2.75m),
+            CancellationToken.None);
+
+        Assert.Equal(2, updated.ContractHistory.Count);
+        Assert.Contains(updated.ContractHistory, item => item.ContractId == firstContract.ContractId && item.ValidFrom == new DateOnly(2026, 4, 1) && item.ValidTo == new DateOnly(2026, 4, 30));
+        Assert.Contains(updated.ContractHistory, item => item.ContractId != firstContract.ContractId && item.ValidFrom == new DateOnly(2026, 5, 1) && item.ValidTo is null);
     }
 }

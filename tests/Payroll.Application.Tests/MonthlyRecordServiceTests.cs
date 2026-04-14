@@ -68,6 +68,33 @@ public sealed class MonthlyRecordServiceTests
         Assert.Equal(80m, updated.ExpenseEntry!.ExpensesTotalChf);
     }
 
+    [Fact]
+    public async Task SaveTimeEntryAsync_RequiresOverwriteWhenSnapshotsChanged()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository(employeeId, "Anna Aktiv")
+        {
+            ForceOverwriteRequired = true
+        };
+        var service = new MonthlyRecordService(repository);
+        var details = await service.GetOrCreateAsync(new MonthlyRecordQuery(employeeId, 2026, 4));
+
+        await Assert.ThrowsAsync<MonthlyRecordOverwriteRequiredException>(() =>
+            service.SaveTimeEntryAsync(
+                new SaveMonthlyTimeEntryCommand(
+                    details.Header.MonthlyRecordId,
+                    null,
+                    new DateOnly(2026, 4, 1),
+                    8m,
+                    0m,
+                    0m,
+                    0m,
+                    0m,
+                    0m,
+                    0m,
+                    null)));
+    }
+
     private sealed class InMemoryMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
     {
         private readonly Dictionary<Guid, EmployeeMonthlyRecord> _monthlyRecordsById = [];
@@ -81,6 +108,7 @@ public sealed class MonthlyRecordServiceTests
         }
 
         public IReadOnlyCollection<EmployeeMonthlyRecord> MonthlyRecords => _monthlyRecordsById.Values;
+        public bool ForceOverwriteRequired { get; set; }
 
         public Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
         {
@@ -122,6 +150,7 @@ public sealed class MonthlyRecordServiceTests
                     record.Year,
                     record.Month,
                     record.Status,
+                    null,
                     null,
                     null,
                     null,
@@ -187,6 +216,17 @@ public sealed class MonthlyRecordServiceTests
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
         {
             return Task.FromResult((IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());
+        }
+
+        public Task<bool> MonthlySnapshotsDifferFromCurrentAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ForceOverwriteRequired);
+        }
+
+        public Task RefreshMonthlySnapshotsAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+        {
+            ForceOverwriteRequired = false;
+            return Task.CompletedTask;
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)

@@ -127,6 +127,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsDecimalSeparator = Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator;
     private string _settingsThousandsSeparator = ThousandsSeparatorApostropheLabel;
     private string _settingsCurrencyCode = Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode;
+    private DateTimeOffset? _settingsCalculationValidFrom;
+    private DateTimeOffset? _settingsCalculationValidTo;
     private string _backupDirectoryPath = string.Empty;
     private string _backupFileName = string.Empty;
     private string _selectedBackupContentType = BackupTypeBothLabel;
@@ -147,10 +149,43 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool _isEditing;
     private bool _isCreatingNew;
     private bool _showDeleteConfirmation;
+    private bool _showContractVersionDialog;
+    private bool _showCalculationSettingsVersionDialog;
+    private bool _showContractVersionCreateSection;
+    private bool _showCalculationSettingsVersionCreateSection;
+    private DateTimeOffset? _newContractVersionValidFrom;
+    private DateTimeOffset? _newContractVersionValidTo;
+    private Guid? _editingContractVersionId;
+    private Guid? _editingCalculationSettingsVersionId;
+    private Guid? _loadedCurrentContractId;
+    private Guid? _loadedCurrentCalculationSettingsVersionId;
+    private DateOnly? _loadedContractCurrentValidFrom;
+    private DateOnly? _loadedCalculationSettingsCurrentValidFrom;
+    private DateOnly? _loadedCalculationSettingsCurrentValidTo;
+    private DateOnly? _loadedContractCurrentValidTo;
+    private decimal? _loadedHourlyRateChf;
+    private decimal? _loadedMonthlyBvgDeductionChf;
+    private decimal? _loadedSpecialSupplementRateChf;
+    private decimal? _loadedSettingsNightSupplementRate;
+    private decimal? _loadedSettingsSundaySupplementRate;
+    private decimal? _loadedSettingsHolidaySupplementRate;
+    private decimal? _loadedSettingsAhvIvEoRate;
+    private decimal? _loadedSettingsAlvRate;
+    private decimal? _loadedSettingsSicknessAccidentInsuranceRate;
+    private decimal? _loadedSettingsTrainingAndHolidayRate;
+    private decimal? _loadedSettingsVacationCompensationRate;
+    private decimal? _loadedSettingsVacationCompensationRateAge50Plus;
+    private decimal? _loadedSettingsVehiclePauschalzone1RateChf;
+    private decimal? _loadedSettingsVehiclePauschalzone2RateChf;
+    private decimal? _loadedSettingsVehicleRegiezone1RateChf;
     private string _employeeCountSummary = "Keine Mitarbeitenden geladen.";
     private string _selectedMonthCaptureFilter = MonthCaptureFilterAll;
     private string _monthCaptureSummary = "Keine Stundenerfassungen geladen.";
     private IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto> _allMonthCaptureOverviewRows = [];
+    private IReadOnlyCollection<PayrollCalculationSettingsVersionDto> _currentSettingsVersionSource = [];
+    private IReadOnlyCollection<EmploymentContractVersionDto> _currentContractHistorySource = [];
+    private EmploymentContractHistoryItemViewModel? _selectedContractHistoryEntry;
+    private PayrollCalculationSettingsVersionItemViewModel? _selectedCalculationSettingsVersion;
     private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
 
     public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
@@ -170,6 +205,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         EmploymentCategoryOptions = [];
         EmploymentLocationOptions = [];
         PayrollPreviewHelpOptions = [];
+        ContractHistory = [];
+        CalculationSettingsVersions = [];
         PersonImportConfigurations = [];
         PersonImportFieldMappings = [];
         PersonImportPreviewItems = [];
@@ -203,6 +240,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeleteCommand = new DelegateCommand(RequestDelete, () => CanRequestDelete);
         ConfirmDeleteCommand = new DelegateCommand(ConfirmDeleteAsync, () => CanConfirmDelete);
         DismissDeleteCommand = new DelegateCommand(DismissDeleteConfirmation, () => CanDismissDelete);
+        ConfirmContractVersionDialogCommand = new DelegateCommand(ConfirmContractVersionDialogAsync, () => CanConfirmContractVersionDialog);
+        DismissContractVersionDialogCommand = new DelegateCommand(DismissContractVersionDialog, () => CanDismissContractVersionDialog);
+        OpenContractVersionDialogCommand = new DelegateCommand(OpenContractVersionDialogFromButton, () => CanOpenContractVersionDialog);
+        OpenNewContractVersionDialogCommand = new DelegateCommand(OpenNewContractVersionDialogFromButton, () => CanOpenNewContractVersionDialog);
+        DeleteSelectedContractVersionCommand = new DelegateCommand(DeleteSelectedContractVersionAsync, () => CanDeleteSelectedContractVersion);
+        OpenCalculationSettingsVersionDialogCommand = new DelegateCommand(OpenCalculationSettingsVersionDialog, () => CanOpenCalculationSettingsVersionDialog);
+        OpenNewCalculationSettingsVersionDialogCommand = new DelegateCommand(OpenNewCalculationSettingsVersionDialog, () => CanOpenNewCalculationSettingsVersionDialog);
+        ConfirmCalculationSettingsVersionDialogCommand = new DelegateCommand(ConfirmCalculationSettingsVersionDialogAsync, () => CanConfirmCalculationSettingsVersionDialog);
+        DismissCalculationSettingsVersionDialogCommand = new DelegateCommand(DismissCalculationSettingsVersionDialog, () => CanDismissCalculationSettingsVersionDialog);
+        DeleteSelectedCalculationSettingsVersionCommand = new DelegateCommand(DeleteSelectedCalculationSettingsVersionAsync, () => CanDeleteSelectedCalculationSettingsVersion);
         ClearExitDateCommand = new DelegateCommand(ClearExitDate, () => CanClearExitDate);
         ShowTimeAndExpensesCommand = new DelegateCommand(SwitchToTimeAndExpensesWorkspace, () => !IsTimeAndExpensesWorkspace);
         ShowPayrollRunsCommand = new DelegateCommand(SwitchToPayrollRunsWorkspace, () => !IsPayrollRunsWorkspace);
@@ -263,6 +310,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<EditableSettingOptionViewModel> EmploymentCategoryOptions { get; }
     public ObservableCollection<EditableSettingOptionViewModel> EmploymentLocationOptions { get; }
     public ObservableCollection<PayrollPreviewHelpToggleViewModel> PayrollPreviewHelpOptions { get; }
+    public ObservableCollection<EmploymentContractHistoryItemViewModel> ContractHistory { get; }
+    public ObservableCollection<PayrollCalculationSettingsVersionItemViewModel> CalculationSettingsVersions { get; }
     public ObservableCollection<ImportConfigurationItemViewModel> PersonImportConfigurations { get; }
     public ObservableCollection<ImportFieldMappingRowViewModel> PersonImportFieldMappings { get; }
     public ObservableCollection<PersonImportPreviewItemViewModel> PersonImportPreviewItems { get; }
@@ -286,6 +335,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand DeleteCommand { get; }
     public DelegateCommand ConfirmDeleteCommand { get; }
     public DelegateCommand DismissDeleteCommand { get; }
+    public DelegateCommand ConfirmContractVersionDialogCommand { get; }
+    public DelegateCommand DismissContractVersionDialogCommand { get; }
+    public DelegateCommand OpenContractVersionDialogCommand { get; }
+    public DelegateCommand OpenNewContractVersionDialogCommand { get; }
+    public DelegateCommand DeleteSelectedContractVersionCommand { get; }
+    public DelegateCommand OpenCalculationSettingsVersionDialogCommand { get; }
+    public DelegateCommand OpenNewCalculationSettingsVersionDialogCommand { get; }
+    public DelegateCommand ConfirmCalculationSettingsVersionDialogCommand { get; }
+    public DelegateCommand DismissCalculationSettingsVersionDialogCommand { get; }
+    public DelegateCommand DeleteSelectedCalculationSettingsVersionCommand { get; }
     public DelegateCommand ClearExitDateCommand { get; }
     public DelegateCommand ShowTimeAndExpensesCommand { get; }
     public DelegateCommand ShowPayrollRunsCommand { get; }
@@ -365,13 +424,23 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanBrowseEmployees => !IsBusy && !_isEditing;
     public bool CanStartCreate => !IsBusy && !_isEditing;
     public bool CanStartEdit => !IsBusy && !_isEditing && _currentEmployeeId.HasValue;
-    public bool CanSave => !IsBusy && _isEditing;
+    public bool CanSave => !IsBusy && _isEditing && !ShowContractVersionDialog;
     public bool CanCancel => !IsBusy && _isEditing;
     public bool CanRequestDelete => !IsBusy && _isEditing && _currentEmployeeId.HasValue && IsActiveEmployee;
     public bool CanConfirmDelete => !IsBusy && _showDeleteConfirmation && _currentEmployeeId.HasValue;
     public bool CanDismissDelete => !IsBusy && _showDeleteConfirmation;
+    public bool CanConfirmContractVersionDialog => !IsBusy && ShowContractVersionDialog && ShowContractVersionCreateSection && NewContractVersionValidFrom.HasValue;
+    public bool CanDismissContractVersionDialog => !IsBusy && ShowContractVersionDialog;
+    public bool CanOpenContractVersionDialog => !IsBusy && _currentEmployeeId.HasValue;
+    public bool CanOpenNewContractVersionDialog => !IsBusy && _isEditing && _currentEmployeeId.HasValue;
+    public bool CanDeleteSelectedContractVersion => !IsBusy && ShowContractVersionDialog && SelectedContractHistoryEntry is not null;
+    public bool CanOpenCalculationSettingsVersionDialog => !IsBusy && IsSettingsWorkspace && CalculationSettingsVersions.Count > 0;
+    public bool CanOpenNewCalculationSettingsVersionDialog => !IsBusy && IsSettingsWorkspace && CalculationSettingsVersions.Count > 0;
+    public bool CanConfirmCalculationSettingsVersionDialog => !IsBusy && ShowCalculationSettingsVersionDialog && ShowCalculationSettingsVersionCreateSection && SettingsCalculationValidFrom.HasValue;
+    public bool CanDismissCalculationSettingsVersionDialog => !IsBusy && ShowCalculationSettingsVersionDialog;
+    public bool CanDeleteSelectedCalculationSettingsVersion => !IsBusy && ShowCalculationSettingsVersionDialog && SelectedCalculationSettingsVersion is not null;
     public bool CanClearExitDate => CanEditFields && ExitDate.HasValue;
-    public bool CanSaveSettings => !IsBusy && IsSettingsWorkspace;
+    public bool CanSaveSettings => !IsBusy && IsSettingsWorkspace && !ShowCalculationSettingsVersionDialog;
     public bool CanLoadPersonImportCsv => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportCsvFilePath);
     public bool CanSavePersonImportConfiguration => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(PersonImportConfigurationName);
     public bool CanLoadPersonImportConfiguration => !IsBusy && IsSettingsWorkspace && SelectedPersonImportConfiguration is not null;
@@ -383,6 +452,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanRemoveDepartmentOption => CanManageSettingsOptions && SelectedSettingsDepartment is not null;
     public bool CanRemoveEmploymentCategoryOption => CanManageSettingsOptions && SelectedSettingsEmploymentCategory is not null;
     public bool CanRemoveEmploymentLocationOption => CanManageSettingsOptions && SelectedSettingsEmploymentLocation is not null;
+    public bool ShowContractHistoryOverlapWarning => ContractHistory.Any(item => item.HasOverlapWarning);
+    public bool ShowContractVersionCreateSection => _showContractVersionCreateSection;
+    public bool ShowCalculationSettingsVersionCreateSection => _showCalculationSettingsVersionCreateSection;
+    public bool ShowCalculationSettingsOverlapWarning => CalculationSettingsVersions.Any(item => item.HasOverlapWarning);
     public bool ShowViewActions => !_isEditing;
     public bool ShowEditActions => _isEditing;
     public bool ShowDeleteConfirmation
@@ -399,6 +472,79 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
         }
     }
+
+    public bool ShowContractVersionDialog
+    {
+        get => _showContractVersionDialog;
+        private set
+        {
+            if (SetProperty(ref _showContractVersionDialog, value))
+            {
+                RaisePropertyChanged(nameof(CanSave));
+                RaisePropertyChanged(nameof(CanConfirmContractVersionDialog));
+                RaisePropertyChanged(nameof(CanDismissContractVersionDialog));
+                ConfirmContractVersionDialogCommand.RaiseCanExecuteChanged();
+                DismissContractVersionDialogCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool ShowCalculationSettingsVersionDialog
+    {
+        get => _showCalculationSettingsVersionDialog;
+        private set
+        {
+            if (SetProperty(ref _showCalculationSettingsVersionDialog, value))
+            {
+                RaisePropertyChanged(nameof(CanSaveSettings));
+                RaisePropertyChanged(nameof(CanConfirmCalculationSettingsVersionDialog));
+                RaisePropertyChanged(nameof(CanDismissCalculationSettingsVersionDialog));
+                RaisePropertyChanged(nameof(CanDeleteSelectedCalculationSettingsVersion));
+                ConfirmCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+                DismissCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+                DeleteSelectedCalculationSettingsVersionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public DateTimeOffset? NewContractVersionValidFrom
+    {
+        get => _newContractVersionValidFrom;
+        set
+        {
+            if (SetProperty(ref _newContractVersionValidFrom, value))
+            {
+                RaisePropertyChanged(nameof(ContractVersionDialogSummary));
+                RaisePropertyChanged(nameof(CanConfirmContractVersionDialog));
+                ConfirmContractVersionDialogCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public DateTimeOffset? NewContractVersionValidTo
+    {
+        get => _newContractVersionValidTo;
+        set
+        {
+            if (SetProperty(ref _newContractVersionValidTo, value))
+            {
+                RaisePropertyChanged(nameof(ContractVersionDialogSummary));
+            }
+        }
+    }
+
+    public bool IsEditingContractVersion => _editingContractVersionId.HasValue;
+    public bool IsEditingCalculationSettingsVersion => _editingCalculationSettingsVersionId.HasValue;
+    public string ContractVersionDialogTitle => !ShowContractVersionCreateSection && !IsEditingContractVersion
+        ? "Vertragshistorie"
+        : IsEditingContractVersion ? "Vertragsstand bearbeiten" : "Neuen Vertragsstand anlegen";
+    public string ContractVersionDialogDescription => !ShowContractVersionCreateSection && !IsEditingContractVersion
+        ? "Die Vertragshistorie wird getrennt von der Hauptmaske angezeigt. Der aktuelle Vertragsstand bleibt in der Mitarbeitendenmaske bearbeitbar."
+        : IsEditingContractVersion
+        ? "Der ausgewaehlte Vertragsstand wird direkt bearbeitet. Gueltig ab und Gueltig bis koennen innerhalb der Historie angepasst werden."
+        : "Die Vertragshistorie wird separat angezeigt. Neue Vertragsstaende werden nur ueber den expliziten Schritt 'Neuer Vertragsstand ab Monat' angelegt.";
+    public string ContractVersionDialogSummary => BuildContractVersionDialogSummary();
+    public string ConfirmContractVersionDialogButtonText => IsEditingContractVersion ? "Stand speichern" : "Neuen Stand speichern";
 
     public string EmployeeCountSummary
     {
@@ -673,7 +819,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DateTimeOffset? ContractValidFrom
     {
         get => _contractValidFrom;
-        set => SetProperty(ref _contractValidFrom, value);
+        set
+        {
+            if (SetProperty(ref _contractValidFrom, value) && ShowContractVersionDialog && ShowContractVersionCreateSection && value.HasValue)
+            {
+                NewContractVersionValidFrom = value;
+            }
+        }
     }
 
     public DateTimeOffset? ContractValidTo
@@ -901,7 +1053,68 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public DateTimeOffset? SettingsCalculationValidFrom
+    {
+        get => _settingsCalculationValidFrom;
+        set
+        {
+            if (SetProperty(ref _settingsCalculationValidFrom, value))
+            {
+                RaisePropertyChanged(nameof(CalculationSettingsVersionDialogSummary));
+                RaisePropertyChanged(nameof(CanConfirmCalculationSettingsVersionDialog));
+                ConfirmCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public DateTimeOffset? SettingsCalculationValidTo
+    {
+        get => _settingsCalculationValidTo;
+        set
+        {
+            if (SetProperty(ref _settingsCalculationValidTo, value))
+            {
+                RaisePropertyChanged(nameof(CalculationSettingsVersionDialogSummary));
+            }
+        }
+    }
+
+    public string CalculationSettingsVersionDialogTitle => !ShowCalculationSettingsVersionCreateSection && !IsEditingCalculationSettingsVersion
+        ? "Satzstandhistorie"
+        : IsEditingCalculationSettingsVersion ? "Satzstand bearbeiten" : "Neuen Satzstand anlegen";
+    public string CalculationSettingsVersionDialogDescription => !ShowCalculationSettingsVersionCreateSection && !IsEditingCalculationSettingsVersion
+        ? "Die Satzstandhistorie wird getrennt von der Hauptmaske angezeigt. Der aktuell gueltige Stand bleibt im Einstellungen-Bereich bearbeitbar."
+        : IsEditingCalculationSettingsVersion
+        ? "Der ausgewaehlte Satzstand wird direkt bearbeitet. Gueltig ab und Gueltig bis koennen innerhalb der Historie angepasst werden."
+        : "Die Satzstandhistorie wird separat angezeigt. Neue Satzstaende werden nur ueber den expliziten Schritt 'Neuer Satzstand ab Monat' angelegt.";
+    public string CalculationSettingsVersionDialogSummary => BuildCalculationSettingsVersionDialogSummary();
+    public string ConfirmCalculationSettingsVersionDialogButtonText => IsEditingCalculationSettingsVersion ? "Stand speichern" : "Neuen Stand speichern";
+
     public string CurrencyPrefix => $"{SettingsCurrencyCode} ";
+
+    public EmploymentContractHistoryItemViewModel? SelectedContractHistoryEntry
+    {
+        get => _selectedContractHistoryEntry;
+        set
+        {
+            SetProperty(ref _selectedContractHistoryEntry, value);
+
+            RaisePropertyChanged(nameof(CanDeleteSelectedContractVersion));
+            DeleteSelectedContractVersionCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public PayrollCalculationSettingsVersionItemViewModel? SelectedCalculationSettingsVersion
+    {
+        get => _selectedCalculationSettingsVersion;
+        set
+        {
+            SetProperty(ref _selectedCalculationSettingsVersion, value);
+
+            RaisePropertyChanged(nameof(CanDeleteSelectedCalculationSettingsVersion));
+            DeleteSelectedCalculationSettingsVersionCommand.RaiseCanExecuteChanged();
+        }
+    }
 
     public string PersonImportCsvFilePath
     {
@@ -1110,6 +1323,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         SwitchToEmployeesWorkspace();
         DismissDeleteConfirmation();
+        DismissCalculationSettingsVersionDialog();
         _returnEmployeeId = _currentEmployeeId;
         SelectedEmployee = null;
         _currentEmployeeId = null;
@@ -1128,6 +1342,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         SwitchToEmployeesWorkspace();
         DismissDeleteConfirmation();
+        DismissCalculationSettingsVersionDialog();
         _returnEmployeeId = _currentEmployeeId;
         SetInteractionState(isEditing: true, isCreatingNew: false);
         StatusMessage = "Bearbeitungsmodus aktiv. Aenderungen mit Speichern uebernehmen oder mit Abbrechen verwerfen.";
@@ -1162,47 +1377,17 @@ public sealed class MainWindowViewModel : ViewModelBase
                 throw new InvalidOperationException("Gueltig ab ist erforderlich.");
             }
 
-            var command = new SaveEmployeeCommand(
-                _currentEmployeeId,
-                PersonnelNumber,
-                FirstName,
-                LastName,
-                BirthDate.HasValue ? DateOnly.FromDateTime(BirthDate.Value.Date) : null,
-                DateOnly.FromDateTime(EntryDate.Value.Date),
-                ExitDate.HasValue ? DateOnly.FromDateTime(ExitDate.Value.Date) : null,
-                IsActiveEmployee,
-                Street,
-                HouseNumber,
-                AddressLine2,
-                PostalCode,
-                City,
-                Country,
-                ResidenceCountry,
-                Nationality,
-                PermitCode,
-                TaxStatus,
-                ParseOptionalBoolean(SelectedWithholdingTaxOption),
-                AhvNumber,
-                Iban,
-                PhoneNumber,
-                Email,
-                SelectedDepartmentOption?.OptionId,
-                SelectedEmploymentCategoryOption?.OptionId,
-                SelectedEmploymentLocationOption?.OptionId,
-                MapSelectedWageType(),
-                DateOnly.FromDateTime(ContractValidFrom.Value.Date),
-                ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null,
-                ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
-                ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)),
-                ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf)));
+            var hourlyRateChf = ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf));
+            var monthlyBvgDeductionChf = ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf));
+            var specialSupplementRateChf = ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf));
 
-            var saved = await _employeeService.SaveAsync(command);
-            _currentEmployeeId = saved.EmployeeId;
-            _returnEmployeeId = saved.EmployeeId;
-            SetInteractionState(isEditing: false, isCreatingNew: false);
-            await ReloadEmployeesAsync();
-            await RestoreSelectionAfterReloadAsync(saved.EmployeeId, selectFirstIfMissing: true);
-            StatusMessage = $"Mitarbeitender {saved.PersonnelNumber} gespeichert.";
+            await SaveEmployeeAsync(
+                _loadedCurrentContractId,
+                hourlyRateChf,
+                monthlyBvgDeductionChf,
+                specialSupplementRateChf,
+                DateOnly.FromDateTime(ContractValidFrom.Value.Date),
+                ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null);
         });
     }
 
@@ -1211,6 +1396,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         await ExecuteBusyAsync(async () =>
         {
             DismissDeleteConfirmation();
+            DismissContractVersionDialog();
+            DismissCalculationSettingsVersionDialog();
 
             if (_isCreatingNew)
             {
@@ -1251,9 +1438,250 @@ public sealed class MainWindowViewModel : ViewModelBase
         ShowDeleteConfirmation = false;
     }
 
+    private void DismissContractVersionDialog()
+    {
+        ShowContractVersionDialog = false;
+        _showContractVersionCreateSection = false;
+        _editingContractVersionId = null;
+        NewContractVersionValidFrom = null;
+        NewContractVersionValidTo = null;
+        SelectedContractHistoryEntry = null;
+        RaisePropertyChanged(nameof(IsEditingContractVersion));
+        RaisePropertyChanged(nameof(ShowContractVersionCreateSection));
+        RaisePropertyChanged(nameof(CanConfirmContractVersionDialog));
+        RaisePropertyChanged(nameof(ContractVersionDialogTitle));
+        RaisePropertyChanged(nameof(ContractVersionDialogDescription));
+        RaisePropertyChanged(nameof(ContractVersionDialogSummary));
+        RaisePropertyChanged(nameof(ConfirmContractVersionDialogButtonText));
+        ConfirmContractVersionDialogCommand.RaiseCanExecuteChanged();
+    }
+
+    private void DismissCalculationSettingsVersionDialog()
+    {
+        ShowCalculationSettingsVersionDialog = false;
+        if (_showCalculationSettingsVersionCreateSection && _loadedCalculationSettingsCurrentValidFrom.HasValue)
+        {
+            SettingsCalculationValidFrom = new DateTimeOffset(_loadedCalculationSettingsCurrentValidFrom.Value.ToDateTime(TimeOnly.MinValue));
+            SettingsCalculationValidTo = _loadedCalculationSettingsCurrentValidTo.HasValue
+                ? new DateTimeOffset(_loadedCalculationSettingsCurrentValidTo.Value.ToDateTime(TimeOnly.MinValue))
+                : null;
+        }
+
+        _showCalculationSettingsVersionCreateSection = false;
+        _editingCalculationSettingsVersionId = null;
+        SelectedCalculationSettingsVersion = null;
+        RaisePropertyChanged(nameof(IsEditingCalculationSettingsVersion));
+        RaisePropertyChanged(nameof(ShowCalculationSettingsVersionCreateSection));
+        RaisePropertyChanged(nameof(CanConfirmCalculationSettingsVersionDialog));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogTitle));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogDescription));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogSummary));
+        RaisePropertyChanged(nameof(ConfirmCalculationSettingsVersionDialogButtonText));
+        ConfirmCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+    }
+
+    private void OpenContractVersionDialogFromButton()
+    {
+        if (!_currentEmployeeId.HasValue)
+        {
+            return;
+        }
+
+        DismissDeleteConfirmation();
+        _showContractVersionCreateSection = false;
+        _editingContractVersionId = null;
+        SelectedContractHistoryEntry = ContractHistory.FirstOrDefault(item => item.IsCurrent) ?? ContractHistory.FirstOrDefault();
+        ShowContractVersionDialog = true;
+        RaisePropertyChanged(nameof(IsEditingContractVersion));
+        RaisePropertyChanged(nameof(ShowContractVersionCreateSection));
+        RaisePropertyChanged(nameof(CanConfirmContractVersionDialog));
+        RaisePropertyChanged(nameof(ContractVersionDialogTitle));
+        RaisePropertyChanged(nameof(ContractVersionDialogDescription));
+        RaisePropertyChanged(nameof(ContractVersionDialogSummary));
+        RaisePropertyChanged(nameof(ConfirmContractVersionDialogButtonText));
+        ConfirmContractVersionDialogCommand.RaiseCanExecuteChanged();
+        StatusMessage = "Vertragshistorie geoeffnet.";
+    }
+
+    private void OpenNewContractVersionDialogFromButton()
+    {
+        if (!_currentEmployeeId.HasValue || !_isEditing)
+        {
+            return;
+        }
+
+        OpenContractVersionDialog();
+    }
+
+    private void OpenCalculationSettingsVersionDialog()
+    {
+        OpenCalculationSettingsVersionDialog(showVersionPrompt: false);
+    }
+
+    private void OpenCalculationSettingsVersionDialog(bool showVersionPrompt)
+    {
+        if (CalculationSettingsVersions.Count == 0)
+        {
+            return;
+        }
+
+        DismissDeleteConfirmation();
+        _showCalculationSettingsVersionCreateSection = showVersionPrompt;
+        _editingCalculationSettingsVersionId = null;
+        SelectedCalculationSettingsVersion = showVersionPrompt
+            ? null
+            : CalculationSettingsVersions.FirstOrDefault(item => item.IsCurrent) ?? CalculationSettingsVersions.FirstOrDefault();
+        if (showVersionPrompt)
+        {
+            SettingsCalculationValidFrom = DetermineSuggestedNewCalculationSettingsValidFrom();
+            SettingsCalculationValidTo = null;
+        }
+
+        ShowCalculationSettingsVersionDialog = true;
+        RaisePropertyChanged(nameof(IsEditingCalculationSettingsVersion));
+        RaisePropertyChanged(nameof(ShowCalculationSettingsVersionCreateSection));
+        RaisePropertyChanged(nameof(CanConfirmCalculationSettingsVersionDialog));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogTitle));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogDescription));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogSummary));
+        RaisePropertyChanged(nameof(ConfirmCalculationSettingsVersionDialogButtonText));
+        ConfirmCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+        StatusMessage = showVersionPrompt
+            ? "Neuer Satzstand wird vorbereitet. Gueltigkeit bestaetigen und anschliessend speichern."
+            : "Satzstandhistorie geoeffnet.";
+    }
+
+    private void OpenNewCalculationSettingsVersionDialog()
+    {
+        OpenCalculationSettingsVersionDialog(showVersionPrompt: true);
+    }
+
+    private async Task ConfirmCalculationSettingsVersionDialogAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            if (!SettingsCalculationValidFrom.HasValue)
+            {
+                throw new InvalidOperationException("Gueltig ab fuer den neuen Satzstand ist erforderlich.");
+            }
+
+            var newValidFrom = DateOnly.FromDateTime(SettingsCalculationValidFrom.Value.Date);
+            var selectedVersionValidFrom = IsEditingCalculationSettingsVersion && SelectedCalculationSettingsVersion is not null
+                ? DateOnly.FromDateTime(SelectedCalculationSettingsVersion.ValidFrom.Date)
+                : (DateOnly?)null;
+
+            if (!selectedVersionValidFrom.HasValue
+                && _loadedCalculationSettingsCurrentValidFrom.HasValue
+                && newValidFrom < _loadedCalculationSettingsCurrentValidFrom.Value)
+            {
+                throw new InvalidOperationException("Der neue Satzstand darf nicht vor dem Beginn des aktuell aktiven Standes starten.");
+            }
+
+            DateOnly? newValidTo = SettingsCalculationValidTo.HasValue
+                ? DateOnly.FromDateTime(SettingsCalculationValidTo.Value.Date)
+                : null;
+            if (newValidTo.HasValue && newValidTo.Value < newValidFrom)
+            {
+                throw new InvalidOperationException("Gueltig bis darf nicht vor Gueltig ab liegen.");
+            }
+
+            await SaveSettingsCoreAsync(closeVersionDialogOnSuccess: true);
+        });
+    }
+
     private void ClearExitDate()
     {
         ExitDate = null;
+    }
+
+    private async Task ConfirmContractVersionDialogAsync()
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            if (!NewContractVersionValidFrom.HasValue)
+            {
+                throw new InvalidOperationException("Gueltig ab fuer den neuen Vertragsstand ist erforderlich.");
+            }
+
+            var newValidFrom = DateOnly.FromDateTime(NewContractVersionValidFrom.Value.Date);
+            var selectedContractValidFrom = IsEditingContractVersion && SelectedContractHistoryEntry is not null
+                ? DateOnly.FromDateTime(SelectedContractHistoryEntry.ValidFrom.Date)
+                : (DateOnly?)null;
+
+            if (!selectedContractValidFrom.HasValue
+                && _loadedContractCurrentValidFrom.HasValue
+                && newValidFrom <= _loadedContractCurrentValidFrom.Value)
+            {
+                throw new InvalidOperationException("Der neue Vertragsstand muss nach dem Beginn des aktuell aktiven Standes starten.");
+            }
+
+            DateOnly? newValidTo = NewContractVersionValidTo.HasValue
+                ? DateOnly.FromDateTime(NewContractVersionValidTo.Value.Date)
+                : null;
+            if (newValidTo.HasValue && newValidTo.Value < newValidFrom)
+            {
+                throw new InvalidOperationException("Gueltig bis darf nicht vor Gueltig ab liegen.");
+            }
+
+            var hourlyRateChf = ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf));
+            var monthlyBvgDeductionChf = ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf));
+            var specialSupplementRateChf = ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf));
+
+            await SaveEmployeeAsync(
+                IsEditingContractVersion ? _editingContractVersionId : null,
+                hourlyRateChf,
+                monthlyBvgDeductionChf,
+                specialSupplementRateChf,
+                newValidFrom,
+                newValidTo);
+        });
+    }
+
+    private async Task DeleteSelectedContractVersionAsync()
+    {
+        if (SelectedContractHistoryEntry is null)
+        {
+            return;
+        }
+
+        await DeleteContractVersionAsync(SelectedContractHistoryEntry.ContractId);
+    }
+
+    private async Task DeleteSelectedCalculationSettingsVersionAsync()
+    {
+        if (SelectedCalculationSettingsVersion is null)
+        {
+            return;
+        }
+
+        await DeleteCalculationSettingsVersionAsync(SelectedCalculationSettingsVersion.VersionId);
+    }
+
+    private async Task DeleteContractVersionAsync(Guid contractId)
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            if (!_currentEmployeeId.HasValue)
+            {
+                return;
+            }
+
+            var updated = await _employeeService.DeleteContractVersionAsync(_currentEmployeeId.Value, contractId);
+            PopulateForm(updated);
+            ShowContractVersionDialog = true;
+            StatusMessage = "Vertragsstand geloescht.";
+        });
+    }
+
+    private async Task DeleteCalculationSettingsVersionAsync(Guid versionId)
+    {
+        await ExecuteBusyAsync(async () =>
+        {
+            var updated = await _payrollSettingsService.DeleteCalculationVersionAsync(versionId);
+            ApplySettings(updated);
+            ShowCalculationSettingsVersionDialog = true;
+            StatusMessage = "Satzstand geloescht.";
+        });
     }
 
     private void AddDepartmentOption()
@@ -1320,47 +1748,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await ExecuteBusyAsync(async () =>
         {
-            var saved = await _payrollSettingsService.SaveAsync(new SavePayrollSettingsCommand(
-                SettingsCompanyAddress,
-                SettingsAppFontFamily,
-                ParseRequiredDecimal(SettingsAppFontSize, nameof(SettingsAppFontSize)),
-                SettingsAppTextColorHex,
-                SettingsAppMutedTextColorHex,
-                SettingsAppBackgroundColorHex,
-                SettingsAppAccentColorHex,
-                SettingsAppLogoText,
-                SettingsAppLogoPath,
-                SettingsPrintFontFamily,
-                ParseRequiredDecimal(SettingsPrintFontSize, nameof(SettingsPrintFontSize)),
-                SettingsPrintTextColorHex,
-                SettingsPrintMutedTextColorHex,
-                SettingsPrintAccentColorHex,
-                SettingsPrintLogoText,
-                SettingsPrintLogoPath,
-                SettingsPrintTemplate,
-                SettingsDecimalSeparator,
-                ToThousandsSeparatorValue(SettingsThousandsSeparator),
-                SettingsCurrencyCode,
-                ParseOptionalPercentage(SettingsNightSupplementRate),
-                ParseOptionalPercentage(SettingsSundaySupplementRate),
-                ParseOptionalPercentage(SettingsHolidaySupplementRate),
-                ParseRequiredPercentage(SettingsAhvIvEoRate, nameof(SettingsAhvIvEoRate)),
-                ParseRequiredPercentage(SettingsAlvRate, nameof(SettingsAlvRate)),
-                ParseRequiredPercentage(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate)),
-                ParseRequiredPercentage(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate)),
-                ParseRequiredPercentage(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
-                ParseRequiredPercentage(SettingsVacationCompensationRateAge50Plus, nameof(SettingsVacationCompensationRateAge50Plus)),
-                ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf)),
-                ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf)),
-                ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf)),
-                BuildPayrollPreviewHelpOptionDtos(PayrollPreviewHelpOptions),
-                BuildSettingOptionDtos(DepartmentOptions),
-                BuildSettingOptionDtos(EmploymentCategoryOptions),
-                BuildSettingOptionDtos(EmploymentLocationOptions)));
-
-            ApplySettings(saved);
-            await MonthlyRecord.ReloadCurrentMonthAsync();
-            StatusMessage = "Einstellungen gespeichert.";
+            await SaveSettingsCoreAsync(closeVersionDialogOnSuccess: false);
         });
     }
 
@@ -1642,6 +2030,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         HourlyRateChf = NumericFormatManager.FormatDecimal(employee.HourlyRateChf, "0.00");
         MonthlyBvgDeductionChf = NumericFormatManager.FormatDecimal(employee.MonthlyBvgDeductionChf, "0.00");
         SpecialSupplementRateChf = NumericFormatManager.FormatDecimal(employee.SpecialSupplementRateChf, "0.00");
+        _loadedContractCurrentValidFrom = employee.ContractValidFrom;
+        _loadedContractCurrentValidTo = employee.ContractValidTo;
+        _loadedHourlyRateChf = employee.HourlyRateChf;
+        _loadedMonthlyBvgDeductionChf = employee.MonthlyBvgDeductionChf;
+        _loadedSpecialSupplementRateChf = employee.SpecialSupplementRateChf;
+        _loadedCurrentContractId = employee.ContractHistory.FirstOrDefault(item => item.IsCurrent)?.ContractId;
+        DismissContractVersionDialog();
+        ApplyContractHistory(employee.ContractHistory);
     }
 
     private void ResetFormForNewDraft()
@@ -1677,6 +2073,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         HourlyRateChf = NumericFormatManager.FormatDecimal(0m, "0");
         MonthlyBvgDeductionChf = NumericFormatManager.FormatDecimal(0m, "0");
         SpecialSupplementRateChf = NumericFormatManager.FormatDecimal(3m, "0.00");
+        _loadedContractCurrentValidFrom = null;
+        _loadedContractCurrentValidTo = null;
+        _loadedHourlyRateChf = null;
+        _loadedMonthlyBvgDeductionChf = null;
+        _loadedSpecialSupplementRateChf = null;
+        _loadedCurrentContractId = null;
+        ContractHistory.Clear();
+        SelectedContractHistoryEntry = null;
+        DismissContractVersionDialog();
     }
 
     private void ClearFormForEmptyState()
@@ -1713,6 +2118,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         HourlyRateChf = string.Empty;
         MonthlyBvgDeductionChf = string.Empty;
         SpecialSupplementRateChf = string.Empty;
+        _loadedContractCurrentValidFrom = null;
+        _loadedContractCurrentValidTo = null;
+        _loadedHourlyRateChf = null;
+        _loadedMonthlyBvgDeductionChf = null;
+        _loadedSpecialSupplementRateChf = null;
+        _loadedCurrentContractId = null;
+        ContractHistory.Clear();
+        SelectedContractHistoryEntry = null;
+        DismissContractVersionDialog();
         SetInteractionState(isEditing: false, isCreatingNew: false);
     }
 
@@ -1720,10 +2134,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         _isEditing = isEditing;
         _isCreatingNew = isCreatingNew;
-        MonthlyRecord.IsLocked = isEditing;
+        MonthlyRecord.IsLocked = isEditing && IsEmployeeWorkspace;
         if (!_isEditing)
         {
             DismissDeleteConfirmation();
+            DismissContractVersionDialog();
+            DismissCalculationSettingsVersionDialog();
         }
 
         RaisePropertyChanged(nameof(FormTitle));
@@ -1755,6 +2171,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeleteCommand.RaiseCanExecuteChanged();
         ConfirmDeleteCommand.RaiseCanExecuteChanged();
         DismissDeleteCommand.RaiseCanExecuteChanged();
+        ConfirmContractVersionDialogCommand.RaiseCanExecuteChanged();
+        DismissContractVersionDialogCommand.RaiseCanExecuteChanged();
+        OpenContractVersionDialogCommand.RaiseCanExecuteChanged();
+        OpenNewContractVersionDialogCommand.RaiseCanExecuteChanged();
+        DeleteSelectedContractVersionCommand.RaiseCanExecuteChanged();
+        OpenCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+        OpenNewCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+        ConfirmCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+        DismissCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+        DeleteSelectedCalculationSettingsVersionCommand.RaiseCanExecuteChanged();
         ClearExitDateCommand.RaiseCanExecuteChanged();
         ShowTimeAndExpensesCommand.RaiseCanExecuteChanged();
         ShowPayrollRunsCommand.RaiseCanExecuteChanged();
@@ -2238,6 +2664,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsDecimalSeparator = settings.DecimalSeparator;
         SettingsThousandsSeparator = settings.ThousandsSeparator;
         SettingsCurrencyCode = settings.CurrencyCode;
+        _loadedCalculationSettingsCurrentValidFrom = settings.CalculationValidFrom;
+        _loadedCalculationSettingsCurrentValidTo = settings.CalculationValidTo;
+        SettingsCalculationValidFrom = new DateTimeOffset(settings.CalculationValidFrom.ToDateTime(TimeOnly.MinValue));
+        SettingsCalculationValidTo = settings.CalculationValidTo.HasValue
+            ? new DateTimeOffset(settings.CalculationValidTo.Value.ToDateTime(TimeOnly.MinValue))
+            : null;
         SettingsNightSupplementRate = FormatNullablePercentage(settings.NightSupplementRate, "0.##");
         SettingsSundaySupplementRate = FormatNullablePercentage(settings.SundaySupplementRate, "0.##");
         SettingsHolidaySupplementRate = FormatNullablePercentage(settings.HolidaySupplementRate, "0.##");
@@ -2250,6 +2682,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsVehiclePauschalzone1RateChf = NumericFormatManager.FormatDecimal(settings.VehiclePauschalzone1RateChf, "0.##");
         SettingsVehiclePauschalzone2RateChf = NumericFormatManager.FormatDecimal(settings.VehiclePauschalzone2RateChf, "0.##");
         SettingsVehicleRegiezone1RateChf = NumericFormatManager.FormatDecimal(settings.VehicleRegiezone1RateChf, "0.##");
+        _loadedSettingsNightSupplementRate = settings.NightSupplementRate;
+        _loadedSettingsSundaySupplementRate = settings.SundaySupplementRate;
+        _loadedSettingsHolidaySupplementRate = settings.HolidaySupplementRate;
+        _loadedSettingsAhvIvEoRate = settings.AhvIvEoRate;
+        _loadedSettingsAlvRate = settings.AlvRate;
+        _loadedSettingsSicknessAccidentInsuranceRate = settings.SicknessAccidentInsuranceRate;
+        _loadedSettingsTrainingAndHolidayRate = settings.TrainingAndHolidayRate;
+        _loadedSettingsVacationCompensationRate = settings.VacationCompensationRate;
+        _loadedSettingsVacationCompensationRateAge50Plus = settings.VacationCompensationRateAge50Plus;
+        _loadedSettingsVehiclePauschalzone1RateChf = settings.VehiclePauschalzone1RateChf;
+        _loadedSettingsVehiclePauschalzone2RateChf = settings.VehiclePauschalzone2RateChf;
+        _loadedSettingsVehicleRegiezone1RateChf = settings.VehicleRegiezone1RateChf;
+        ApplyCalculationSettingsVersions(settings.CalculationVersions);
         ApplyPayrollPreviewHelpOptions(settings.PayrollPreviewHelpOptions);
         AppLogoText = settings.AppLogoText;
         AppLogoImage = TryLoadLogo(settings.AppLogoPath);
@@ -2264,9 +2709,460 @@ public sealed class MainWindowViewModel : ViewModelBase
         RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
     }
 
+    private void ApplyContractHistory(IReadOnlyCollection<EmploymentContractVersionDto> history)
+    {
+        _currentContractHistorySource = history.ToArray();
+        ContractHistory.Clear();
+        var overlappingContractIds = DetermineOverlappingContractIds(_currentContractHistorySource);
+
+        foreach (var version in _currentContractHistorySource)
+        {
+            ContractHistory.Add(new EmploymentContractHistoryItemViewModel
+            {
+                ContractId = version.ContractId,
+                ValidFrom = new DateTimeOffset(version.ValidFrom.ToDateTime(TimeOnly.MinValue)),
+                ValidTo = version.ValidTo.HasValue
+                    ? new DateTimeOffset(version.ValidTo.Value.ToDateTime(TimeOnly.MinValue))
+                    : null,
+                HourlyRateDisplay = $"{version.HourlyRateChf:0.00} CHF/h",
+                MonthlyBvgDisplay = $"{version.MonthlyBvgDeductionChf:0.00} CHF",
+                SpecialSupplementDisplay = $"{version.SpecialSupplementRateChf:0.00} CHF/h",
+                Summary = $"{version.ValidFrom:dd.MM.yyyy} bis {FormatDate(version.ValidTo)} | {version.HourlyRateChf:0.00} CHF/h | BVG {version.MonthlyBvgDeductionChf:0.00} CHF | Spezial {version.SpecialSupplementRateChf:0.00} CHF/h",
+                WarningText = overlappingContractIds.Contains(version.ContractId)
+                    ? "Dieser Vertragsstand ueberschneidet sich mit einem anderen Gueltigkeitszeitraum."
+                    : string.Empty,
+                LoadToEditorCommand = new DelegateCommand(() => LoadContractHistoryEntryToEditor(version.ContractId, continueEditing: false)),
+                ContinueEditingCommand = new DelegateCommand(() => LoadContractHistoryEntryToEditor(version.ContractId, continueEditing: true)),
+                DeleteCommand = new DelegateCommand(() => DeleteContractVersionAsync(version.ContractId), () => !IsBusy),
+                IsCurrent = version.IsCurrent
+            });
+        }
+
+        SelectedContractHistoryEntry = ContractHistory.FirstOrDefault(item => item.IsCurrent) ?? ContractHistory.FirstOrDefault();
+        RaisePropertyChanged(nameof(ShowContractHistoryOverlapWarning));
+    }
+
+    private bool RequiresNewContractVersion(decimal hourlyRateChf, decimal monthlyBvgDeductionChf, decimal specialSupplementRateChf)
+    {
+        return _currentEmployeeId.HasValue
+            && _loadedContractCurrentValidFrom.HasValue
+            && (_loadedHourlyRateChf != hourlyRateChf
+                || _loadedMonthlyBvgDeductionChf != monthlyBvgDeductionChf
+                || _loadedSpecialSupplementRateChf != specialSupplementRateChf);
+    }
+
+    private void OpenContractVersionDialog()
+    {
+        DismissDeleteConfirmation();
+        _showContractVersionCreateSection = true;
+        _editingContractVersionId = null;
+        SelectedContractHistoryEntry = null;
+        NewContractVersionValidFrom = DetermineSuggestedNewContractVersionValidFrom();
+        NewContractVersionValidTo = null;
+        ShowContractVersionDialog = true;
+        RaisePropertyChanged(nameof(IsEditingContractVersion));
+        RaisePropertyChanged(nameof(ShowContractVersionCreateSection));
+        RaisePropertyChanged(nameof(CanConfirmContractVersionDialog));
+        RaisePropertyChanged(nameof(ContractVersionDialogTitle));
+        RaisePropertyChanged(nameof(ContractVersionDialogDescription));
+        RaisePropertyChanged(nameof(ContractVersionDialogSummary));
+        RaisePropertyChanged(nameof(ConfirmContractVersionDialogButtonText));
+        ConfirmContractVersionDialogCommand.RaiseCanExecuteChanged();
+        RaisePropertyChanged(nameof(ConfirmContractVersionDialogButtonText));
+        StatusMessage = "Historisierte Vertragswerte wurden geaendert. Bitte neuen Vertragsstand bestaetigen.";
+    }
+
+    private DateTimeOffset DetermineSuggestedNewContractVersionValidFrom()
+    {
+        if (ContractValidFrom.HasValue
+            && _loadedContractCurrentValidFrom.HasValue
+            && DateOnly.FromDateTime(ContractValidFrom.Value.Date) > _loadedContractCurrentValidFrom.Value)
+        {
+            return ContractValidFrom.Value;
+        }
+
+        var fallback = _loadedContractCurrentValidFrom?.AddMonths(1)
+            ?? DateOnly.FromDateTime(DateTime.Today);
+
+        return new DateTimeOffset(fallback.ToDateTime(TimeOnly.MinValue));
+    }
+
+    private async Task SaveEmployeeAsync(
+        Guid? editingContractId,
+        decimal hourlyRateChf,
+        decimal monthlyBvgDeductionChf,
+        decimal specialSupplementRateChf,
+        DateOnly contractValidFrom,
+        DateOnly? contractValidTo)
+    {
+        var command = new SaveEmployeeCommand(
+            _currentEmployeeId,
+            editingContractId,
+            PersonnelNumber,
+            FirstName,
+            LastName,
+            BirthDate.HasValue ? DateOnly.FromDateTime(BirthDate.Value.Date) : null,
+            DateOnly.FromDateTime(EntryDate!.Value.Date),
+            ExitDate.HasValue ? DateOnly.FromDateTime(ExitDate.Value.Date) : null,
+            IsActiveEmployee,
+            Street,
+            HouseNumber,
+            AddressLine2,
+            PostalCode,
+            City,
+            Country,
+            ResidenceCountry,
+            Nationality,
+            PermitCode,
+            TaxStatus,
+            ParseOptionalBoolean(SelectedWithholdingTaxOption),
+            AhvNumber,
+            Iban,
+            PhoneNumber,
+            Email,
+            SelectedDepartmentOption?.OptionId,
+            SelectedEmploymentCategoryOption?.OptionId,
+            SelectedEmploymentLocationOption?.OptionId,
+            MapSelectedWageType(),
+            contractValidFrom,
+            contractValidTo,
+            hourlyRateChf,
+            monthlyBvgDeductionChf,
+            specialSupplementRateChf);
+
+        var saved = await _employeeService.SaveAsync(command);
+        DismissContractVersionDialog();
+        _currentEmployeeId = saved.EmployeeId;
+        _returnEmployeeId = saved.EmployeeId;
+        SetInteractionState(isEditing: false, isCreatingNew: false);
+        await ReloadEmployeesAsync();
+        await RestoreSelectionAfterReloadAsync(saved.EmployeeId, selectFirstIfMissing: true);
+        StatusMessage = $"Mitarbeitender {saved.PersonnelNumber} gespeichert.";
+    }
+
+    private string BuildContractVersionDialogSummary()
+    {
+        if (!ShowContractVersionCreateSection && !IsEditingContractVersion)
+        {
+            return "Historische Vertragsstaende werden hier nur angezeigt. Neue Versionen entstehen ausschliesslich ueber 'Neuer Vertragsstand ab Monat'.";
+        }
+
+        if (!NewContractVersionValidFrom.HasValue)
+        {
+            return "Beim Speichern wird ein neuer Vertragsstand angelegt.";
+        }
+
+        if (IsEditingContractVersion)
+        {
+            var rangeEnd = NewContractVersionValidTo.HasValue
+                ? FormatDate(NewContractVersionValidTo)
+                : "offen";
+            return $"Der ausgewaehlte Vertragsstand wird direkt auf {FormatDate(NewContractVersionValidFrom)} bis {rangeEnd} angepasst.";
+        }
+
+        if (!_loadedContractCurrentValidFrom.HasValue)
+        {
+            return "Beim Speichern wird ein neuer Vertragsstand angelegt.";
+        }
+
+        var previousEnd = NewContractVersionValidFrom.Value.AddDays(-1);
+        var newRangeEnd = NewContractVersionValidTo.HasValue
+            ? FormatDate(NewContractVersionValidTo)
+            : "offen";
+
+        return $"Der bisher aktive Stand endet automatisch am {FormatDate(previousEnd)}. Der neue Stand gilt von {FormatDate(NewContractVersionValidFrom)} bis {newRangeEnd}.";
+    }
+
+    private string BuildCalculationSettingsVersionDialogSummary()
+    {
+        if (!SettingsCalculationValidFrom.HasValue)
+        {
+            return "Beim Speichern wird ein neuer Satzstand angelegt.";
+        }
+
+        if (IsEditingCalculationSettingsVersion)
+        {
+            var rangeEnd = SettingsCalculationValidTo.HasValue
+                ? FormatDate(SettingsCalculationValidTo)
+                : "offen";
+            return $"Der ausgewaehlte Satzstand wird direkt auf {FormatDate(SettingsCalculationValidFrom)} bis {rangeEnd} angepasst.";
+        }
+
+        if (!_loadedCalculationSettingsCurrentValidFrom.HasValue)
+        {
+            return "Beim Speichern wird ein neuer Satzstand angelegt.";
+        }
+
+        var previousEnd = SettingsCalculationValidFrom.Value.AddDays(-1);
+        var newRangeEnd = SettingsCalculationValidTo.HasValue
+            ? FormatDate(SettingsCalculationValidTo)
+            : "offen";
+
+        return $"Der bisher aktive Stand endet automatisch am {FormatDate(previousEnd)}. Der neue Stand gilt von {FormatDate(SettingsCalculationValidFrom)} bis {newRangeEnd}.";
+    }
+
+    private bool RequiresNewCalculationSettingsVersion()
+    {
+        if (!_loadedCalculationSettingsCurrentValidFrom.HasValue)
+        {
+            return false;
+        }
+
+        return _loadedSettingsNightSupplementRate != ParseOptionalPercentage(SettingsNightSupplementRate)
+            || _loadedSettingsSundaySupplementRate != ParseOptionalPercentage(SettingsSundaySupplementRate)
+            || _loadedSettingsHolidaySupplementRate != ParseOptionalPercentage(SettingsHolidaySupplementRate)
+            || _loadedSettingsAhvIvEoRate != ParseRequiredPercentage(SettingsAhvIvEoRate, nameof(SettingsAhvIvEoRate))
+            || _loadedSettingsAlvRate != ParseRequiredPercentage(SettingsAlvRate, nameof(SettingsAlvRate))
+            || _loadedSettingsSicknessAccidentInsuranceRate != ParseRequiredPercentage(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate))
+            || _loadedSettingsTrainingAndHolidayRate != ParseRequiredPercentage(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate))
+            || _loadedSettingsVacationCompensationRate != ParseRequiredPercentage(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate))
+            || _loadedSettingsVacationCompensationRateAge50Plus != ParseRequiredPercentage(SettingsVacationCompensationRateAge50Plus, nameof(SettingsVacationCompensationRateAge50Plus))
+            || _loadedSettingsVehiclePauschalzone1RateChf != ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf))
+            || _loadedSettingsVehiclePauschalzone2RateChf != ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf))
+            || _loadedSettingsVehicleRegiezone1RateChf != ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf));
+    }
+
+    private DateTimeOffset DetermineSuggestedNewCalculationSettingsValidFrom()
+    {
+        if (SettingsCalculationValidFrom.HasValue
+            && _loadedCalculationSettingsCurrentValidFrom.HasValue
+            && DateOnly.FromDateTime(SettingsCalculationValidFrom.Value.Date) > _loadedCalculationSettingsCurrentValidFrom.Value)
+        {
+            return SettingsCalculationValidFrom.Value;
+        }
+
+        var fallback = _loadedCalculationSettingsCurrentValidFrom?.AddMonths(1)
+            ?? DateOnly.FromDateTime(DateTime.Today);
+
+        return new DateTimeOffset(fallback.ToDateTime(TimeOnly.MinValue));
+    }
+
+    private void ApplyCalculationSettingsVersions(IReadOnlyCollection<PayrollCalculationSettingsVersionDto> versions)
+    {
+        _currentSettingsVersionSource = versions.ToArray();
+        CalculationSettingsVersions.Clear();
+        var overlappingVersionIds = DetermineOverlappingCalculationVersionIds(_currentSettingsVersionSource);
+
+        foreach (var version in _currentSettingsVersionSource)
+        {
+            CalculationSettingsVersions.Add(new PayrollCalculationSettingsVersionItemViewModel
+            {
+                VersionId = version.VersionId,
+                ValidFrom = new DateTimeOffset(version.ValidFrom.ToDateTime(TimeOnly.MinValue)),
+                ValidTo = version.ValidTo.HasValue
+                    ? new DateTimeOffset(version.ValidTo.Value.ToDateTime(TimeOnly.MinValue))
+                    : null,
+                SupplementSummary = $"N {FormatNullablePercentage(version.NightSupplementRate, "0.##")} | S {FormatNullablePercentage(version.SundaySupplementRate, "0.##")} | F {FormatNullablePercentage(version.HolidaySupplementRate, "0.##")}",
+                DeductionSummary = $"AHV {FormatPercentage(version.AhvIvEoRate, "0.###")} | ALV {FormatPercentage(version.AlvRate, "0.###")} | UVG {FormatPercentage(version.SicknessAccidentInsuranceRate, "0.###")}",
+                VacationSummary = $"Ferien {FormatPercentage(version.VacationCompensationRate, "0.##")} | ab 50 {FormatPercentage(version.VacationCompensationRateAge50Plus, "0.##")}",
+                VehicleSummary = $"P1 {NumericFormatManager.FormatDecimal(version.VehiclePauschalzone1RateChf, "0.##")} | P2 {NumericFormatManager.FormatDecimal(version.VehiclePauschalzone2RateChf, "0.##")} | R1 {NumericFormatManager.FormatDecimal(version.VehicleRegiezone1RateChf, "0.##")}",
+                Summary = $"{version.ValidFrom:dd.MM.yyyy} bis {FormatDate(version.ValidTo)}",
+                WarningText = overlappingVersionIds.Contains(version.VersionId)
+                    ? "Dieser Satzstand ueberschneidet sich mit einem anderen Gueltigkeitszeitraum."
+                    : string.Empty,
+                LoadToEditorCommand = new DelegateCommand(() => LoadCalculationSettingsVersionToEditor(version.VersionId, continueEditing: false)),
+                ContinueEditingCommand = new DelegateCommand(() => LoadCalculationSettingsVersionToEditor(version.VersionId, continueEditing: true)),
+                DeleteCommand = new DelegateCommand(() => DeleteCalculationSettingsVersionAsync(version.VersionId), () => !IsBusy),
+                IsCurrent = version.IsCurrent
+            });
+        }
+
+        SelectedCalculationSettingsVersion = CalculationSettingsVersions.FirstOrDefault(item => item.IsCurrent) ?? CalculationSettingsVersions.FirstOrDefault();
+        _loadedCurrentCalculationSettingsVersionId = SelectedCalculationSettingsVersion?.VersionId;
+        RaisePropertyChanged(nameof(ShowCalculationSettingsOverlapWarning));
+    }
+
+    private async Task SaveSettingsCoreAsync(bool closeVersionDialogOnSuccess)
+    {
+        var editingCalculationVersionId = closeVersionDialogOnSuccess
+            ? _editingCalculationSettingsVersionId
+            : _loadedCurrentCalculationSettingsVersionId;
+        var calculationValidFrom = SettingsCalculationValidFrom;
+        var calculationValidTo = SettingsCalculationValidTo;
+
+        if (!calculationValidFrom.HasValue)
+        {
+            throw new InvalidOperationException("Gueltig ab fuer die Berechnungssaetze ist erforderlich.");
+        }
+
+        var saved = await _payrollSettingsService.SaveAsync(new SavePayrollSettingsCommand(
+            SettingsCompanyAddress,
+            SettingsAppFontFamily,
+            ParseRequiredDecimal(SettingsAppFontSize, nameof(SettingsAppFontSize)),
+            SettingsAppTextColorHex,
+            SettingsAppMutedTextColorHex,
+            SettingsAppBackgroundColorHex,
+            SettingsAppAccentColorHex,
+            SettingsAppLogoText,
+            SettingsAppLogoPath,
+            SettingsPrintFontFamily,
+            ParseRequiredDecimal(SettingsPrintFontSize, nameof(SettingsPrintFontSize)),
+            SettingsPrintTextColorHex,
+            SettingsPrintMutedTextColorHex,
+            SettingsPrintAccentColorHex,
+            SettingsPrintLogoText,
+            SettingsPrintLogoPath,
+            SettingsPrintTemplate,
+            SettingsDecimalSeparator,
+            ToThousandsSeparatorValue(SettingsThousandsSeparator),
+            SettingsCurrencyCode,
+            editingCalculationVersionId,
+            DateOnly.FromDateTime(calculationValidFrom.Value.Date),
+            calculationValidTo.HasValue ? DateOnly.FromDateTime(calculationValidTo.Value.Date) : null,
+            ParseOptionalPercentage(SettingsNightSupplementRate),
+            ParseOptionalPercentage(SettingsSundaySupplementRate),
+            ParseOptionalPercentage(SettingsHolidaySupplementRate),
+            ParseRequiredPercentage(SettingsAhvIvEoRate, nameof(SettingsAhvIvEoRate)),
+            ParseRequiredPercentage(SettingsAlvRate, nameof(SettingsAlvRate)),
+            ParseRequiredPercentage(SettingsSicknessAccidentInsuranceRate, nameof(SettingsSicknessAccidentInsuranceRate)),
+            ParseRequiredPercentage(SettingsTrainingAndHolidayRate, nameof(SettingsTrainingAndHolidayRate)),
+            ParseRequiredPercentage(SettingsVacationCompensationRate, nameof(SettingsVacationCompensationRate)),
+            ParseRequiredPercentage(SettingsVacationCompensationRateAge50Plus, nameof(SettingsVacationCompensationRateAge50Plus)),
+            ParseRequiredDecimal(SettingsVehiclePauschalzone1RateChf, nameof(SettingsVehiclePauschalzone1RateChf)),
+            ParseRequiredDecimal(SettingsVehiclePauschalzone2RateChf, nameof(SettingsVehiclePauschalzone2RateChf)),
+            ParseRequiredDecimal(SettingsVehicleRegiezone1RateChf, nameof(SettingsVehicleRegiezone1RateChf)),
+            BuildPayrollPreviewHelpOptionDtos(PayrollPreviewHelpOptions),
+            BuildSettingOptionDtos(DepartmentOptions),
+            BuildSettingOptionDtos(EmploymentCategoryOptions),
+            BuildSettingOptionDtos(EmploymentLocationOptions)));
+
+        ApplySettings(saved);
+        if (closeVersionDialogOnSuccess)
+        {
+            DismissCalculationSettingsVersionDialog();
+        }
+
+        await MonthlyRecord.ReloadCurrentMonthAsync();
+        StatusMessage = "Einstellungen gespeichert.";
+    }
+
+    private void LoadContractHistoryEntryToEditor(Guid contractId, bool continueEditing)
+    {
+        var item = ContractHistory.FirstOrDefault(entry => entry.ContractId == contractId);
+        if (item is null)
+        {
+            return;
+        }
+
+        SwitchToEmployeesWorkspace();
+        SelectedContractHistoryEntry = item;
+        _editingContractVersionId = continueEditing ? item.ContractId : null;
+        NewContractVersionValidFrom = item.ValidFrom;
+        NewContractVersionValidTo = item.ValidTo;
+        ShowContractVersionDialog = true;
+        RaisePropertyChanged(nameof(IsEditingContractVersion));
+        RaisePropertyChanged(nameof(ContractVersionDialogTitle));
+        RaisePropertyChanged(nameof(ContractVersionDialogDescription));
+        RaisePropertyChanged(nameof(ContractVersionDialogSummary));
+
+        if (continueEditing && !_isEditing)
+        {
+            BeginEditEmployee();
+        }
+
+        StatusMessage = continueEditing
+            ? "Vertragsstand in den Bearbeitungsbereich geladen. Aenderungen koennen jetzt gespeichert werden."
+            : "Vertragsstand in den Bearbeitungsbereich geladen.";
+    }
+
+    private void LoadCalculationSettingsVersionToEditor(Guid versionId, bool continueEditing)
+    {
+        var item = CalculationSettingsVersions.FirstOrDefault(entry => entry.VersionId == versionId);
+        if (item is null)
+        {
+            return;
+        }
+
+        SwitchToSettingsWorkspace();
+        SelectedCalculationSettingsVersion = item;
+        _showCalculationSettingsVersionCreateSection = continueEditing;
+        _editingCalculationSettingsVersionId = continueEditing ? item.VersionId : null;
+        ShowCalculationSettingsVersionDialog = true;
+        RaisePropertyChanged(nameof(IsEditingCalculationSettingsVersion));
+        RaisePropertyChanged(nameof(ShowCalculationSettingsVersionCreateSection));
+        RaisePropertyChanged(nameof(CanConfirmCalculationSettingsVersionDialog));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogTitle));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogDescription));
+        RaisePropertyChanged(nameof(CalculationSettingsVersionDialogSummary));
+        RaisePropertyChanged(nameof(ConfirmCalculationSettingsVersionDialogButtonText));
+        ConfirmCalculationSettingsVersionDialogCommand.RaiseCanExecuteChanged();
+        StatusMessage = continueEditing
+            ? "Satzstand in den Bearbeitungsbereich geladen. Gueltigkeit bei Bedarf anpassen und speichern."
+            : "Satzstand in den Bearbeitungsbereich geladen.";
+    }
+
+    private static HashSet<Guid> DetermineOverlappingContractIds(IReadOnlyCollection<EmploymentContractVersionDto> history)
+    {
+        return DetermineOverlappingIds(
+            history,
+            item => item.ContractId,
+            item => item.ValidFrom,
+            item => item.ValidTo);
+    }
+
+    private static HashSet<Guid> DetermineOverlappingCalculationVersionIds(IReadOnlyCollection<PayrollCalculationSettingsVersionDto> history)
+    {
+        return DetermineOverlappingIds(
+            history,
+            item => item.VersionId,
+            item => item.ValidFrom,
+            item => item.ValidTo);
+    }
+
+    private static HashSet<Guid> DetermineOverlappingIds<TItem>(
+        IReadOnlyCollection<TItem> history,
+        Func<TItem, Guid> idSelector,
+        Func<TItem, DateOnly> validFromSelector,
+        Func<TItem, DateOnly?> validToSelector)
+    {
+        var items = history.ToArray();
+        var overlappingIds = new HashSet<Guid>();
+
+        for (var index = 0; index < items.Length; index++)
+        {
+            for (var compareIndex = index + 1; compareIndex < items.Length; compareIndex++)
+            {
+                if (!PeriodsOverlap(
+                        validFromSelector(items[index]),
+                        validToSelector(items[index]),
+                        validFromSelector(items[compareIndex]),
+                        validToSelector(items[compareIndex])))
+                {
+                    continue;
+                }
+
+                overlappingIds.Add(idSelector(items[index]));
+                overlappingIds.Add(idSelector(items[compareIndex]));
+            }
+        }
+
+        return overlappingIds;
+    }
+
+    private static bool PeriodsOverlap(DateOnly firstFrom, DateOnly? firstTo, DateOnly secondFrom, DateOnly? secondTo)
+    {
+        var normalizedFirstTo = firstTo ?? DateOnly.MaxValue;
+        var normalizedSecondTo = secondTo ?? DateOnly.MaxValue;
+        return firstFrom <= normalizedSecondTo && secondFrom <= normalizedFirstTo;
+    }
+
     private static string FormatPercentage(decimal value, string format)
     {
         return NumericFormatManager.FormatDecimal(value * 100m, format);
+    }
+
+    private static string FormatDate(DateTimeOffset? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("dd.MM.yyyy")
+            : "offen";
+    }
+
+    private static string FormatDate(DateOnly? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("dd.MM.yyyy")
+            : "offen";
     }
 
     private static string ToThousandsSeparatorValue(string? label)
@@ -2437,6 +3333,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         _currentSection = section;
+        MonthlyRecord.IsLocked = _isEditing && section == WorkspaceSection.Employees;
         RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
         RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
         RaisePropertyChanged(nameof(IsReportingWorkspace));

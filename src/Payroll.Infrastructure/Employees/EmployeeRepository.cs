@@ -96,6 +96,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
         }
 
         var contract = await LoadLatestContractAsync(employeeId, asNoTracking: true, cancellationToken);
+        var contractHistory = await LoadContractHistoryAsync(employeeId, cancellationToken);
         var departmentName = await LoadOptionNameAsync(_dbContext.DepartmentOptions, employee.DepartmentOptionId, cancellationToken);
         var categoryName = await LoadOptionNameAsync(_dbContext.EmploymentCategoryOptions, employee.EmploymentCategoryOptionId, cancellationToken);
         var locationName = await LoadOptionNameAsync(_dbContext.EmploymentLocationOptions, employee.EmploymentLocationOptionId, cancellationToken);
@@ -135,7 +136,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
             contract?.ValidTo,
             contract?.HourlyRateChf ?? 0m,
             contract?.MonthlyBvgDeductionChf ?? 0m,
-            contract?.SpecialSupplementRateChf ?? 0m);
+            contract?.SpecialSupplementRateChf ?? 0m,
+            contractHistory);
     }
 
     public async Task<EmployeeDetailsDto?> GetByPersonnelNumberAsync(string personnelNumber, CancellationToken cancellationToken)
@@ -173,6 +175,10 @@ public sealed class EmployeeRepository : IEmployeeRepository
     {
         Employee employee;
         EmploymentContract contract;
+        var normalizedContractValidFrom = NormalizeToMonthStart(command.ContractValidFrom);
+        DateOnly? normalizedContractValidTo = command.ContractValidTo.HasValue
+            ? NormalizeToMonthEnd(command.ContractValidTo.Value)
+            : null;
 
         if (command.EmployeeId.HasValue)
         {
@@ -200,28 +206,15 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.EmploymentLocationOptionId,
                 command.WageType);
 
-            contract = await LoadLatestContractAsync(employee.Id, asNoTracking: false, cancellationToken)
-                ?? new EmploymentContract(
-                    employee.Id,
-                    command.ContractValidFrom,
-                    command.ContractValidTo,
-                    command.HourlyRateChf,
-                    command.MonthlyBvgDeductionChf,
-                    command.SpecialSupplementRateChf);
-
-            if (contract.EmployeeId == employee.Id && _dbContext.Entry(contract).State != EntityState.Detached)
-            {
-                contract.UpdateTerms(
-                    command.ContractValidFrom,
-                    command.ContractValidTo,
-                    command.HourlyRateChf,
-                    command.MonthlyBvgDeductionChf,
-                    command.SpecialSupplementRateChf);
-            }
-            else
-            {
-                _dbContext.EmploymentContracts.Add(contract);
-            }
+            contract = await SaveContractVersionAsync(
+                employee.Id,
+                command.EditingContractId,
+                normalizedContractValidFrom,
+                normalizedContractValidTo,
+                command.HourlyRateChf,
+                command.MonthlyBvgDeductionChf,
+                command.SpecialSupplementRateChf,
+                cancellationToken);
         }
         else
         {
@@ -249,8 +242,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 command.WageType);
             contract = new EmploymentContract(
                 employee.Id,
-                command.ContractValidFrom,
-                command.ContractValidTo,
+                normalizedContractValidFrom,
+                normalizedContractValidTo,
                 command.HourlyRateChf,
                 command.MonthlyBvgDeductionChf,
                 command.SpecialSupplementRateChf);
@@ -263,6 +256,58 @@ public sealed class EmployeeRepository : IEmployeeRepository
 
         return await GetByIdAsync(employee.Id, cancellationToken)
             ?? throw new InvalidOperationException("Saved employee could not be loaded.");
+    }
+
+    public async Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken)
+    {
+        var contracts = await _dbContext.EmploymentContracts
+            .Where(item => item.EmployeeId == employeeId)
+            .OrderBy(item => item.ValidFrom)
+            .ToListAsync(cancellationToken);
+
+        var contract = contracts.SingleOrDefault(item => item.Id == contractId)
+            ?? throw new InvalidOperationException("Vertragsstand wurde nicht gefunden.");
+
+        var currentContractId = contracts
+            .OrderByDescending(item => item.ValidFrom)
+            .ThenByDescending(item => item.CreatedAtUtc)
+            .First()
+            .Id;
+
+        if (contract.Id == currentContractId)
+        {
+            throw new InvalidOperationException("Der aktive Vertragsstand kann nicht geloescht werden.");
+        }
+
+        var previousContract = contracts
+            .Where(item => item.ValidFrom < contract.ValidFrom)
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefault();
+        var nextContract = contracts
+            .Where(item => item.ValidFrom > contract.ValidFrom)
+            .OrderBy(item => item.ValidFrom)
+            .FirstOrDefault();
+
+        _dbContext.EmploymentContracts.Remove(contract);
+
+        if (previousContract is not null)
+        {
+            var newValidTo = nextContract is not null
+                ? nextContract.ValidFrom.AddDays(-1)
+                : (DateOnly?)null;
+
+            previousContract.UpdateTerms(
+                previousContract.ValidFrom,
+                newValidTo,
+                previousContract.HourlyRateChf,
+                previousContract.MonthlyBvgDeductionChf,
+                previousContract.SpecialSupplementRateChf);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(employeeId, cancellationToken)
+            ?? throw new InvalidOperationException("Mitarbeitender wurde nicht gefunden.");
     }
 
     private static EmployeeAddress CreateAddress(SaveEmployeeCommand command)
@@ -316,6 +361,127 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 group => group
                     .OrderByDescending(contract => contract.ValidFrom)
                     .First());
+    }
+
+    private async Task<IReadOnlyCollection<EmploymentContractVersionDto>> LoadContractHistoryAsync(
+        Guid employeeId,
+        CancellationToken cancellationToken)
+    {
+        var contracts = await _dbContext.EmploymentContracts
+            .AsNoTracking()
+            .Where(contract => contract.EmployeeId == employeeId)
+            .ToListAsync(cancellationToken);
+
+        contracts = contracts
+            .OrderByDescending(contract => contract.ValidFrom)
+            .ThenByDescending(contract => contract.CreatedAtUtc)
+            .ToList();
+
+        var currentContractId = contracts
+            .OrderByDescending(contract => contract.ValidFrom)
+            .FirstOrDefault()
+            ?.Id;
+
+        return contracts
+            .Select(contract => new EmploymentContractVersionDto(
+                contract.Id,
+                contract.ValidFrom,
+                contract.ValidTo,
+                contract.HourlyRateChf,
+                contract.MonthlyBvgDeductionChf,
+                contract.SpecialSupplementRateChf,
+                contract.Id == currentContractId))
+            .ToArray();
+    }
+
+    private async Task<EmploymentContract> SaveContractVersionAsync(
+        Guid employeeId,
+        Guid? editingContractId,
+        DateOnly validFrom,
+        DateOnly? validTo,
+        decimal hourlyRateChf,
+        decimal monthlyBvgDeductionChf,
+        decimal specialSupplementRateChf,
+        CancellationToken cancellationToken)
+    {
+        var existingContracts = await _dbContext.EmploymentContracts
+            .Where(item => item.EmployeeId == employeeId)
+            .OrderBy(item => item.ValidFrom)
+            .ToListAsync(cancellationToken);
+
+        var contract = editingContractId.HasValue
+            ? existingContracts.SingleOrDefault(item => item.Id == editingContractId.Value)
+            : existingContracts.SingleOrDefault(item => item.ValidFrom == validFrom);
+        if (editingContractId.HasValue && contract is null)
+        {
+            throw new InvalidOperationException("Der zu bearbeitende Vertragsstand wurde nicht gefunden.");
+        }
+
+        if (existingContracts.Any(item => item.Id != contract?.Id && item.ValidFrom == validFrom))
+        {
+            throw new InvalidOperationException("Es existiert bereits ein anderer Vertragsstand mit demselben Gueltig-ab-Datum.");
+        }
+
+        var nextContract = existingContracts
+            .Where(item => item.Id != contract?.Id && item.ValidFrom > validFrom)
+            .OrderBy(item => item.ValidFrom)
+            .FirstOrDefault();
+
+        if (!validTo.HasValue && nextContract is not null)
+        {
+            validTo = nextContract.ValidFrom.AddDays(-1);
+        }
+
+        if (validTo.HasValue && nextContract is not null && nextContract.ValidFrom <= validTo.Value)
+        {
+            throw new InvalidOperationException("Der Gueltigkeitsbereich des Vertragsstands ueberlappt mit einem spaeteren Vertragsstand.");
+        }
+
+        var previousContract = existingContracts
+            .Where(item => item.Id != contract?.Id && item.ValidFrom < validFrom)
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefault();
+
+        if (previousContract is not null && (!previousContract.ValidTo.HasValue || previousContract.ValidTo.Value >= validFrom))
+        {
+            previousContract.UpdateTerms(
+                previousContract.ValidFrom,
+                validFrom.AddDays(-1),
+                previousContract.HourlyRateChf,
+                previousContract.MonthlyBvgDeductionChf,
+                previousContract.SpecialSupplementRateChf);
+        }
+
+        if (contract is null)
+        {
+            contract = new EmploymentContract(
+                employeeId,
+                validFrom,
+                validTo,
+                hourlyRateChf,
+                monthlyBvgDeductionChf,
+                specialSupplementRateChf);
+            _dbContext.EmploymentContracts.Add(contract);
+            return contract;
+        }
+
+        contract.UpdateTerms(
+            validFrom,
+            validTo,
+            hourlyRateChf,
+            monthlyBvgDeductionChf,
+            specialSupplementRateChf);
+        return contract;
+    }
+
+    private static DateOnly NormalizeToMonthStart(DateOnly date)
+    {
+        return new DateOnly(date.Year, date.Month, 1);
+    }
+
+    private static DateOnly NormalizeToMonthEnd(DateOnly date)
+    {
+        return new DateOnly(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
     }
 
     private static async Task<string?> LoadOptionNameAsync<TOption>(

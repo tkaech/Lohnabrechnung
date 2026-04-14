@@ -35,4 +35,9 @@ public sealed class EmployeeService
     {
         return _repository.ArchiveAsync(employeeId, cancellationToken);
     }
+
+    public Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken = default)
+    {
+        return _repository.DeleteContractVersionAsync(employeeId, contractId, cancellationToken);
+    }
 }

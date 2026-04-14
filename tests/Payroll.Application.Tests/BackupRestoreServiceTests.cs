@@ -62,6 +62,9 @@ public sealed class BackupRestoreServiceTests
                 ",",
                 "'",
                 "CHF",
+                null,
+                new DateOnly(2026, 1, 1),
+                null,
                 0.25m,
                 0.50m,
                 1.00m,
@@ -80,6 +83,7 @@ public sealed class BackupRestoreServiceTests
                 [new SettingOptionDto(locationId, "Schachenstr. 7, Emmenbruecke")]));
 
             var employee = await employeeService.SaveAsync(new SaveEmployeeCommand(
+                null,
                 null,
                 "1000",
                 "Nora",
@@ -156,6 +160,9 @@ public sealed class BackupRestoreServiceTests
                 ".",
                 " ",
                 "EUR",
+                null,
+                new DateOnly(2026, 5, 1),
+                null,
                 0.20m,
                 0.30m,
                 0.40m,

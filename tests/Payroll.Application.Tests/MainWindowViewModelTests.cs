@@ -238,6 +238,255 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SavingChangedHistoricalContractValue_UpdatesCurrentContractImmediately()
+    {
+        var employee = TestEmployeeRepository.CreateDetailsWithContractHistory(
+            "1000",
+            "Anna",
+            "Aktiv",
+            "Bern",
+            [
+                new EmploymentContractVersionDto(
+                    Guid.NewGuid(),
+                    new DateOnly(2026, 4, 1),
+                    null,
+                    35m,
+                    300m,
+                    4.00m,
+                    true),
+                new EmploymentContractVersionDto(
+                    Guid.NewGuid(),
+                    new DateOnly(2026, 1, 1),
+                    new DateOnly(2026, 3, 31),
+                    32.5m,
+                    280m,
+                    3.00m,
+                    false)
+            ]);
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.EditEmployeeCommand.Execute(null);
+        viewModel.HourlyRateChf = "36.00";
+
+        viewModel.SaveCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Mitarbeitender 1000 gespeichert.");
+
+        Assert.False(viewModel.ShowContractVersionDialog);
+        Assert.NotNull(repository.LastSavedCommand);
+        Assert.Equal(employee.ContractHistory.Single(item => item.IsCurrent).ContractId, repository.LastSavedCommand!.EditingContractId);
+        Assert.Equal(36.00m, repository.LastSavedCommand.HourlyRateChf);
+    }
+
+    [Fact]
+    public async Task NewContractVersionDialog_SavesNewVersionFromSelectedDate()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.EditEmployeeCommand.Execute(null);
+        viewModel.MonthlyBvgDeductionChf = "295.00";
+        viewModel.OpenNewContractVersionDialogCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ShowContractVersionDialog);
+
+        viewModel.NewContractVersionValidFrom = new DateTimeOffset(new DateTime(2025, 2, 1));
+        viewModel.ConfirmContractVersionDialogCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && !viewModel.ShowContractVersionDialog && viewModel.StatusMessage == "Mitarbeitender 1000 gespeichert.");
+
+        Assert.NotNull(repository.LastSavedCommand);
+        Assert.Null(repository.LastSavedCommand!.EditingContractId);
+        Assert.Equal(new DateOnly(2025, 2, 1), repository.LastSavedCommand!.ContractValidFrom);
+        Assert.Equal(295m, repository.LastSavedCommand.MonthlyBvgDeductionChf);
+    }
+
+    [Fact]
+    public async Task NewContractVersionDialog_WithManualEndDate_SavesClosedRange()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.EditEmployeeCommand.Execute(null);
+        viewModel.SpecialSupplementRateChf = "4.50";
+        viewModel.OpenNewContractVersionDialogCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ShowContractVersionDialog);
+
+        viewModel.NewContractVersionValidFrom = new DateTimeOffset(new DateTime(2025, 2, 1));
+        viewModel.NewContractVersionValidTo = new DateTimeOffset(new DateTime(2025, 6, 30));
+        viewModel.ConfirmContractVersionDialogCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && !viewModel.ShowContractVersionDialog && viewModel.StatusMessage == "Mitarbeitender 1000 gespeichert.");
+
+        Assert.NotNull(repository.LastSavedCommand);
+        Assert.Null(repository.LastSavedCommand!.EditingContractId);
+        Assert.Equal(new DateOnly(2025, 2, 1), repository.LastSavedCommand!.ContractValidFrom);
+        Assert.Equal(new DateOnly(2025, 6, 30), repository.LastSavedCommand.ContractValidTo);
+        Assert.Equal(4.50m, repository.LastSavedCommand.SpecialSupplementRateChf);
+    }
+
+    [Fact]
+    public async Task SavingUnchangedContractValues_DoesNotOpenDialog()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.EditEmployeeCommand.Execute(null);
+        viewModel.City = "Basel";
+        viewModel.SaveCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Mitarbeitender 1000 gespeichert.");
+
+        Assert.False(viewModel.ShowContractVersionDialog);
+        Assert.NotNull(repository.LastSavedCommand);
+        Assert.Equal("Basel", repository.LastSavedCommand!.City);
+    }
+
+    [Fact]
+    public async Task ContractHistoryDialog_CanBeOpenedWithoutValueChange()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        viewModel.OpenContractVersionDialogCommand.Execute(null);
+
+        Assert.True(viewModel.ShowContractVersionDialog);
+        Assert.False(viewModel.ShowContractVersionCreateSection);
+    }
+
+    [Fact]
+    public async Task CalculationSettingsHistoryDialog_CanBeOpenedWithoutValueChange()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var viewModel = CreateViewModel(new TestEmployeeRepository(employee));
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+
+        viewModel.OpenCalculationSettingsVersionDialogCommand.Execute(null);
+
+        Assert.True(viewModel.ShowCalculationSettingsVersionDialog);
+        Assert.False(viewModel.ShowCalculationSettingsVersionCreateSection);
+    }
+
+    [Fact]
+    public async Task SavingChangedGeneralCalculationSetting_SavesCurrentSettingsWithoutHistoryDialog()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var viewModel = CreateViewModel(new TestEmployeeRepository(employee));
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.SettingsAhvIvEoRate == "5.3");
+
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.SettingsAhvIvEoRate = "5.4";
+
+        viewModel.SaveSettingsCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Einstellungen gespeichert.");
+
+        Assert.False(viewModel.ShowCalculationSettingsVersionDialog);
+        Assert.Equal("5.4", viewModel.SettingsAhvIvEoRate);
+    }
+
+    [Fact]
+    public async Task NewCalculationSettingsVersionDialog_SavesNewSettingsVersion()
+    {
+        var employeeRepository = new TestEmployeeRepository(TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"));
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
+            new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.OpenNewCalculationSettingsVersionDialogCommand.Execute(null);
+        Assert.True(viewModel.ShowCalculationSettingsVersionCreateSection);
+        viewModel.SettingsCalculationValidFrom = new DateTimeOffset(new DateTime(2026, 5, 1));
+        viewModel.SettingsCalculationValidTo = null;
+        viewModel.SettingsNightSupplementRate = "30";
+
+        viewModel.ConfirmCalculationSettingsVersionDialogCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Einstellungen gespeichert.");
+
+        Assert.False(viewModel.ShowCalculationSettingsVersionDialog);
+        Assert.Equal(new DateOnly(2026, 5, 1), settingsRepository.Current.CalculationValidFrom);
+        Assert.Null(settingsRepository.Current.CalculationValidTo);
+        Assert.Equal(0.30m, settingsRepository.Current.NightSupplementRate);
+    }
+
+    [Fact]
+    public async Task SavingCurrentSettingsVersion_UpdatesExistingSettingsDirectly()
+    {
+        var employeeRepository = new TestEmployeeRepository(TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"));
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
+            new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.SettingsNightSupplementRate = "35";
+
+        viewModel.SaveSettingsCommand.Execute(null);
+        await WaitUntilAsync(() => !viewModel.IsBusy && viewModel.StatusMessage == "Einstellungen gespeichert.");
+
+        Assert.False(viewModel.ShowCalculationSettingsVersionDialog);
+        Assert.Equal(new DateOnly(2026, 1, 1), settingsRepository.Current.CalculationValidFrom);
+        Assert.Equal(0.35m, settingsRepository.Current.NightSupplementRate);
+    }
+
+    [Fact]
+    public async Task OpenNewCalculationSettingsVersionDialogCommand_OpensCreateMode()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var viewModel = CreateViewModel(new TestEmployeeRepository(employee));
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.OpenNewCalculationSettingsVersionDialogCommand.Execute(null);
+
+        Assert.True(viewModel.ShowCalculationSettingsVersionDialog);
+        Assert.True(viewModel.ShowCalculationSettingsVersionCreateSection);
+    }
+
+    [Fact]
     public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsReportingEmployeesSettingsAndHelp()
     {
         var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
@@ -292,6 +541,28 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsHelpWorkspace);
         Assert.False(viewModel.ShowEmployeeSelectionArea);
         Assert.False(viewModel.ShowPrimaryWorkspaceArea);
+    }
+
+    [Fact]
+    public async Task MonthlyRecordUnlocksAgain_WhenEmployeeEditModeEndsByLeavingEmployeeWorkspace()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.MonthlyRecord.CanSaveTimeEntry);
+
+        viewModel.ShowEmployeesCommand.Execute(null);
+        viewModel.EditEmployeeCommand.Execute(null);
+
+        Assert.True(viewModel.MonthlyRecord.IsLocked);
+        Assert.False(viewModel.MonthlyRecord.CanSaveTimeEntry);
+
+        viewModel.ShowTimeAndExpensesCommand.Execute(null);
+
+        Assert.False(viewModel.MonthlyRecord.IsLocked);
+        Assert.True(viewModel.MonthlyRecord.CanSaveTimeEntry);
     }
 
     [Fact]
@@ -523,9 +794,9 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Personalnummer", viewModel.PersonImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn);
     }
 
-    private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository)
+    private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository, InMemoryPayrollSettingsRepository? settingsRepository = null)
     {
-        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        settingsRepository ??= new InMemoryPayrollSettingsRepository();
         var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
         var importService = CreateImportService(repository);
 
@@ -691,10 +962,39 @@ public sealed class MainWindowViewModelTests
                 command.ContractValidTo,
                 command.HourlyRateChf,
                 command.MonthlyBvgDeductionChf,
-                command.SpecialSupplementRateChf);
+                command.SpecialSupplementRateChf,
+                [
+                    new EmploymentContractVersionDto(
+                        Guid.NewGuid(),
+                        command.ContractValidFrom,
+                        command.ContractValidTo,
+                        command.HourlyRateChf,
+                        command.MonthlyBvgDeductionChf,
+                        command.SpecialSupplementRateChf,
+                        true)
+                ]);
 
             _employees[employeeId] = employee;
             return Task.FromResult(employee);
+        }
+
+        public Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken)
+        {
+            var employee = _employees[employeeId];
+            var history = employee.ContractHistory.Where(item => item.ContractId != contractId).ToArray();
+            var current = history.First(item => item.IsCurrent);
+
+            _employees[employeeId] = employee with
+            {
+                ContractValidFrom = current.ValidFrom,
+                ContractValidTo = current.ValidTo,
+                HourlyRateChf = current.HourlyRateChf,
+                MonthlyBvgDeductionChf = current.MonthlyBvgDeductionChf,
+                SpecialSupplementRateChf = current.SpecialSupplementRateChf,
+                ContractHistory = history
+            };
+
+            return Task.FromResult(_employees[employeeId]);
         }
 
         public static EmployeeDetailsDto CreateDetails(string personnelNumber, string firstName, string lastName, string city)
@@ -734,7 +1034,65 @@ public sealed class MainWindowViewModelTests
                 null,
                 32.5m,
                 280m,
-                3.00m);
+                3.00m,
+                [
+                    new EmploymentContractVersionDto(
+                        Guid.NewGuid(),
+                        new DateOnly(2025, 1, 1),
+                        null,
+                        32.5m,
+                        280m,
+                        3.00m,
+                        true)
+                ]);
+        }
+
+        public static EmployeeDetailsDto CreateDetailsWithContractHistory(
+            string personnelNumber,
+            string firstName,
+            string lastName,
+            string city,
+            IReadOnlyCollection<EmploymentContractVersionDto> contractHistory)
+        {
+            var currentContract = contractHistory.First(item => item.IsCurrent);
+
+            return new EmployeeDetailsDto(
+                Guid.NewGuid(),
+                personnelNumber,
+                firstName,
+                lastName,
+                new DateOnly(1990, 1, 1),
+                new DateOnly(2025, 1, 1),
+                null,
+                true,
+                "Beispielstrasse",
+                "1",
+                null,
+                "8000",
+                city,
+                "Schweiz",
+                "Schweiz",
+                "CH",
+                "B",
+                "Ordentlich",
+                false,
+                "756.0000.0000.00",
+                "CH9300762011623852957",
+                "+41 79 000 00 00",
+                $"{firstName.ToLowerInvariant()}.{lastName.ToLowerInvariant()}@example.ch",
+                Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                "Sicherheit",
+                Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                "A",
+                Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                "Schachenstr. 7, Emmenbruecke",
+                EmployeeWageType.Hourly,
+                currentContract.ValidFrom,
+                currentContract.ValidTo,
+                currentContract.HourlyRateChf,
+                currentContract.MonthlyBvgDeductionChf,
+                currentContract.SpecialSupplementRateChf,
+                contractHistory);
         }
 
         public static EmployeeDetailsDto CreateInactiveDetails(string personnelNumber, string firstName, string lastName, string city)
@@ -774,7 +1132,17 @@ public sealed class MainWindowViewModelTests
                 null,
                 32.5m,
                 280m,
-                3.00m);
+                3.00m,
+                [
+                    new EmploymentContractVersionDto(
+                        Guid.NewGuid(),
+                        new DateOnly(2025, 1, 1),
+                        null,
+                        32.5m,
+                        280m,
+                        3.00m,
+                        true)
+                ]);
         }
 
         private static EmployeeListItemDto ToListItem(EmployeeDetailsDto employee)
@@ -872,6 +1240,16 @@ public sealed class MainWindowViewModelTests
                 : (IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());
         }
 
+        public Task<bool> MonthlySnapshotsDifferFromCurrentAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task RefreshMonthlySnapshotsAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
@@ -919,32 +1297,40 @@ public sealed class MainWindowViewModelTests
 
     private sealed class InMemoryPayrollSettingsRepository : IPayrollSettingsRepository
     {
-        private PayrollSettingsDto _settings = new(
-            "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri",
-            "Segoe UI",
-            13m,
-            "#FF1A2530",
-            "#FF5F6B7A",
-            "#FFF5F7FA",
-            "#FF14324A",
-            "PA",
-            string.Empty,
-            "Helvetica",
-            9m,
-            "#FF000000",
-            "#FF4B5563",
-            "#FFFFFF00",
-            "PA",
-            string.Empty,
-            "BANNER|Lohnblatt|{{Monat}}",
-            global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
-            global::Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator,
-            global::Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode,
-            0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m,
-            PayrollPreviewHelpCatalog.GetDefaultOptions(),
-            [new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111111"), "Sicherheit"), new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111112"), "Buero")],
-            [new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "A"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222223"), "B"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222224"), "C")],
-            [new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333333"), "Schachenstr. 7, Emmenbruecke"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333334"), "Weinbergstrasse 8, Baar"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333335"), "Rainstrasse 37, Unteraegeri")]);
+        private PayrollSettingsDto _settings;
+
+        public InMemoryPayrollSettingsRepository(PayrollSettingsDto? settings = null)
+        {
+            _settings = settings ?? new PayrollSettingsDto(
+                "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri",
+                "Segoe UI",
+                13m,
+                "#FF1A2530",
+                "#FF5F6B7A",
+                "#FFF5F7FA",
+                "#FF14324A",
+                "PA",
+                string.Empty,
+                "Helvetica",
+                9m,
+                "#FF000000",
+                "#FF4B5563",
+                "#FFFFFF00",
+                "PA",
+                string.Empty,
+                "BANNER|Lohnblatt|{{Monat}}",
+                global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
+                global::Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator,
+                global::Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode,
+                new DateOnly(2026, 1, 1),
+                null,
+                0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m,
+                [new PayrollCalculationSettingsVersionDto(Guid.NewGuid(), new DateOnly(2026, 1, 1), null, 0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, true)],
+                PayrollPreviewHelpCatalog.GetDefaultOptions(),
+                [new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111111"), "Sicherheit"), new SettingOptionDto(Guid.Parse("11111111-1111-1111-1111-111111111112"), "Buero")],
+                [new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222222"), "A"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222223"), "B"), new SettingOptionDto(Guid.Parse("22222222-2222-2222-2222-222222222224"), "C")],
+                [new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333333"), "Schachenstr. 7, Emmenbruecke"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333334"), "Weinbergstrasse 8, Baar"), new SettingOptionDto(Guid.Parse("33333333-3333-3333-3333-333333333335"), "Rainstrasse 37, Unteraegeri")]);
+        }
 
         public PayrollSettingsDto Current => _settings;
 
@@ -984,6 +1370,8 @@ public sealed class MainWindowViewModelTests
                 command.DecimalSeparator,
                 command.ThousandsSeparator,
                 command.CurrencyCode,
+                command.CalculationValidFrom,
+                command.CalculationValidTo,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,
@@ -996,10 +1384,21 @@ public sealed class MainWindowViewModelTests
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
                 command.VehicleRegiezone1RateChf,
+                [new PayrollCalculationSettingsVersionDto(Guid.NewGuid(), command.CalculationValidFrom, command.CalculationValidTo, command.NightSupplementRate, command.SundaySupplementRate, command.HolidaySupplementRate, command.AhvIvEoRate, command.AlvRate, command.SicknessAccidentInsuranceRate, command.TrainingAndHolidayRate, command.VacationCompensationRate, command.VacationCompensationRateAge50Plus, command.VehiclePauschalzone1RateChf, command.VehiclePauschalzone2RateChf, command.VehicleRegiezone1RateChf, true)],
                 command.PayrollPreviewHelpOptions,
                 command.Departments,
                 command.EmploymentCategories,
                 command.EmploymentLocations);
+            return Task.FromResult(_settings);
+        }
+
+        public Task<PayrollSettingsDto> DeleteCalculationVersionAsync(Guid versionId, CancellationToken cancellationToken)
+        {
+            _settings = _settings with
+            {
+                CalculationVersions = _settings.CalculationVersions.Where(item => item.VersionId != versionId).ToArray()
+            };
+
             return Task.FromResult(_settings);
         }
     }

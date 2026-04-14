@@ -486,6 +486,7 @@ public sealed class ImportServiceTests
     {
         return new SaveEmployeeCommand(
             employeeId,
+            null,
             personnelNumber,
             firstName,
             lastName,
@@ -639,10 +640,16 @@ public sealed class ImportServiceTests
                 command.ContractValidTo,
                 command.HourlyRateChf,
                 command.MonthlyBvgDeductionChf,
-                command.SpecialSupplementRateChf);
+                command.SpecialSupplementRateChf,
+                []);
 
             _employees[employeeId] = employee;
             return Task.FromResult(employee);
+        }
+
+        public Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -153,6 +153,57 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
+    public async Task GetDetailsAsync_ExplainsWhenMonthlySnapshotMissesSupplementRule_AlthoughCurrentMonthHasOne()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(null, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, 0m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var currentSettings = await dbContext.PayrollSettings.SingleAsync();
+        currentSettings.UpdateWorkTimeSupplementSettings(new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m));
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Notes, note => note.Contains("gespeicherten Monats-Snapshot", StringComparison.Ordinal));
+        Assert.Contains(details.PayrollPreview.Notes, note => note.Contains("25 %", StringComparison.Ordinal));
+        Assert.Contains(
+            details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items),
+            item => item.Label == "Fehlender Nachtzuschlagssatz"
+                && item.Detail is not null
+                && item.Detail.Contains("gespeicherten Monats-Snapshot", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task GetDetailsAsync_ShowsAge50PlusVacationCompensationHint_FromStartOfYearEmployeeTurns50()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

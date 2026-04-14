@@ -8,4 +8,5 @@ public interface IEmployeeRepository
     Task<bool> PersonnelNumberExistsAsync(string personnelNumber, Guid? excludingEmployeeId, CancellationToken cancellationToken);
     Task ArchiveAsync(Guid employeeId, CancellationToken cancellationToken);
     Task<EmployeeDetailsDto> SaveAsync(SaveEmployeeCommand command, CancellationToken cancellationToken);
+    Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken);
 }

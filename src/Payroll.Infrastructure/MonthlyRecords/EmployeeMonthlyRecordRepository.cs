@@ -22,7 +22,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
     public async Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
     {
-        var currentPayrollSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
+        var effectivePayrollSettings = await LoadEffectivePayrollSettingsForMonthAsync(
+            new DateOnly(year, month, 1),
+            new DateOnly(year, month, DateTime.DaysInMonth(year, month)),
+            cancellationToken);
         var contractForSnapshot = await LoadBestAvailableContractForMonthAsync(
             employeeId,
             new DateOnly(year, month, 1),
@@ -37,13 +40,13 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
         if (existingRecord is not null)
         {
-            existingRecord.InitializePayrollParameterSnapshot(currentPayrollSettings);
+            existingRecord.InitializePayrollParameterSnapshot(effectivePayrollSettings);
             existingRecord.InitializeEmploymentContractSnapshot(contractForSnapshot);
             return existingRecord;
         }
 
         var createdRecord = new EmployeeMonthlyRecord(employeeId, year, month);
-        createdRecord.InitializePayrollParameterSnapshot(currentPayrollSettings);
+        createdRecord.InitializePayrollParameterSnapshot(effectivePayrollSettings);
         createdRecord.InitializeEmploymentContractSnapshot(contractForSnapshot);
         _dbContext.EmployeeMonthlyRecords.Add(createdRecord);
         return createdRecord;
@@ -61,7 +64,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             return null;
         }
 
-        monthlyRecord.InitializePayrollParameterSnapshot(await LoadCurrentPayrollSettingsAsync(cancellationToken));
+        monthlyRecord.InitializePayrollParameterSnapshot(await LoadEffectivePayrollSettingsForMonthAsync(
+            monthlyRecord.PeriodStart,
+            monthlyRecord.PeriodEnd,
+            cancellationToken));
         monthlyRecord.InitializeEmploymentContractSnapshot(
             await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken));
         return monthlyRecord;
@@ -88,13 +94,17 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             monthlyRecord,
             await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken));
         var currentPayrollSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
+        var effectivePayrollSettings = await LoadEffectivePayrollSettingsForMonthAsync(
+            monthlyRecord.PeriodStart,
+            monthlyRecord.PeriodEnd,
+            cancellationToken);
         var payrollSettings = ResolvePayrollSettingsForMonth(
             monthlyRecord,
-            currentPayrollSettings);
+            effectivePayrollSettings);
 
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
         var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
-        var payrollPreview = BuildPayrollPreview(monthlyRecord, employee.BirthDate, contract, payrollSettings, currentPayrollSettings);
+        var payrollPreview = BuildPayrollPreview(monthlyRecord, employee.BirthDate, contract, payrollSettings, effectivePayrollSettings, currentPayrollSettings);
         var employeeMonthlyRecords = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Where(record => record.EmployeeId == monthlyRecord.EmployeeId)
@@ -115,6 +125,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             contract?.ValidFrom,
             contract?.ValidTo,
             contract?.HourlyRateChf,
+            contract?.SpecialSupplementRateChf,
             contract?.MonthlyBvgDeductionChf,
             monthlyRecord.TimeEntries.Sum(entry => entry.HoursWorked),
             monthlyRecord.TimeEntries.Sum(entry => entry.SupplementHours),
@@ -226,6 +237,28 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> MonthlySnapshotsDifferFromCurrentAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(monthlyRecord);
+
+        var currentPayrollSettings = await LoadEffectivePayrollSettingsForMonthAsync(monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken);
+        var currentContract = await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken);
+
+        return !PayrollSnapshotMatches(monthlyRecord, currentPayrollSettings)
+            || !ContractSnapshotMatches(monthlyRecord, currentContract);
+    }
+
+    public async Task RefreshMonthlySnapshotsAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(monthlyRecord);
+
+        var currentPayrollSettings = await LoadEffectivePayrollSettingsForMonthAsync(monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken);
+        var currentContract = await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken);
+
+        monthlyRecord.RefreshPayrollParameterSnapshot(currentPayrollSettings);
+        monthlyRecord.RefreshEmploymentContractSnapshot(currentContract);
+    }
+
     public void ClearTracking()
     {
         _dbContext.ChangeTracker.Clear();
@@ -315,6 +348,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         DateOnly? employeeBirthDate,
         Domain.Employees.EmploymentContract? contract,
         PayrollSettings payrollSettings,
+        PayrollSettings effectivePayrollSettings,
         PayrollSettings currentPayrollSettings)
     {
         var timeEntries = monthlyRecord.TimeEntries.OrderBy(entry => entry.WorkDate).ToArray();
@@ -350,7 +384,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
             foreach (var issue in derivationResult.Issues)
             {
-                notes.Add(TranslateDerivationIssue(issue.Code));
+                notes.Add(DescribeDerivationIssue(issue, monthlyRecord, payrollSettings, effectivePayrollSettings, numberCulture));
             }
         }
 
@@ -582,10 +616,12 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .ToArray();
 
         var derivationGroups = BuildPayrollPreviewDerivationGroups(
+            monthlyRecord,
             monthlyRecord.PeriodEnd,
             employeeBirthDate,
             contract,
             payrollSettings,
+            effectivePayrollSettings,
             workSummary,
             timeEntries,
             derivationLines,
@@ -771,10 +807,12 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     }
 
     private static IReadOnlyCollection<MonthlyPayrollPreviewDerivationGroupDto> BuildPayrollPreviewDerivationGroups(
+        EmployeeMonthlyRecord monthlyRecord,
         DateOnly payrollReferenceDate,
         DateOnly? employeeBirthDate,
         Domain.Employees.EmploymentContract? contract,
         PayrollSettings payrollSettings,
+        PayrollSettings effectivePayrollSettings,
         PayrollWorkSummary workSummary,
         IReadOnlyCollection<Domain.TimeTracking.TimeEntry> timeEntries,
         IReadOnlyCollection<PayrollRunLine> derivationLines,
@@ -900,7 +938,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 TranslateDerivationIssue(issue.Code),
                 issue.Code,
                 null,
-                issue.Message,
+                DescribeDerivationIssue(issue, monthlyRecord, payrollSettings, effectivePayrollSettings, numberCulture),
                 "ISSUE"))
             .ToArray();
 
@@ -982,6 +1020,22 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             ?? new PayrollSettings();
     }
 
+    private async Task<PayrollSettings> LoadEffectivePayrollSettingsForMonthAsync(
+        DateOnly periodStart,
+        DateOnly periodEnd,
+        CancellationToken cancellationToken)
+    {
+        var currentSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
+        var version = await _dbContext.PayrollCalculationSettingsVersions
+            .AsNoTracking()
+            .Where(item => item.ValidFrom <= periodEnd
+                && (!item.ValidTo.HasValue || item.ValidTo.Value >= periodStart))
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return version?.ToPayrollSettings() ?? currentSettings;
+    }
+
     private static PayrollSettings ResolvePayrollSettingsForMonth(EmployeeMonthlyRecord monthlyRecord, PayrollSettings currentPayrollSettings)
     {
         return monthlyRecord.PayrollParameterSnapshot.IsInitialized
@@ -996,6 +1050,48 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return monthlyRecord.EmploymentContractSnapshot.IsInitialized
             ? monthlyRecord.EmploymentContractSnapshot.ToEmploymentContract(monthlyRecord.EmployeeId)
             : currentContract;
+    }
+
+    private static bool PayrollSnapshotMatches(EmployeeMonthlyRecord monthlyRecord, PayrollSettings currentPayrollSettings)
+    {
+        if (!monthlyRecord.PayrollParameterSnapshot.IsInitialized)
+        {
+            return false;
+        }
+
+        var snapshot = monthlyRecord.PayrollParameterSnapshot;
+        return snapshot.NightSupplementRate == currentPayrollSettings.WorkTimeSupplementSettings.NightSupplementRate
+            && snapshot.SundaySupplementRate == currentPayrollSettings.WorkTimeSupplementSettings.SundaySupplementRate
+            && snapshot.HolidaySupplementRate == currentPayrollSettings.WorkTimeSupplementSettings.HolidaySupplementRate
+            && snapshot.AhvIvEoRate == currentPayrollSettings.AhvIvEoRate
+            && snapshot.AlvRate == currentPayrollSettings.AlvRate
+            && snapshot.SicknessAccidentInsuranceRate == currentPayrollSettings.SicknessAccidentInsuranceRate
+            && snapshot.TrainingAndHolidayRate == currentPayrollSettings.TrainingAndHolidayRate
+            && snapshot.VacationCompensationRate == currentPayrollSettings.VacationCompensationRate
+            && snapshot.VacationCompensationRateAge50Plus == currentPayrollSettings.VacationCompensationRateAge50Plus
+            && snapshot.VehiclePauschalzone1RateChf == currentPayrollSettings.VehiclePauschalzone1RateChf
+            && snapshot.VehiclePauschalzone2RateChf == currentPayrollSettings.VehiclePauschalzone2RateChf
+            && snapshot.VehicleRegiezone1RateChf == currentPayrollSettings.VehicleRegiezone1RateChf;
+    }
+
+    private static bool ContractSnapshotMatches(EmployeeMonthlyRecord monthlyRecord, Domain.Employees.EmploymentContract? currentContract)
+    {
+        if (currentContract is null)
+        {
+            return !monthlyRecord.EmploymentContractSnapshot.IsInitialized;
+        }
+
+        if (!monthlyRecord.EmploymentContractSnapshot.IsInitialized)
+        {
+            return false;
+        }
+
+        var snapshot = monthlyRecord.EmploymentContractSnapshot;
+        return snapshot.ValidFrom == currentContract.ValidFrom
+            && snapshot.ValidTo == currentContract.ValidTo
+            && snapshot.HourlyRateChf == currentContract.HourlyRateChf
+            && snapshot.MonthlyBvgDeductionChf == currentContract.MonthlyBvgDeductionChf
+            && snapshot.SpecialSupplementRateChf == currentContract.SpecialSupplementRateChf;
     }
 
     private static decimal GetVehicleAmount(IEnumerable<PayrollRunLine> derivationLines, string code)
@@ -1256,12 +1352,69 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     {
         return code switch
         {
-            "MISSING_NIGHT_RULE" => "Nachtzuschlag kann mangels zentralem Satz noch nicht berechnet werden.",
-            "MISSING_SUN_RULE" => "Sonntagszuschlag kann mangels zentralem Satz noch nicht berechnet werden.",
-            "MISSING_HOL_RULE" => "Feiertagszuschlag kann mangels zentralem Satz noch nicht berechnet werden.",
+            "MISSING_NIGHT_RULE" => "Fehlender Nachtzuschlagssatz",
+            "MISSING_SUN_RULE" => "Fehlender Sonntagszuschlagssatz",
+            "MISSING_HOL_RULE" => "Fehlender Feiertagszuschlagssatz",
             "AMBIGUOUS_SPECIAL_HOUR_OVERLAP" => "Spezialstunden uebersteigen die Arbeitsstunden. Zuschlagsberechnung bleibt deshalb unvollstaendig.",
             _ => code
         };
+    }
+
+    private static string DescribeDerivationIssue(
+        PayrollDerivationIssue issue,
+        EmployeeMonthlyRecord monthlyRecord,
+        PayrollSettings payrollSettings,
+        PayrollSettings effectivePayrollSettings,
+        CultureInfo numberCulture)
+    {
+        return issue.Code switch
+        {
+            "MISSING_NIGHT_RULE" => BuildMissingSupplementIssueDetail(
+                "Nachtzuschlag",
+                monthlyRecord,
+                payrollSettings.WorkTimeSupplementSettings.NightSupplementRate,
+                effectivePayrollSettings.WorkTimeSupplementSettings.NightSupplementRate,
+                numberCulture),
+            "MISSING_SUN_RULE" => BuildMissingSupplementIssueDetail(
+                "Sonntagszuschlag",
+                monthlyRecord,
+                payrollSettings.WorkTimeSupplementSettings.SundaySupplementRate,
+                effectivePayrollSettings.WorkTimeSupplementSettings.SundaySupplementRate,
+                numberCulture),
+            "MISSING_HOL_RULE" => BuildMissingSupplementIssueDetail(
+                "Feiertagszuschlag",
+                monthlyRecord,
+                payrollSettings.WorkTimeSupplementSettings.HolidaySupplementRate,
+                effectivePayrollSettings.WorkTimeSupplementSettings.HolidaySupplementRate,
+                numberCulture),
+            _ => string.IsNullOrWhiteSpace(issue.Message)
+                ? TranslateDerivationIssue(issue.Code)
+                : issue.Message
+        };
+    }
+
+    private static string BuildMissingSupplementIssueDetail(
+        string ruleLabel,
+        EmployeeMonthlyRecord monthlyRecord,
+        decimal? appliedRate,
+        decimal? effectiveRateForMonth,
+        CultureInfo numberCulture)
+    {
+        if (appliedRate.HasValue)
+        {
+            return $"{ruleLabel} konnte trotz vorhandenem Satz nicht berechnet werden. Bitte Monatsdaten und Zeitwerte pruefen.";
+        }
+
+        if (monthlyRecord.PayrollParameterSnapshot.IsInitialized)
+        {
+            return effectiveRateForMonth.HasValue
+                ? $"{ruleLabel} fehlt im gespeicherten Monats-Snapshot. Fuer {monthlyRecord.Month:00}/{monthlyRecord.Year} ist aktuell {FormatPercentageRate(effectiveRateForMonth.Value, numberCulture)} hinterlegt, der Monatsstand verwendet jedoch noch den fehlenden Snapshot-Wert."
+                : $"{ruleLabel} fehlt im gespeicherten Monats-Snapshot, und fuer {monthlyRecord.Month:00}/{monthlyRecord.Year} existiert auch aktuell kein gueltiger Satz.";
+        }
+
+        return effectiveRateForMonth.HasValue
+            ? $"{ruleLabel} wurde im geladenen Monatskontext nicht gefunden, obwohl fuer {monthlyRecord.Month:00}/{monthlyRecord.Year} aktuell {FormatPercentageRate(effectiveRateForMonth.Value, numberCulture)} hinterlegt ist."
+            : $"{ruleLabel} fehlt fuer {monthlyRecord.Month:00}/{monthlyRecord.Year}; deshalb bleibt die Zuschlagsberechnung offen.";
     }
 
     private static decimal RoundToFiveRappen(decimal amountChf)

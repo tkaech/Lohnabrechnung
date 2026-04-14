@@ -8,6 +8,8 @@ public interface IEmployeeMonthlyRecordRepository
     Task<EmployeeMonthlyRecord?> GetByIdAsync(Guid monthlyRecordId, CancellationToken cancellationToken);
     Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken);
     Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken);
+    Task<bool> MonthlySnapshotsDifferFromCurrentAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken);
+    Task RefreshMonthlySnapshotsAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken);
     void ClearTracking();
     void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class;
     Task SaveChangesAsync(CancellationToken cancellationToken);

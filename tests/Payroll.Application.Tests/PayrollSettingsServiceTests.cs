@@ -32,6 +32,9 @@ public sealed class PayrollSettingsServiceTests
             ",",
             "'",
             "CHF",
+            null,
+            new DateOnly(2026, 4, 1),
+            null,
             0.25m, 0.50m, 1.00m, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 1.10m, 2.20m, 3.30m,
             PayrollPreviewHelpCatalog.GetDefaultOptions(),
             [new SettingOptionDto(Guid.NewGuid(), "Sicherheit")],
@@ -94,7 +97,11 @@ public sealed class PayrollSettingsServiceTests
             global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
             global::Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator,
             global::Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode,
-            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, PayrollPreviewHelpCatalog.GetDefaultOptions(), [], [], []);
+            new DateOnly(2026, 4, 1),
+            null,
+            null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m,
+            [new PayrollCalculationSettingsVersionDto(Guid.NewGuid(), new DateOnly(2026, 4, 1), null, null, null, null, 0.053m, 0.011m, 0.00821m, 0.00015m, 0.1064m, 0.1264m, 0m, 0m, 0m, true)],
+            PayrollPreviewHelpCatalog.GetDefaultOptions(), [], [], []);
 
         public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
         {
@@ -132,6 +139,8 @@ public sealed class PayrollSettingsServiceTests
                 command.DecimalSeparator,
                 command.ThousandsSeparator,
                 command.CurrencyCode,
+                command.CalculationValidFrom,
+                command.CalculationValidTo,
                 command.NightSupplementRate,
                 command.SundaySupplementRate,
                 command.HolidaySupplementRate,
@@ -144,11 +153,17 @@ public sealed class PayrollSettingsServiceTests
                 command.VehiclePauschalzone1RateChf,
                 command.VehiclePauschalzone2RateChf,
                 command.VehicleRegiezone1RateChf,
+                [new PayrollCalculationSettingsVersionDto(Guid.NewGuid(), command.CalculationValidFrom, command.CalculationValidTo, command.NightSupplementRate, command.SundaySupplementRate, command.HolidaySupplementRate, command.AhvIvEoRate, command.AlvRate, command.SicknessAccidentInsuranceRate, command.TrainingAndHolidayRate, command.VacationCompensationRate, command.VacationCompensationRateAge50Plus, command.VehiclePauschalzone1RateChf, command.VehiclePauschalzone2RateChf, command.VehicleRegiezone1RateChf, true)],
                 command.PayrollPreviewHelpOptions,
                 command.Departments,
                 command.EmploymentCategories,
                 command.EmploymentLocations);
             return Task.FromResult(_settings);
+        }
+
+        public Task<PayrollSettingsDto> DeleteCalculationVersionAsync(Guid versionId, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
         }
     }
 }

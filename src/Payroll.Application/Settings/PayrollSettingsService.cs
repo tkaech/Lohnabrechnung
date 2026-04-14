@@ -26,4 +26,9 @@ public sealed class PayrollSettingsService
         ArgumentNullException.ThrowIfNull(command);
         return _repository.SaveAsync(command, cancellationToken);
     }
+
+    public Task<PayrollSettingsDto> DeleteCalculationVersionAsync(Guid versionId, CancellationToken cancellationToken = default)
+    {
+        return _repository.DeleteCalculationVersionAsync(versionId, cancellationToken);
+    }
 }

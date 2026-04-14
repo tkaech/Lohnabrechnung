@@ -44,6 +44,7 @@ public sealed record MonthlyRecordHeaderDto(
     DateOnly? ContractValidFrom,
     DateOnly? ContractValidTo,
     decimal? HourlyRateChf,
+    decimal? SpecialSupplementRateChf,
     decimal? MonthlyBvgDeductionChf,
     decimal TotalWorkedHours,
     decimal TotalSpecialHours,
@@ -60,7 +61,8 @@ public sealed record MonthlyTimeEntryDto(
     decimal VehiclePauschalzone1Chf,
     decimal VehiclePauschalzone2Chf,
     decimal VehicleRegiezone1Chf,
-    string? Note);
+    string? Note,
+    bool OverwriteExistingMonth = false);
 
 public sealed record MonthlyExpenseEntryDto(
     Guid ExpenseEntryId,
@@ -149,8 +151,10 @@ public sealed record SaveMonthlyTimeEntryCommand(
     decimal VehiclePauschalzone1Chf,
     decimal VehiclePauschalzone2Chf,
     decimal VehicleRegiezone1Chf,
-    string? Note);
+    string? Note,
+    bool OverwriteExistingMonth = false);
 
 public sealed record SaveMonthlyExpenseEntryCommand(
     Guid MonthlyRecordId,
-    decimal ExpensesTotalChf);
+    decimal ExpensesTotalChf,
+    bool OverwriteExistingMonth = false);

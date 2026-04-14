@@ -256,6 +256,7 @@ public sealed class ImportService
 
                 var saveCommand = new SaveEmployeeCommand(
                     existingEmployee?.EmployeeId,
+                    null,
                     personnelNumber!,
                     firstName!,
                     lastName!,

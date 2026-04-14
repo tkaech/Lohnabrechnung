@@ -26,6 +26,7 @@ public sealed class AppBootstrapper
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory);
 
         var dbContext = InitializeDatabase(databasePath, runtimeOptions.SeedTestData);
+        ResetLegacyMonthlyDataIfNeeded(dbContext);
 
         var repository = new EmployeeRepository(dbContext);
         var employeeService = new EmployeeService(repository);
@@ -455,6 +456,34 @@ public sealed class AppBootstrapper
                 connection,
                 "IX_ImportMappingConfigurations_Type_Name",
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ImportMappingConfigurations_Type_Name\" ON \"ImportMappingConfigurations\" (\"Type\", \"Name\");");
+            EnsureTable(
+                connection,
+                "PayrollCalculationSettingsVersions",
+                """
+                CREATE TABLE IF NOT EXISTS "PayrollCalculationSettingsVersions" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_PayrollCalculationSettingsVersions" PRIMARY KEY,
+                    "ValidFrom" TEXT NOT NULL,
+                    "ValidTo" TEXT NULL,
+                    "WorkTimeSupplementSettings_NightSupplementRate" TEXT NULL,
+                    "WorkTimeSupplementSettings_SundaySupplementRate" TEXT NULL,
+                    "WorkTimeSupplementSettings_HolidaySupplementRate" TEXT NULL,
+                    "AhvIvEoRate" TEXT NOT NULL,
+                    "AlvRate" TEXT NOT NULL,
+                    "SicknessAccidentInsuranceRate" TEXT NOT NULL,
+                    "TrainingAndHolidayRate" TEXT NOT NULL,
+                    "VacationCompensationRate" TEXT NOT NULL,
+                    "VacationCompensationRateAge50Plus" TEXT NOT NULL,
+                    "VehiclePauschalzone1RateChf" TEXT NOT NULL,
+                    "VehiclePauschalzone2RateChf" TEXT NOT NULL,
+                    "VehicleRegiezone1RateChf" TEXT NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NULL
+                );
+                """);
+            EnsureIndex(
+                connection,
+                "IX_PayrollCalculationSettingsVersions_ValidFrom",
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PayrollCalculationSettingsVersions_ValidFrom\" ON \"PayrollCalculationSettingsVersions\" (\"ValidFrom\");");
         }
         finally
         {
@@ -524,5 +553,59 @@ public sealed class AppBootstrapper
         }
 
         return false;
+    }
+
+    private static void ResetLegacyMonthlyDataIfNeeded(PayrollDbContext dbContext)
+    {
+        using var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != System.Data.ConnectionState.Open;
+        if (shouldCloseConnection)
+        {
+            connection.Open();
+        }
+
+        try
+        {
+            if (!TableExists(connection, "PayrollCalculationSettingsVersions"))
+            {
+                return;
+            }
+
+            if (ExecuteScalarCount(connection, "SELECT COUNT(*) FROM \"PayrollCalculationSettingsVersions\";") > 0)
+            {
+                return;
+            }
+
+            if (ExecuteScalarCount(connection, "SELECT COUNT(*) FROM \"EmployeeMonthlyRecords\";") == 0)
+            {
+                return;
+            }
+
+            using var deleteTimeEntries = connection.CreateCommand();
+            deleteTimeEntries.CommandText = "DELETE FROM \"TimeEntries\";";
+            deleteTimeEntries.ExecuteNonQuery();
+
+            using var deleteExpenseEntries = connection.CreateCommand();
+            deleteExpenseEntries.CommandText = "DELETE FROM \"ExpenseEntries\";";
+            deleteExpenseEntries.ExecuteNonQuery();
+
+            using var deleteMonthlyRecords = connection.CreateCommand();
+            deleteMonthlyRecords.CommandText = "DELETE FROM \"EmployeeMonthlyRecords\";";
+            deleteMonthlyRecords.ExecuteNonQuery();
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                connection.Close();
+            }
+        }
+    }
+
+    private static int ExecuteScalarCount(DbConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 }

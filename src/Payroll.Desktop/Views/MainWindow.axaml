@@ -145,8 +145,15 @@
       </controls:AppSectionCard>
 
       <controls:AppSectionCard Grid.Column="0" Grid.ColumnSpan="2" Header="Einstellungen" Margin="8,0,0,0" IsVisible="{Binding ShowSettingsWorkspace}">
-        <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <Grid RowDefinitions="Auto,Auto" MinHeight="0">
+        <Grid RowDefinitions="Auto,*" MinHeight="0">
+          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Foreground="#FF5F6B7A" VerticalAlignment="Center" Text="Die Werte gelten zentral fuer die spaetere Lohnberechnung und werden nicht mehr in Berechnungen hart codiert." TextWrapping="Wrap" />
+              <Button Grid.Column="1" Classes="primary-action" Command="{Binding SaveSettingsCommand}" Content="Einstellungen speichern" />
+            </Grid>
+          </Border>
+          <ScrollViewer Grid.Row="1" MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <Grid RowDefinitions="Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
             <TabControl>
               <TabItem Header="System / DB">
@@ -296,29 +303,41 @@
 
                       <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
                       <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden als echte Prozentangaben erfasst und intern fuer die Berechnung automatisch in Dezimalwerte umgerechnet." TextWrapping="Wrap" />
-                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto">
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
+                          <TextBlock Classes="section-caption" Text="Gueltig ab" />
+                          <DatePicker SelectedDate="{Binding SettingsCalculationValidFrom, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                          <TextBlock Classes="section-caption" Text="Gueltig bis" />
+                          <DatePicker SelectedDate="{Binding SettingsCalculationValidTo, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8,22,0,6" Spacing="10">
+                          <Button Command="{Binding OpenCalculationSettingsVersionDialogCommand}" Content="Historie anzeigen" />
+                          <Button Command="{Binding OpenNewCalculationSettingsVersionDialogCommand}" Content="Neuer Satzstand ab Monat" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,0,8,6">
                           <TextBlock Classes="section-caption" Text="AHV/IV/EO" />
                           <Grid>
                             <TextBox Padding="8,6,28,6" Text="{Binding SettingsAhvIvEoRate, Mode=TwoWay}" Watermark="5.3" />
                             <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
                           </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,0,0,6">
                           <TextBlock Classes="section-caption" Text="ALV" />
                           <Grid>
                             <TextBox Padding="8,6,28,6" Text="{Binding SettingsAlvRate, Mode=TwoWay}" Watermark="1.1" />
                             <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
                           </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
+                        <StackPanel Grid.Row="2" Grid.Column="0" Spacing="4" Margin="0,6,8,0">
                           <TextBlock Classes="section-caption" Text="Krankentaggeld/UVG" />
                           <Grid>
                             <TextBox Padding="8,6,28,6" Text="{Binding SettingsSicknessAccidentInsuranceRate, Mode=TwoWay}" Watermark="0.821" />
                             <TextBlock Margin="0,0,10,0" HorizontalAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False" Text="%" />
                           </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
+                        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="8,6,0,0">
                           <TextBlock Classes="section-caption" Text="Aus- und Weiterbildung inkl. Ferien" />
                           <Grid>
                             <TextBox Padding="8,6,28,6" Text="{Binding SettingsTrainingAndHolidayRate, Mode=TwoWay}" Watermark="0.015" />
@@ -344,6 +363,31 @@
 
                   <TabItem Header="Stundenlohn">
                     <StackPanel Spacing="12" Margin="0,12,0,0">
+                      <TextBlock FontWeight="SemiBold" Text="Gueltigkeit Berechnungssaetze" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Berechnungsrelevante globale Saetze werden monatsweise historisiert. Neue Satzstaende gelten ab Monatsanfang." TextWrapping="Wrap" />
+                      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                          <TextBlock Classes="section-caption" Text="Gueltig ab" />
+                          <DatePicker SelectedDate="{Binding SettingsCalculationValidFrom, Mode=TwoWay}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+                          <TextBlock Classes="section-caption" Text="Gueltig bis" />
+                          <DatePicker SelectedDate="{Binding SettingsCalculationValidTo, Mode=TwoWay}" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock FontWeight="SemiBold" Text="Historisierte Satzstaende" />
+                        <Button Grid.Column="1" Command="{Binding OpenCalculationSettingsVersionDialogCommand}" Content="Historie anzeigen" />
+                        <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding OpenNewCalculationSettingsVersionDialogCommand}" Content="Neuer Satzstand ab Monat" />
+                      </Grid>
+                      <Border Background="#FFFFF4E5" BorderBrush="#FFF1C18A" BorderThickness="1" CornerRadius="8" Padding="10"
+                              IsVisible="{Binding ShowCalculationSettingsOverlapWarning}">
+                        <TextBlock Foreground="#FF6B4A1F"
+                                   Text="Mindestens ein Satzstand ueberschneidet sich mit einem anderen Zeitraum. Die betroffenen Eintraege sind markiert."
+                                   TextWrapping="Wrap" />
+                      </Border>
+
                       <TextBlock FontWeight="SemiBold" Text="Arbeitszeitzuschlaege" />
                       <TextBlock Foreground="#FF5F6B7A" Text="Prozentsaetze als echte Prozentwerte pflegen, zum Beispiel `25` oder `25,5` fuer 25 bzw. 25,5 Prozent." TextWrapping="Wrap" />
                       <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto">
@@ -672,12 +716,9 @@
             </TabControl>
           </Border>
 
-          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
-            <TextBlock Foreground="#FF5F6B7A" VerticalAlignment="Center" Text="Die Werte gelten zentral fuer die spaetere Lohnberechnung und werden nicht mehr in Berechnungen hart codiert." TextWrapping="Wrap" />
-            <Button Grid.Column="1" Classes="primary-action" Command="{Binding SaveSettingsCommand}" Content="Einstellungen speichern" />
-          </Grid>
-          </Grid>
-        </ScrollViewer>
+            </Grid>
+          </ScrollViewer>
+        </Grid>
       </controls:AppSectionCard>
 
       <controls:AppSectionCard Grid.Column="0" Grid.ColumnSpan="2" Header="Hilfe" Margin="8,0,0,0" IsVisible="{Binding ShowHelpWorkspace}">
@@ -691,7 +732,7 @@
             </Border>
 
             <TabControl>
-              <TabItem Header="Template-Hilfe">
+              <TabItem Header="Einstellungen">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="8">
@@ -702,6 +743,56 @@
                     </StackPanel>
                   </Border>
 
+                  <TabControl>
+                    <TabItem Header="Berechnungen">
+                      <TabControl Margin="0,12,0,0">
+                        <TabItem Header="Allgemein">
+                          <StackPanel Spacing="12" Margin="0,12,0,0">
+                            <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                              <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold" Text="Allgemein" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Die allgemeinen Berechnungswerte werden historisiert und im selben History-Popup wie die weiteren Satzstaende verwaltet." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Die Reihenfolge in der Maske ist: zuerst `Gueltig ab`, dann optional `Gueltig bis`, danach `Historie anzeigen`." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Ein leeres `Gueltig bis` bedeutet, dass der Stand offen bleibt." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="In `Globale Abzuege` werden AHV/IV/EO, ALV, Krankentaggeld/UVG sowie Aus- und Weiterbildung inkl. Ferien als echte Prozentwerte erfasst." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Intern wird kulturunabhaengig mit Dezimalwerten gerechnet. Die UI zeigt Zahlen mit dem gewaelten Dezimal- und Tausendertrennzeichen." TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
+                        </TabItem>
+
+                        <TabItem Header="Stundenlohn">
+                          <StackPanel Spacing="12" Margin="0,12,0,0">
+                            <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                              <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold" Text="Stundenlohn" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Berechnungsrelevante globale Saetze werden monatsweise historisiert. Neue Satzstaende gelten ab Monatsanfang." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Die Historie wird ueber `Historie anzeigen` geoeffnet. Dort koennen bestaetigte Stande eingesehen und verwaltet werden." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Diese Parameter werden weiterhin fuer die bestehende Stundenlohn-Berechnung verwendet, insbesondere Zuschlaege, Ferienentschaedigung und Fahrzeugansaetze." TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
+                        </TabItem>
+
+                        <TabItem Header="Monatslohn">
+                          <StackPanel Spacing="12" Margin="0,12,0,0">
+                            <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+                              <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold" Text="Monatslohn" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Dieser Bereich ist als Grundlage fuer spaetere Monatslohn-Parameter vorbereitet." TextWrapping="Wrap" />
+                                <TextBlock Foreground="#FF5F6B7A" Text="Die aktuelle Payroll-Logik bleibt bewusst auf Stundenlohn fokussiert." TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
+                        </TabItem>
+                      </TabControl>
+                    </TabItem>
+                  </TabControl>
+                </StackPanel>
+              </TabItem>
+
+              <TabItem Header="Template-Hilfe">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
                   <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="8">
                       <TextBlock FontWeight="SemiBold" Text="Wichtige Informationen" />
@@ -838,7 +929,7 @@
           CornerRadius="10"
           Padding="{DynamicResource Theme.Spacing.CardPadding}"
           IsVisible="{Binding ShowPrimaryWorkspaceArea}">
-        <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
+        <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="8" Padding="12" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
               <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" DataContext="{Binding MonthlyRecord}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
@@ -876,8 +967,35 @@
                   <TextBlock Foreground="#FF5F6B7A" Text="{Binding ContextDescription}" TextWrapping="Wrap" />
                   <TextBlock Classes="section-caption" Text="{Binding StatusSummary}" />
                   <TextBlock Classes="section-caption" Text="{Binding ContractSummary}" TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*,*" Margin="0,4,0,0">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="section-caption" Text="Stundenlohn" />
+                      <TextBox IsReadOnly="True" Text="{Binding MonthlyHourlyRateSummary}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="4">
+                      <TextBlock Classes="section-caption" Text="Spezialzuschlag" />
+                      <TextBox IsReadOnly="True" Text="{Binding MonthlySpecialSupplementSummary}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="8,0,0,0" Spacing="4">
+                      <TextBlock Classes="section-caption" Text="BVG" />
+                      <TextBox IsReadOnly="True" Text="{Binding MonthlyBvgSummary}" />
+                    </StackPanel>
+                  </Grid>
                   <TextBlock Classes="section-caption" Text="{Binding TotalsSummary}" TextWrapping="Wrap" />
                   <TextBlock Classes="section-caption" Text="{Binding ActionMessage}" TextWrapping="Wrap" />
+                  <Border Margin="0,4,0,0"
+                          Padding="10"
+                          Background="#FFFFFFFF"
+                          BorderBrush="#FFE6B325"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          IsVisible="{Binding ShowOverwriteConfirmation}">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                      <TextBlock VerticalAlignment="Center" Text="{Binding OverwriteConfirmationText}" TextWrapping="Wrap" />
+                      <Button Grid.Column="1" Margin="8,0,0,0" Classes="primary-action" Command="{Binding ConfirmOverwriteCommand}" Content="Ueberschreiben" />
+                      <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding DismissOverwriteCommand}" Content="Abbrechen" />
+                    </Grid>
+                  </Border>
                 </StackPanel>
               </Border>
 
@@ -1570,7 +1688,11 @@
                 </Grid>
               </StackPanel>
 
-              <TextBlock Grid.Row="23" Grid.ColumnSpan="2" Classes="section-caption" Margin="0,8,0,0" Text="Zuschlagssaetze" />
+              <Grid Grid.Row="23" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto,Auto" Margin="0,8,0,0">
+                <TextBlock Classes="section-caption" Text="Zuschlagssaetze" />
+                <Button Grid.Column="1" Command="{Binding OpenContractVersionDialogCommand}" Content="Historie anzeigen" />
+                <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding OpenNewContractVersionDialogCommand}" Content="Neuer Vertragsstand ab Monat" IsVisible="{Binding ShowEditActions}" />
+              </Grid>
               <Border Grid.Row="24" Grid.ColumnSpan="2" Margin="0,10,0,0" Background="#FFF8FAFC" CornerRadius="8" Padding="12">
                 <TextBlock Foreground="#FF5F6B7A" Text="Nacht-, Sonntags- und Feiertagszuschlaege werden zentral im Bereich Einstellungen gepflegt und nicht mehr pro Mitarbeitendem." TextWrapping="Wrap" />
               </Border>
@@ -1578,7 +1700,7 @@
           </ScrollViewer>
 
           <Border
-              Grid.Row="3"
+              Grid.Row="4"
               Margin="0,12,0,0"
               Padding="12"
               Background="#FFFFF1E6"
@@ -1593,11 +1715,11 @@
             </Grid>
           </Border>
 
-          <Border Grid.Row="4" Background="#FFF8FAFC" CornerRadius="8" Padding="12" Margin="0,12,0,0">
+          <Border Grid.Row="5" Background="#FFF8FAFC" CornerRadius="8" Padding="12" Margin="0,12,0,0">
             <TextBlock Foreground="#FF304255" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
           </Border>
 
-          <Grid Grid.Row="5" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="0,12,0,0" IsVisible="{Binding ShowEmployeeWorkspace}">
+          <Grid Grid.Row="6" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="0,12,0,0" IsVisible="{Binding ShowEmployeeWorkspace}">
             <Button Grid.Column="0" Command="{Binding NewEmployeeCommand}" Content="Neu" />
             <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding EditEmployeeCommand}" Content="Bearbeiten" IsVisible="{Binding ShowViewActions}" />
             <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding DeleteCommand}" Content="Loeschen" IsVisible="{Binding ShowEditActions}" />
@@ -1606,6 +1728,198 @@
           </Grid>
 
         </Grid>
+      </Border>
+
+      <Border
+          Grid.Column="1"
+          Background="#660F172A"
+          Padding="24"
+          IsVisible="{Binding ShowContractVersionDialog}">
+        <Border
+            MaxWidth="1040"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Center"
+            Padding="14"
+            Background="#FFF8FAFC"
+            BorderBrush="#FFD7E1EA"
+            BorderThickness="1"
+            CornerRadius="8">
+          <StackPanel Spacing="12">
+            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding ContractVersionDialogTitle}" />
+            <TextBlock Foreground="#FF5F6B7A" Text="{Binding ContractVersionDialogDescription}" TextWrapping="Wrap" />
+
+            <StackPanel Spacing="8">
+              <TextBlock Classes="section-caption" Text="Bisherige Historie" />
+              <Border BorderBrush="#FFD7E1EA" BorderThickness="1,1,1,0" CornerRadius="8,8,0,0" Background="#FFF8FAFC">
+                <Grid ColumnDefinitions="150,150,150,*,120,90">
+                  <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Gueltig ab" /></Border>
+                  <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Gueltig bis" /></Border>
+                  <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Stundenlohn" /></Border>
+                  <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="BVG / Spezial" /></Border>
+                  <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
+                  <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Loeschen" /></Border>
+                </Grid>
+              </Border>
+              <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                <ListBox ItemsSource="{Binding ContractHistory}" SelectedItem="{Binding SelectedContractHistoryEntry, Mode=TwoWay}" MinHeight="120">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="150,150,150,*,120,90">
+                          <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock Text="{Binding ValidFromDisplay}" /></Border>
+                          <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock Text="{Binding ValidToDisplay}" /></Border>
+                          <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock Text="{Binding HourlyRateDisplay}" /></Border>
+                          <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock Text="{Binding CompactRateSummary}" TextWrapping="Wrap" /></Border>
+                          <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                            <Border Background="{Binding StatusBadgeBackground}" CornerRadius="999" Padding="8,2" IsVisible="{Binding HasStatusBadge}" HorizontalAlignment="Left">
+                              <TextBlock Classes="section-caption" Foreground="{Binding StatusBadgeForeground}" Text="{Binding StatusBadgeText}" />
+                            </Border>
+                          </Border>
+                          <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6">
+                            <Button Command="{Binding DeleteCommand}" Content="Loeschen" />
+                          </Border>
+                        </Grid>
+                        <Border Background="#FFFFF4E5"
+                                BorderBrush="#FFD7E1EA"
+                                BorderThickness="0,0,0,1"
+                                Padding="8,6"
+                                IsVisible="{Binding HasOverlapWarning}">
+                          <TextBlock Foreground="#FF9F2D2D"
+                                     Classes="section-caption"
+                                     Text="{Binding WarningText}"
+                                     TextWrapping="Wrap" />
+                        </Border>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Border>
+            </StackPanel>
+
+            <Grid ColumnDefinitions="150,150,*" IsVisible="{Binding ShowContractVersionCreateSection}">
+              <StackPanel Spacing="4" Width="138">
+                <TextBlock Classes="section-caption" Text="Neuer Stand gueltig ab" />
+                <DatePicker SelectedDate="{Binding NewContractVersionValidFrom, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="4" Width="138">
+                <TextBlock Classes="section-caption" Text="Gueltig bis" />
+                <DatePicker SelectedDate="{Binding NewContractVersionValidTo, Mode=TwoWay}" />
+              </StackPanel>
+              <Border Grid.Column="2" Margin="12,20,0,0" Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="10">
+                <TextBlock Foreground="#FF304255" Text="{Binding ContractVersionDialogSummary}" TextWrapping="Wrap" />
+              </Border>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+              <TextBlock Foreground="#FF5F6B7A"
+                         VerticalAlignment="Center"
+                         Text="Beim Speichern endet der bisher aktive Stand automatisch am Vortag des neuen Datums."
+                         IsVisible="{Binding ShowContractVersionCreateSection}"
+                         TextWrapping="Wrap" />
+              <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding DeleteSelectedContractVersionCommand}" Content="Ausgewaehlten Stand loeschen" />
+              <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding DismissContractVersionDialogCommand}" Content="Schliessen" />
+              <Button Grid.Column="3" Margin="10,0,0,0" Classes="primary-action" Command="{Binding ConfirmContractVersionDialogCommand}" Content="{Binding ConfirmContractVersionDialogButtonText}" IsVisible="{Binding ShowContractVersionCreateSection}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </Border>
+
+      <Border
+          Grid.Column="1"
+          Background="#660F172A"
+          Padding="24"
+          IsVisible="{Binding ShowCalculationSettingsVersionDialog}">
+        <Border
+            MaxWidth="1040"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Center"
+            Padding="14"
+            Background="#FFF8FAFC"
+            BorderBrush="#FFD7E1EA"
+            BorderThickness="1"
+            CornerRadius="8">
+          <StackPanel Spacing="12">
+            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding CalculationSettingsVersionDialogTitle}" />
+            <TextBlock Foreground="#FF5F6B7A" Text="{Binding CalculationSettingsVersionDialogDescription}" TextWrapping="Wrap" />
+
+            <StackPanel Spacing="8">
+              <TextBlock Classes="section-caption" Text="Bisherige Historie" />
+              <Border BorderBrush="#FFD7E1EA" BorderThickness="1,1,1,0" CornerRadius="8,8,0,0" Background="#FFF8FAFC">
+                <Grid ColumnDefinitions="150,150,*,120,90">
+                  <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Gueltig ab" /></Border>
+                  <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Gueltig bis" /></Border>
+                  <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Berechnungssaetze" /></Border>
+                  <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
+                  <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6"><TextBlock FontWeight="SemiBold" Text="Loeschen" /></Border>
+                </Grid>
+              </Border>
+              <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                <ListBox ItemsSource="{Binding CalculationSettingsVersions}" SelectedItem="{Binding SelectedCalculationSettingsVersion, Mode=TwoWay}" MinHeight="120">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="150,150,*,120,90">
+                          <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock Text="{Binding ValidFromDisplay}" /></Border>
+                          <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6"><TextBlock Text="{Binding ValidToDisplay}" /></Border>
+                          <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                            <StackPanel Spacing="2">
+                              <TextBlock Text="{Binding CompactSummary}" TextWrapping="Wrap" />
+                              <TextBlock Classes="section-caption" Text="{Binding VacationSummary}" TextWrapping="Wrap" />
+                              <TextBlock Classes="section-caption" Text="{Binding VehicleSummary}" TextWrapping="Wrap" />
+                            </StackPanel>
+                          </Border>
+                          <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                            <Border Background="{Binding StatusBadgeBackground}" CornerRadius="999" Padding="8,2" IsVisible="{Binding HasStatusBadge}" HorizontalAlignment="Left">
+                              <TextBlock Classes="section-caption" Foreground="{Binding StatusBadgeForeground}" Text="{Binding StatusBadgeText}" />
+                            </Border>
+                          </Border>
+                          <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="8,6">
+                            <Button Command="{Binding DeleteCommand}" Content="Loeschen" />
+                          </Border>
+                        </Grid>
+                        <Border Background="#FFFFF4E5"
+                                BorderBrush="#FFD7E1EA"
+                                BorderThickness="0,0,0,1"
+                                Padding="8,6"
+                                IsVisible="{Binding HasOverlapWarning}">
+                          <TextBlock Foreground="#FF9F2D2D"
+                                     Classes="section-caption"
+                                     Text="{Binding WarningText}"
+                                     TextWrapping="Wrap" />
+                        </Border>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Border>
+            </StackPanel>
+
+            <Grid ColumnDefinitions="150,150,*" IsVisible="{Binding ShowCalculationSettingsVersionCreateSection}">
+              <StackPanel Spacing="4" Width="138">
+                <TextBlock Classes="section-caption" Text="Neuer Stand gueltig ab" />
+                <DatePicker SelectedDate="{Binding SettingsCalculationValidFrom, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="4" Width="138">
+                <TextBlock Classes="section-caption" Text="Gueltig bis" />
+                <DatePicker SelectedDate="{Binding SettingsCalculationValidTo, Mode=TwoWay}" />
+              </StackPanel>
+              <Border Grid.Column="2" Margin="12,20,0,0" Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="10">
+                <TextBlock Foreground="#FF304255" Text="{Binding CalculationSettingsVersionDialogSummary}" TextWrapping="Wrap" />
+              </Border>
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+              <TextBlock Foreground="#FF5F6B7A"
+                         VerticalAlignment="Center"
+                         Text="Beim Speichern endet der bisher aktive Stand automatisch am Vortag des neuen Datums."
+                         IsVisible="{Binding ShowCalculationSettingsVersionCreateSection}"
+                         TextWrapping="Wrap" />
+              <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding DeleteSelectedCalculationSettingsVersionCommand}" Content="Ausgewaehlten Stand loeschen" />
+              <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding DismissCalculationSettingsVersionDialogCommand}" Content="Schliessen" />
+              <Button Grid.Column="3" Margin="10,0,0,0" Classes="primary-action" Command="{Binding ConfirmCalculationSettingsVersionDialogCommand}" Content="{Binding ConfirmCalculationSettingsVersionDialogButtonText}" IsVisible="{Binding ShowCalculationSettingsVersionCreateSection}" />
+            </Grid>
+          </StackPanel>
+        </Border>
       </Border>
     </Grid>
 

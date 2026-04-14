@@ -57,10 +57,21 @@ public sealed record EmployeeDetailsDto(
     DateOnly? ContractValidTo,
     decimal HourlyRateChf,
     decimal MonthlyBvgDeductionChf,
-    decimal SpecialSupplementRateChf);
+    decimal SpecialSupplementRateChf,
+    IReadOnlyCollection<EmploymentContractVersionDto> ContractHistory);
+
+public sealed record EmploymentContractVersionDto(
+    Guid ContractId,
+    DateOnly ValidFrom,
+    DateOnly? ValidTo,
+    decimal HourlyRateChf,
+    decimal MonthlyBvgDeductionChf,
+    decimal SpecialSupplementRateChf,
+    bool IsCurrent);
 
 public sealed record SaveEmployeeCommand(
     Guid? EmployeeId,
+    Guid? EditingContractId,
     string PersonnelNumber,
     string FirstName,
     string LastName,

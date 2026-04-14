@@ -19,6 +19,7 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<EmploymentContract> EmploymentContracts => Set<EmploymentContract>();
     public DbSet<EmployeeMonthlyRecord> EmployeeMonthlyRecords => Set<EmployeeMonthlyRecord>();
     public DbSet<PayrollSettings> PayrollSettings => Set<PayrollSettings>();
+    public DbSet<PayrollCalculationSettingsVersion> PayrollCalculationSettingsVersions => Set<PayrollCalculationSettingsVersion>();
     public DbSet<DepartmentOption> DepartmentOptions => Set<DepartmentOption>();
     public DbSet<EmploymentCategoryOption> EmploymentCategoryOptions => Set<EmploymentCategoryOption>();
     public DbSet<EmploymentLocationOption> EmploymentLocationOptions => Set<EmploymentLocationOption>();
@@ -130,6 +131,30 @@ public sealed class PayrollDbContext : DbContext
                 supplementBuilder.Property(item => item.SundaySupplementRate).HasColumnType("TEXT");
                 supplementBuilder.Property(item => item.HolidaySupplementRate).HasColumnType("TEXT");
             });
+        });
+
+        modelBuilder.Entity<PayrollCalculationSettingsVersion>(builder =>
+        {
+            builder.ToTable("PayrollCalculationSettingsVersions");
+            builder.HasKey(version => version.Id);
+            builder.Property(version => version.ValidFrom).IsRequired();
+            builder.Property(version => version.ValidTo);
+            builder.Property(version => version.AhvIvEoRate).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.AlvRate).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.SicknessAccidentInsuranceRate).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.TrainingAndHolidayRate).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.VacationCompensationRate).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.VacationCompensationRateAge50Plus).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.VehiclePauschalzone1RateChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.VehiclePauschalzone2RateChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(version => version.VehicleRegiezone1RateChf).HasColumnType("TEXT").IsRequired();
+            builder.OwnsOne(version => version.WorkTimeSupplementSettings, supplementBuilder =>
+            {
+                supplementBuilder.Property(item => item.NightSupplementRate).HasColumnType("TEXT");
+                supplementBuilder.Property(item => item.SundaySupplementRate).HasColumnType("TEXT");
+                supplementBuilder.Property(item => item.HolidaySupplementRate).HasColumnType("TEXT");
+            });
+            builder.HasIndex(version => version.ValidFrom).IsUnique();
         });
 
         modelBuilder.Entity<DepartmentOption>(builder =>

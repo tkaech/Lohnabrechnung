@@ -71,10 +71,30 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         Touch();
     }
 
+    public void RefreshPayrollParameterSnapshot(Settings.PayrollSettings payrollSettings)
+    {
+        ArgumentNullException.ThrowIfNull(payrollSettings);
+        PayrollParameterSnapshot = PayrollParameterSnapshot.Create(payrollSettings);
+        Touch();
+    }
+
     public void InitializeEmploymentContractSnapshot(Employees.EmploymentContract? contract)
     {
         if (contract is null || EmploymentContractSnapshot.IsInitialized)
         {
+            return;
+        }
+
+        EmploymentContractSnapshot = EmploymentContractSnapshot.Create(contract);
+        Touch();
+    }
+
+    public void RefreshEmploymentContractSnapshot(Employees.EmploymentContract? contract)
+    {
+        if (contract is null)
+        {
+            EmploymentContractSnapshot = new EmploymentContractSnapshot();
+            Touch();
             return;
         }
 

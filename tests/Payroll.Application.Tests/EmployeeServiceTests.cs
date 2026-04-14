@@ -250,10 +250,16 @@ public sealed class EmployeeServiceTests
                 command.ContractValidTo,
                 command.HourlyRateChf,
                 command.MonthlyBvgDeductionChf,
-                command.SpecialSupplementRateChf);
+                command.SpecialSupplementRateChf,
+                []);
 
             _employees[employeeId] = employee;
             return Task.FromResult(employee);
+        }
+
+        public Task<EmployeeDetailsDto> DeleteContractVersionAsync(Guid employeeId, Guid contractId, CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -276,6 +282,7 @@ public sealed class EmployeeServiceTests
     {
         return new SaveEmployeeCommand(
             employeeId,
+            null,
             personnelNumber,
             firstName,
             lastName,

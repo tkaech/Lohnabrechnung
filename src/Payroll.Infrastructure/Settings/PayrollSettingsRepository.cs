@@ -30,11 +30,18 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
     public async Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
     {
         var settings = await GetOrCreateAsync(cancellationToken);
-        return await ToDto(settings, cancellationToken);
+        var calculationVersion = await LoadLatestCalculationSettingsVersionAsync(cancellationToken);
+        return await ToDto(settings, calculationVersion, cancellationToken);
     }
 
     public async Task<WorkTimeSupplementSettings> GetWorkTimeSupplementSettingsAsync(CancellationToken cancellationToken)
     {
+        var version = await LoadCurrentCalculationSettingsVersionAsync(DateOnly.FromDateTime(DateTime.Today), cancellationToken);
+        if (version is not null)
+        {
+            return version.WorkTimeSupplementSettings;
+        }
+
         var settings = await GetOrCreateAsync(cancellationToken);
         return settings.WorkTimeSupplementSettings;
     }
@@ -78,12 +85,59 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.VehiclePauschalzone1RateChf,
             command.VehiclePauschalzone2RateChf,
             command.VehicleRegiezone1RateChf);
+        var calculationVersion = await UpsertCalculationVersionAsync(command, cancellationToken);
         await SyncOptionsAsync(_dbContext.DepartmentOptions, command.Departments, nameof(global::Payroll.Domain.Employees.Employee.DepartmentOptionId), "Abteilung", cancellationToken);
         await SyncOptionsAsync(_dbContext.EmploymentCategoryOptions, command.EmploymentCategories, nameof(global::Payroll.Domain.Employees.Employee.EmploymentCategoryOptionId), "Anstellungskategorie", cancellationToken);
         await SyncOptionsAsync(_dbContext.EmploymentLocationOptions, command.EmploymentLocations, nameof(global::Payroll.Domain.Employees.Employee.EmploymentLocationOptionId), "Anstellungsort", cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return await ToDto(settings, cancellationToken);
+        return await ToDto(settings, calculationVersion, cancellationToken);
+    }
+
+    public async Task<PayrollSettingsDto> DeleteCalculationVersionAsync(Guid versionId, CancellationToken cancellationToken)
+    {
+        var settings = await GetOrCreateAsync(cancellationToken);
+        var versions = await _dbContext.PayrollCalculationSettingsVersions
+            .OrderBy(item => item.ValidFrom)
+            .ToListAsync(cancellationToken);
+
+        var version = versions.SingleOrDefault(item => item.Id == versionId)
+            ?? throw new InvalidOperationException("Satzstand wurde nicht gefunden.");
+
+        var currentVersionId = versions
+            .OrderByDescending(item => item.ValidFrom)
+            .ThenByDescending(item => item.CreatedAtUtc)
+            .First()
+            .Id;
+
+        if (version.Id == currentVersionId)
+        {
+            throw new InvalidOperationException("Der aktive Satzstand kann nicht geloescht werden.");
+        }
+
+        var previousVersion = versions
+            .Where(item => item.ValidFrom < version.ValidFrom)
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefault();
+        var nextVersion = versions
+            .Where(item => item.ValidFrom > version.ValidFrom)
+            .OrderBy(item => item.ValidFrom)
+            .FirstOrDefault();
+
+        _dbContext.PayrollCalculationSettingsVersions.Remove(version);
+
+        if (previousVersion is not null)
+        {
+            var newValidTo = nextVersion is not null
+                ? nextVersion.ValidFrom.AddDays(-1)
+                : (DateOnly?)null;
+            previousVersion.UpdatePeriod(previousVersion.ValidFrom, newValidTo);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var currentVersion = await LoadLatestCalculationSettingsVersionAsync(cancellationToken);
+        return await ToDto(settings, currentVersion, cancellationToken);
     }
 
     private async Task<PayrollSettings> GetOrCreateAsync(CancellationToken cancellationToken)
@@ -92,6 +146,14 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         if (settings is not null)
         {
             await EnsureDefaultOptionsAsync(cancellationToken);
+            if (!await _dbContext.PayrollCalculationSettingsVersions.AnyAsync(cancellationToken))
+            {
+                _dbContext.PayrollCalculationSettingsVersions.Add(PayrollCalculationSettingsVersion.Create(
+                    NormalizeToMonthStart(DateOnly.FromDateTime(DateTime.Today)),
+                    null,
+                    settings));
+            }
+
             if (_dbContext.ChangeTracker.HasChanges())
             {
                 await _dbContext.SaveChangesAsync(cancellationToken);
@@ -102,6 +164,14 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         settings = new PayrollSettings();
         _dbContext.Set<PayrollSettings>().Add(settings);
         await EnsureDefaultOptionsAsync(cancellationToken);
+        if (!await _dbContext.PayrollCalculationSettingsVersions.AnyAsync(cancellationToken))
+        {
+            _dbContext.PayrollCalculationSettingsVersions.Add(PayrollCalculationSettingsVersion.Create(
+                NormalizeToMonthStart(DateOnly.FromDateTime(DateTime.Today)),
+                null,
+                settings));
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         return settings;
     }
@@ -136,11 +206,16 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         }
     }
 
-    private async Task<PayrollSettingsDto> ToDto(PayrollSettings settings, CancellationToken cancellationToken)
+    private async Task<PayrollSettingsDto> ToDto(
+        PayrollSettings settings,
+        PayrollCalculationSettingsVersion? calculationVersion,
+        CancellationToken cancellationToken)
     {
         var printTemplate = string.IsNullOrWhiteSpace(settings.PrintTemplate)
             ? PayrollStatementTemplateProvider.LoadDefaultTemplate()
             : settings.PrintTemplate;
+        var effectiveCalculationSettings = calculationVersion?.ToPayrollSettings() ?? settings;
+        var calculationVersions = await LoadCalculationVersionsAsync(cancellationToken);
 
         return new PayrollSettingsDto(
             settings.CompanyAddress,
@@ -163,22 +238,177 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             settings.DecimalSeparator,
             settings.ThousandsSeparator,
             settings.CurrencyCode,
-            settings.WorkTimeSupplementSettings.NightSupplementRate,
-            settings.WorkTimeSupplementSettings.SundaySupplementRate,
-            settings.WorkTimeSupplementSettings.HolidaySupplementRate,
-            settings.AhvIvEoRate,
-            settings.AlvRate,
-            settings.SicknessAccidentInsuranceRate,
-            settings.TrainingAndHolidayRate,
-            settings.VacationCompensationRate,
-            settings.VacationCompensationRateAge50Plus,
-            settings.VehiclePauschalzone1RateChf,
-            settings.VehiclePauschalzone2RateChf,
-            settings.VehicleRegiezone1RateChf,
+            calculationVersion?.ValidFrom ?? NormalizeToMonthStart(DateOnly.FromDateTime(DateTime.Today)),
+            calculationVersion?.ValidTo,
+            effectiveCalculationSettings.WorkTimeSupplementSettings.NightSupplementRate,
+            effectiveCalculationSettings.WorkTimeSupplementSettings.SundaySupplementRate,
+            effectiveCalculationSettings.WorkTimeSupplementSettings.HolidaySupplementRate,
+            effectiveCalculationSettings.AhvIvEoRate,
+            effectiveCalculationSettings.AlvRate,
+            effectiveCalculationSettings.SicknessAccidentInsuranceRate,
+            effectiveCalculationSettings.TrainingAndHolidayRate,
+            effectiveCalculationSettings.VacationCompensationRate,
+            effectiveCalculationSettings.VacationCompensationRateAge50Plus,
+            effectiveCalculationSettings.VehiclePauschalzone1RateChf,
+            effectiveCalculationSettings.VehiclePauschalzone2RateChf,
+            effectiveCalculationSettings.VehicleRegiezone1RateChf,
+            calculationVersions,
             LoadPayrollPreviewHelpOptions(settings),
             await LoadOptionsAsync(_dbContext.DepartmentOptions, cancellationToken),
             await LoadOptionsAsync(_dbContext.EmploymentCategoryOptions, cancellationToken),
             await LoadOptionsAsync(_dbContext.EmploymentLocationOptions, cancellationToken));
+    }
+
+    private async Task<PayrollCalculationSettingsVersion?> LoadLatestCalculationSettingsVersionAsync(CancellationToken cancellationToken)
+    {
+        return await _dbContext.PayrollCalculationSettingsVersions
+            .AsNoTracking()
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<PayrollCalculationSettingsVersion?> LoadCurrentCalculationSettingsVersionAsync(DateOnly date, CancellationToken cancellationToken)
+    {
+        return await _dbContext.PayrollCalculationSettingsVersions
+            .AsNoTracking()
+            .Where(item => item.ValidFrom <= date
+                && (!item.ValidTo.HasValue || item.ValidTo.Value >= date))
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<IReadOnlyCollection<PayrollCalculationSettingsVersionDto>> LoadCalculationVersionsAsync(CancellationToken cancellationToken)
+    {
+        var versions = await _dbContext.PayrollCalculationSettingsVersions
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        versions = versions
+            .OrderByDescending(item => item.ValidFrom)
+            .ThenByDescending(item => item.CreatedAtUtc)
+            .ToList();
+
+        var currentVersionId = versions.FirstOrDefault()?.Id;
+
+        return versions
+            .Select(version => new PayrollCalculationSettingsVersionDto(
+                version.Id,
+                version.ValidFrom,
+                version.ValidTo,
+                version.WorkTimeSupplementSettings.NightSupplementRate,
+                version.WorkTimeSupplementSettings.SundaySupplementRate,
+                version.WorkTimeSupplementSettings.HolidaySupplementRate,
+                version.AhvIvEoRate,
+                version.AlvRate,
+                version.SicknessAccidentInsuranceRate,
+                version.TrainingAndHolidayRate,
+                version.VacationCompensationRate,
+                version.VacationCompensationRateAge50Plus,
+                version.VehiclePauschalzone1RateChf,
+                version.VehiclePauschalzone2RateChf,
+                version.VehicleRegiezone1RateChf,
+                version.Id == currentVersionId))
+            .ToArray();
+    }
+
+    private async Task<PayrollCalculationSettingsVersion> UpsertCalculationVersionAsync(
+        SavePayrollSettingsCommand command,
+        CancellationToken cancellationToken)
+    {
+        var validFrom = NormalizeToMonthStart(command.CalculationValidFrom);
+        DateOnly? validTo = command.CalculationValidTo.HasValue
+            ? NormalizeToMonthEnd(command.CalculationValidTo.Value)
+            : null;
+
+        var existingVersions = await _dbContext.PayrollCalculationSettingsVersions
+            .OrderBy(item => item.ValidFrom)
+            .ToListAsync(cancellationToken);
+
+        var version = command.EditingCalculationVersionId.HasValue
+            ? existingVersions.SingleOrDefault(item => item.Id == command.EditingCalculationVersionId.Value)
+            : existingVersions.SingleOrDefault(item => item.ValidFrom == validFrom);
+        if (command.EditingCalculationVersionId.HasValue && version is null)
+        {
+            throw new InvalidOperationException("Der zu bearbeitende Satzstand wurde nicht gefunden.");
+        }
+
+        if (existingVersions.Any(item => item.Id != version?.Id && item.ValidFrom == validFrom))
+        {
+            throw new InvalidOperationException("Es existiert bereits ein anderer Satzstand mit demselben Gueltig-ab-Datum.");
+        }
+
+        var nextVersion = existingVersions
+            .Where(item => item.Id != version?.Id && item.ValidFrom > validFrom)
+            .OrderBy(item => item.ValidFrom)
+            .FirstOrDefault();
+
+        if (!validTo.HasValue && nextVersion is not null)
+        {
+            validTo = nextVersion.ValidFrom.AddDays(-1);
+        }
+
+        if (validTo.HasValue && nextVersion is not null && nextVersion.ValidFrom <= validTo.Value)
+        {
+            throw new InvalidOperationException("Der Gueltigkeitsbereich der globalen Saetze ueberlappt mit einem spaeteren Satzstand.");
+        }
+
+        var previousVersion = existingVersions
+            .Where(item => item.Id != version?.Id && item.ValidFrom < validFrom)
+            .OrderByDescending(item => item.ValidFrom)
+            .FirstOrDefault();
+
+        if (previousVersion is not null && (!previousVersion.ValidTo.HasValue || previousVersion.ValidTo.Value >= validFrom))
+        {
+            previousVersion.UpdatePeriod(previousVersion.ValidFrom, validFrom.AddDays(-1));
+        }
+
+        var workTimeSupplementSettings = new WorkTimeSupplementSettings(
+            command.NightSupplementRate,
+            command.SundaySupplementRate,
+            command.HolidaySupplementRate);
+
+        if (version is null)
+        {
+            version = new PayrollCalculationSettingsVersion(
+                validFrom,
+                validTo,
+                workTimeSupplementSettings,
+                command.AhvIvEoRate,
+                command.AlvRate,
+                command.SicknessAccidentInsuranceRate,
+                command.TrainingAndHolidayRate,
+                command.VacationCompensationRate,
+                command.VacationCompensationRateAge50Plus,
+                command.VehiclePauschalzone1RateChf,
+                command.VehiclePauschalzone2RateChf,
+                command.VehicleRegiezone1RateChf);
+            _dbContext.PayrollCalculationSettingsVersions.Add(version);
+            return version;
+        }
+
+        version.UpdatePeriod(validFrom, validTo);
+        version.UpdateRates(
+            workTimeSupplementSettings,
+            command.AhvIvEoRate,
+            command.AlvRate,
+            command.SicknessAccidentInsuranceRate,
+            command.TrainingAndHolidayRate,
+            command.VacationCompensationRate,
+            command.VacationCompensationRateAge50Plus,
+            command.VehiclePauschalzone1RateChf,
+            command.VehiclePauschalzone2RateChf,
+            command.VehicleRegiezone1RateChf);
+        return version;
+    }
+
+    private static DateOnly NormalizeToMonthStart(DateOnly date)
+    {
+        return new DateOnly(date.Year, date.Month, 1);
+    }
+
+    private static DateOnly NormalizeToMonthEnd(DateOnly date)
+    {
+        return new DateOnly(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
     }
 
     private static IReadOnlyCollection<PayrollPreviewHelpOptionDto> LoadPayrollPreviewHelpOptions(PayrollSettings settings)

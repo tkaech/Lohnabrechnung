@@ -31,6 +31,17 @@ public sealed class MonthlyRecordService
 
         _repository.ClearTracking();
         var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
+        if (!command.OverwriteExistingMonth
+            && await _repository.MonthlySnapshotsDifferFromCurrentAsync(monthlyRecord, cancellationToken))
+        {
+            throw new MonthlyRecordOverwriteRequiredException();
+        }
+
+        if (command.OverwriteExistingMonth)
+        {
+            await _repository.RefreshMonthlySnapshotsAsync(monthlyRecord, cancellationToken);
+        }
+
         var isNewEntry = !command.TimeEntryId.HasValue
             && monthlyRecord.TimeEntries.Count == 0;
 
@@ -72,6 +83,17 @@ public sealed class MonthlyRecordService
 
         _repository.ClearTracking();
         var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
+        if (!command.OverwriteExistingMonth
+            && await _repository.MonthlySnapshotsDifferFromCurrentAsync(monthlyRecord, cancellationToken))
+        {
+            throw new MonthlyRecordOverwriteRequiredException();
+        }
+
+        if (command.OverwriteExistingMonth)
+        {
+            await _repository.RefreshMonthlySnapshotsAsync(monthlyRecord, cancellationToken);
+        }
+
         var hadExpenseEntry = monthlyRecord.ExpenseEntry is not null;
         var expenseEntry = monthlyRecord.SaveExpenseEntry(command.ExpensesTotalChf);
 

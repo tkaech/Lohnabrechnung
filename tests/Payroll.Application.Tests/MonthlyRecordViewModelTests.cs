@@ -320,6 +320,20 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Single(viewModel.PayrollPreviewNotes, note => note == "Monat noch nicht erfasst");
     }
 
+    [Fact]
+    public void CurrentSaveBlockReason_ExplainsWhySavingIsBlocked()
+    {
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository()));
+
+        Assert.Contains("kein Mitarbeitender", viewModel.CurrentSaveBlockReason, StringComparison.Ordinal);
+        Assert.Contains("Speichern blockiert", viewModel.ActionMessage, StringComparison.Ordinal);
+
+        viewModel.IsLocked = true;
+
+        Assert.Contains("gesperrt", viewModel.CurrentSaveBlockReason, StringComparison.Ordinal);
+        Assert.Contains("gesperrt", viewModel.ActionMessage, StringComparison.Ordinal);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
     {
         var startedAt = DateTime.UtcNow;
@@ -390,6 +404,7 @@ public sealed class MonthlyRecordViewModelTests
                     null,
                     null,
                     null,
+                    null,
                     record.TimeEntries.Sum(item => item.HoursWorked),
                     record.TimeEntries.Sum(item => item.NightHours + item.SundayHours + item.HolidayHours),
                     record.ExpenseEntry?.ExpensesTotalChf ?? 0m,
@@ -430,6 +445,16 @@ public sealed class MonthlyRecordViewModelTests
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
         {
             return Task.FromResult((IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());
+        }
+
+        public Task<bool> MonthlySnapshotsDifferFromCurrentAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task RefreshMonthlySnapshotsAsync(EmployeeMonthlyRecord monthlyRecord, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken)

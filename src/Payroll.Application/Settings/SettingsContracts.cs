@@ -31,6 +31,8 @@ public sealed record PayrollSettingsDto(
     string DecimalSeparator,
     string ThousandsSeparator,
     string CurrencyCode,
+    DateOnly CalculationValidFrom,
+    DateOnly? CalculationValidTo,
     decimal? NightSupplementRate,
     decimal? SundaySupplementRate,
     decimal? HolidaySupplementRate,
@@ -43,10 +45,29 @@ public sealed record PayrollSettingsDto(
     decimal VehiclePauschalzone1RateChf,
     decimal VehiclePauschalzone2RateChf,
     decimal VehicleRegiezone1RateChf,
+    IReadOnlyCollection<PayrollCalculationSettingsVersionDto> CalculationVersions,
     IReadOnlyCollection<PayrollPreviewHelpOptionDto> PayrollPreviewHelpOptions,
     IReadOnlyCollection<SettingOptionDto> Departments,
     IReadOnlyCollection<SettingOptionDto> EmploymentCategories,
     IReadOnlyCollection<SettingOptionDto> EmploymentLocations);
+
+public sealed record PayrollCalculationSettingsVersionDto(
+    Guid VersionId,
+    DateOnly ValidFrom,
+    DateOnly? ValidTo,
+    decimal? NightSupplementRate,
+    decimal? SundaySupplementRate,
+    decimal? HolidaySupplementRate,
+    decimal AhvIvEoRate,
+    decimal AlvRate,
+    decimal SicknessAccidentInsuranceRate,
+    decimal TrainingAndHolidayRate,
+    decimal VacationCompensationRate,
+    decimal VacationCompensationRateAge50Plus,
+    decimal VehiclePauschalzone1RateChf,
+    decimal VehiclePauschalzone2RateChf,
+    decimal VehicleRegiezone1RateChf,
+    bool IsCurrent);
 
 public sealed record SavePayrollSettingsCommand(
     string CompanyAddress,
@@ -69,6 +90,9 @@ public sealed record SavePayrollSettingsCommand(
     string DecimalSeparator,
     string ThousandsSeparator,
     string CurrencyCode,
+    Guid? EditingCalculationVersionId,
+    DateOnly CalculationValidFrom,
+    DateOnly? CalculationValidTo,
     decimal? NightSupplementRate,
     decimal? SundaySupplementRate,
     decimal? HolidaySupplementRate,

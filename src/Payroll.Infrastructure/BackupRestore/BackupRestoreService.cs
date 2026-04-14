@@ -191,7 +191,8 @@ public sealed class BackupRestoreService : IBackupRestoreService
                     contract?.ValidTo,
                     contract?.HourlyRateChf ?? 0m,
                     contract?.MonthlyBvgDeductionChf ?? 0m,
-                    contract?.SpecialSupplementRateChf ?? 0m);
+                    contract?.SpecialSupplementRateChf ?? 0m,
+                    []);
             })
             .OrderBy(employee => employee.LastName)
             .ThenBy(employee => employee.FirstName)
@@ -255,6 +256,9 @@ public sealed class BackupRestoreService : IBackupRestoreService
             settings.DecimalSeparator,
             settings.ThousandsSeparator,
             settings.CurrencyCode,
+            null,
+            settings.CalculationValidFrom,
+            settings.CalculationValidTo,
             settings.NightSupplementRate,
             settings.SundaySupplementRate,
             settings.HolidaySupplementRate,
