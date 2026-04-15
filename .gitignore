@@ -1,0 +1,29 @@
+# Build outputs
+bin/
+obj/
+
+# User and IDE files
+.vs/
+.vscode/
+*.user
+*.rsuser
+*.suo
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Local databases and generated exports
+*.db
+*.sqlite
+*.sqlite3
+*.pdf
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# NuGet and local tooling artifacts
+packages/
+TestResults/

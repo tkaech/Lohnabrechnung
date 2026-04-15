@@ -1,0 +1,157 @@
+# Worklog
+
+## Start
+Projekt neu strukturiert
+
+## 2026-03-31
+- Solution- und Projektstruktur unter `src/` und `tests/` erstellt
+- Schichten gemäss Architektur getrennt
+- Modulordner für Employee, TimeTracking, Expenses, Payroll, AHV, Tax und Reporting angelegt
+- erste Basisentitäten und Service-Platzhalter erstellt
+- lokale `.sln` für .NET 8 ergänzt
+
+## 2026-04-03
+- `prompts/codex_start.md` befolgt und Projektkontext aus `docs/context`, `docs/planning` und `docs/progress` eingearbeitet
+- Excel-Analyse unter `docs/analysis/` mit bestehendem Domain-Modell abgeglichen
+- `Employee` mit Validierung, `FullName` und Umbenennung ergänzt
+- `EmploymentContract` neu eingeführt mit Stundenansatz, Gültigkeit und fixem monatlichem BVG-Betrag
+- `TimeEntry` auf `decimal`-Stunden plus Zuschlagsstunden geschärft
+- `ExpenseEntry` auf CHF-Betrag präzisiert und `VehicleCompensation` als zentrale Entität ergänzt
+- `PayrollRun` um Status, Linienaggregation sowie Summen- und Stundenlogik erweitert
+- `PayrollRunLine` inklusive Typen und Fabrikmethoden für Stunden-, CHF- und fixe Abzugszeilen ergänzt
+- `ContributionRate` und `TaxRule` um versionierbare Gültigkeit und Berechnungslogik ergänzt
+- xUnit-Testprojekte vervollständigt und Unit Tests für Domainlogik ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` kompiliert, Testausführung aber durch Sandbox-Socket-Restriktion blockiert
+- offene Fachfragen aus `docs/analysis/open_questions.md` entschieden und in Domain-Entscheidungen sowie Mapping-Dokumentation überführt
+- fachliche Definition von `PayrollRunLine` als auditierbare Ergebniszeile dokumentiert
+- Ableitungslogik aus Arbeitsstunden, Nacht-/Sonntags-/Feiertagsstunden, Spesen, Fahrzeugentschädigung und Vertragsdaten modelliert
+- `TimeEntry` um Nacht-, Sonntags- und Feiertagsstunden geschärft
+- `EmploymentContract` um konfigurierbare Zuschlagsparameter ergänzt
+- `ExpenseEntry` um fachlichen Spesentypcode ergänzt
+- `PayrollRunLine` um Herkunft direkt vs. berechnet ergänzt
+- `PayrollRunLineDerivationService`, `PayrollWorkSummary` und Ergebnis-Issues für offene Regeln ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` nach den Änderungen erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` weiterhin nur an der Sandbox-Socket-Restriktion gescheitert
+- Excel-Datei technisch eingesehen und konkrete Payroll-Begriffe wie `ZUSCHLÄGE NSF`, `Spezialzuschlag gemäss Vertrag`, `BVG Arbeitnehmeranteil`, `Fahrzeitentschädigung`, `Mehrzeit/Unterzeit` und `Unfalltaggeld` als Fachsignale verwendet
+- offene Regeln in gesicherte Erkenntnisse, Annahmen und weiterhin offene Punkte getrennt
+- bei mehrdeutiger Ueberlappung von Spezialstunden wird nun ein fachlicher Konflikt gemeldet statt eine unsichere Zuschlagsberechnung durchgeführt
+- Domain-Tests für diese Konfliktmarkierung ergänzt
+- erster Vertikalschnitt fuer Mitarbeitendenverwaltung umgesetzt
+- `Employee` und `EmploymentContract` um Bearbeitungslogik fuer CRUD-Szenarien ergänzt
+- Application-Contracts, Repository-Abstraktion und `EmployeeService` fuer Liste, Anlegen und Bearbeiten ergänzt
+- EF-Core-`PayrollDbContext` und SQLite-Repository fuer Mitarbeitende und Verträge umgesetzt
+- Avalonia-App mit einfacher Mitarbeiterliste und Erfassungs-/Bearbeitungsformular aufgebaut
+- Domain- und Application-Tests fuer Mitarbeitendenverwaltung ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` nach UI-/Persistence-Erweiterung erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` weiterhin nur an der Sandbox-Socket-Restriktion gescheitert
+- Session-Abschluss erstellt und Übergabe mit offenen Punkten, Risiken, Einschränkungen und drei priorisierten nächsten Schritten bereinigt
+- Mitarbeitendenverwaltung von einfachem CRUD-Schnitt zu einem brauchbaren Stammdatenmodul erweitert
+- `Employee` um Geburtsdatum, Eintritt/Austritt, Aktivstatus, Telefon, E-Mail, Wohnsitzland, Nationalitaet, Bewilligung, Steuerstatus, Quellensteuerpflicht, AHV-Nummer und IBAN ergänzt
+- Adresse als strukturierte Komponente mit Strasse, Hausnummer, Adresszusatz, Postleitzahl, Ort und Land modelliert
+- Application-Contracts und Repository fuer Suche/Filter nach Mitarbeitenden erweitert
+- Avalonia-UI um Suchfeld, Aktiv/Inaktiv-Filter sowie erweitertes Formular fuer Stammdaten, Kontakt, Adresse und vorbereitete payroll-relevante Felder ergänzt
+- Domain- und Application-Tests fuer erweiterte Mitarbeitendenverwaltung ergänzt
+- bestehenden Payroll-Domain-Test fuer Fahrzeugentschaedigung an die bereits implementierte Ableitung angeglichen
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- AppSectionCard-Template von StackPanel auf Grid umgestellt, damit ScrollViewer in der UI sauber begrenzt werden
+- Mitarbeitendenliste als Arbeitsansicht mit sichtbarer Trefferanzahl und besser nutzbarer Such-/Filterleiste geschärft
+- Formularbereich so angepasst, dass Felder scrollen, Statusmeldung und Aktionen aber erreichbar bleiben
+- lokale Entwicklungsdatenbank `payroll.localdev.db` eingeführt und mit 10 plausiblen Demo-Mitarbeitenden geseedet
+- Demo- und Produktivdatenbank im Desktop-Bootstrap explizit getrennt
+- zusätzlicher Test für idempotentes Seed-Verhalten der Demo-Daten ergänzt
+- SQLite-Fehler `SQL APPLY operation, which is not supported on SQLite` in der Mitarbeitendenliste analysiert
+- Ursache identifiziert: neuester Vertrag wurde in einer SQL-Projektion über `OrderByDescending(...).FirstOrDefault()` bestimmt
+- Employee-Repository auf SQLite-kompatiblen Ladepfad umgestellt: Mitarbeitende und Verträge getrennt laden, neuesten Vertrag im Speicher bestimmen
+- Speichern/Reload-Pfad der Mitarbeitendenverwaltung damit wieder funktionsfähig gemacht
+- zusätzlichen SQLite-In-Memory-Repository-Test fuer Save+List ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Mitarbeitenden-UI von permanent editierbarem Formular auf klaren Ansichts- und Bearbeitungsmodus umgebaut
+- ViewModel um expliziten Aktionsfluss fuer `Neu`, `Bearbeiten`, `Speichern`, `Abbrechen` und Loeschbestaetigung erweitert
+- Loeschfunktion fachlich als logisches Archivieren/Deaktivieren im Employee-Modul umgesetzt
+- Desktop-Shell um vorbereitete Navigationsstruktur fuer weitere Bereiche ergänzt
+- UI-Design-System um Shell-/Aktionsleistenregeln erweitert
+- Domain-Test fuer Archivierung und Application-Test fuer Archivierungsfluss ergänzt
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Session-Abschluss erstellt und aktueller UI-Blocker dokumentiert: Nach dem letzten UI-Umbau ist derzeit keine Person mehr aus der Mitarbeitendenliste auswählbar
+- Auswahl-Blocker in der Mitarbeitendenliste gezielt analysiert: asynchrones Laden von Details und gleichzeitiges Disable der Liste konnten spaetere Selection-Wechsel verschlucken
+- `MainWindowViewModel` um nachgezogene Pending-Selection erweitert; die Liste bleibt waehrend Detail-Ladevorgaengen selektierbar, waehrend Such-/Refresh-Aktionen weiter sauber gesperrt bleiben
+- ViewModel-Tests fuer Initialauswahl, Busy-Selection, Abbrechen nach Neueingabe und Archivieren mit Reload ergänzt
+- Archivieren in der Mitarbeitendenverwaltung auf den Bearbeitungsmodus eingeschraenkt und den Testfall entsprechend abgesichert
+- fehlendes `CanExecuteChanged` fuer die Delete-Bestaetigungsbuttons nach dem Einblenden der Sicherheitsabfrage behoben
+- Suchfeld, Filter und Refresh fuer Mitarbeitende vom Bearbeitungsmodus entkoppelt; aktive Mitarbeitenden-Navigation nicht mehr deaktiviert
+- fehlende `PropertyChanged`-Signale fuer busy-abhaengige UI-Freigaben im ViewModel ergaenzt, damit Suchfeld und weitere Aktionen nach dem Laden wieder aktiv werden
+- fachliche Zielrichtung fuer historisierte `EmploymentContract`-Versionen sowie fuer den naechsten Payroll-Orchestrierungsschritt dokumentiert
+- Planungsdokumente an den realen Ist-Stand angepasst
+- Session-Abschluss erstellt, offene Punkte konsolidiert und `docs/context/ai_summary.md` auf den aktuellen Stand gebracht
+- fachliches Sollbild fuer die gemeinsame Monatserfassung von Zeiten und Spesen in den bestehenden Doku-Dateien verankert
+- manuelle Erfassung vor Import sowie Jahresableitung aus Monatsdaten als naechste Richtung dokumentiert
+- `EmployeeMonthlyRecord` als expliziten Monatsanker eingefuehrt und damit referentielle Integritaet fuer Monatsdaten abgesichert
+- `TimeEntry`, `ExpenseEntry` und `VehicleCompensation` an den Monatskontext angebunden
+- Application-Service und Repository fuer Monat laden/anlegen, Zeit-/Spesenpflege und Summen ergänzt
+- ersten funktionalen Avalonia-Schnitt fuer die gemeinsame Monatserfassung pro Mitarbeitenden umgesetzt
+- Domain-, Application- und SQLite-Tests fuer Monatskontext, Uniqueness, Datumsvalidierung und Persistenz ergänzt
+- voller Build- und Testlauf ausserhalb der Sandbox erfolgreich ausgeführt
+- UI-Feedback aufgenommen: Monatserfassung soll nicht unter Personendaten haengen, sondern monatszentriert gefuehrt werden
+- Desktop-Shell entsprechend umgebaut: Monat links als Fuehrungskontext, Personendaten in separatem Tab, Monatserfassung als primaerer Arbeitsbereich
+- `dotnet build Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` nach dem UI-Umbau erfolgreich ausgeführt
+- weiterer UX-Schritt umgesetzt: eigener Bereich `Zeit- und Spesenerfassung` und separater Bereich `Mitarbeitende` statt Personendaten innerhalb derselben Erfassungsflaeche
+- `MonthlyRecordViewModel` so stabilisiert, dass Monatskontext bei Mitarbeitenden- oder Monatswechsel automatisch geladen wird
+- Speichern von Arbeitsstunden und Spesen funktioniert jetzt auch ohne expliziten manuellen `Monat laden`-Zwischenschritt
+- ViewModel-Tests fuer automatisches Nachladen des Monatskontexts und Bereichsumschaltung ergänzt
+- voller Build- und Testlauf ausserhalb der Sandbox erneut erfolgreich ausgeführt
+
+## 2026-04-05
+- Nacht-, Sonntags- und Feiertagszuschlag aus dem Mitarbeitendenformular entfernt und als zentrale `Einstellungen` umgesetzt
+- `PayrollSettings` sowie Service-/Repository-Pfad fuer die drei lohnrelevanten Zuschlagssaetze ergänzt
+- `EmploymentContract` und Mitarbeitenden-Speicherpfad von individuellen Zuschlagsparametern entkoppelt; Payroll-Ableitung auf zentrale Herkunft umgestellt
+- gezielte Settings-, Employee-, ViewModel- und SQLite-Tests fuer den neuen zentralen Pflegeort angepasst und ergänzt
+- Spesenlogik im Monatskontext fachlich vereinfacht: nur noch `Diverse Spesen` als festes Monatstotal je `EmployeeMonthlyRecord`
+- `ExpenseEntry`, `EmployeeMonthlyRecord`, `MonthlyRecordService`, DTOs und EF-Mapping auf Eingabe mit nur Datum und Betrag umgestellt
+- eindeutige Persistenzregel fuer genau einen `ExpenseEntry` pro Monatskontext ergänzt; UI-Felder und Listenanzeige fuer Typ/Beschreibung entfernt
+- Preview- und Payroll-Ableitung fuer die feste Spesenbezeichnung vereinheitlicht
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests fuer die vereinfachte Spesenerfassung angepasst und ergänzt
+- Fahrzeugentschaedigung im Monatserfassungsbereich von reiner Anzeige auf editierbaren Unterbereich erweitert
+- Save-/Delete-Flow fuer `VehicleCompensation` in `EmployeeMonthlyRecord`, `MonthlyRecordService` und `MonthlyRecordViewModel` ergänzt
+- Avalonia-UI fuer Datum, Betrag, Beschreibung, Auswahl und Loeschen von Fahrzeugentschaedigungen erweitert
+- gezielte Tests fuer Service- und ViewModel-Flow der Fahrzeugentschaedigung ergänzt
+- `dotnet build src/Payroll.Desktop/Payroll.Desktop.csproj -maxcpucount:1 -nodeReuse:false` erfolgreich ausgeführt
+- fokussierter Testlauf `dotnet test tests/Payroll.Application.Tests/Payroll.Application.Tests.csproj --filter "MonthlyRecordServiceTests|MonthlyRecordViewModelTests" -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Fehlerursache fuer inaktive Save-Buttons im Monatsbereich eingegrenzt: veraltete lokale Development-DB enthielt nur `Employees` und `EmploymentContracts`, aber keine Monatstabellen
+- `AppBootstrapper` erweitert, damit eine veraltete Development-DB ohne `EmployeeMonthlyRecords`, `TimeEntries`, `ExpenseEntries` und `VehicleCompensations` automatisch geloescht und neu erstellt wird
+- Ursache fuer weiterhin wirkungsloses Speichern im Monatsbereich eingegrenzt: `DateOnly.TryParse` war kulturabhaengig und akzeptierte im de-CH-Kontext das eingegebene ISO-Datum `yyyy-MM-dd` nicht verlaesslich
+- Datums- und Zahlenparser im `MonthlyRecordViewModel` auf ISO- und lokale Formate sowie Punkt/Komma-Varianten erweitert
+- gezielter ViewModel-Test fuer Speichern mit `de-CH`-Kultur und ISO-Datum ergänzt und ausserhalb der Sandbox erfolgreich ausgeführt
+- EF-Fehler `expected to affect 1 row(s), but actually affected 0 row(s)` im Monatsbereich auf langlebiges Tracking des gemeinsam genutzten Desktop-`DbContext` eingegrenzt
+- `MonthlyRecordService` und Monthly-Repository um explizites `ClearTracking()` vor Save-/Delete-/Load-Operationen erweitert, damit Monatsaggregate immer frisch geladen und ohne stale Tracking-Zustand gespeichert werden
+- In-Memory-Repository-Doubles in den Application-Tests an die neue Tracking-Schnittstelle angepasst
+- fokussierter Testlauf fuer `MonthlyRecordServiceTests|MonthlyRecordViewModelTests` ausserhalb der Sandbox erneut erfolgreich ausgeführt
+- reproduzierbaren SQLite/ViewModel-Integrationstest fuer den echten Speichern-Pfad ergänzt und damit die verbleibende Ursache sichtbar gemacht
+- eigentliche Ursache identifiziert: neue `TimeEntry`-, `ExpenseEntry`- und `VehicleCompensation`-Objekte mit bereits gesetzter GUID wurden von EF im Graph als bestehend interpretiert und deshalb als `Modified` statt `Added` behandelt
+- Monthly-Repository um explizites `MarkAsAdded(...)` erweitert; `MonthlyRecordService` markiert neue Child-Eintraege jetzt bewusst als Inserts
+- fokussierter Monats-Testlauf mit Repository-, Service- und ViewModel-Tests ausserhalb der Sandbox erfolgreich ausgeführt
+- Monatsvorschau im Desktop von summarischer Verdichtung auf tabellarische Zeilenansicht aller Monatseintraege umgestellt
+- neuer `MonthlyPreviewRowViewModel` eingefuehrt; Zeit-, Spesen- und Fahrzeugeintraege werden im ViewModel zu einer sortierten Monatsliste zusammengefuehrt
+- ViewModel-Test fuer tabellarische Monatsvorschau ergänzt und ausserhalb der Sandbox erfolgreich ausgeführt
+- Vorschau danach von Einzelmonat auf Mehrmonatsverlauf der selektierten Person erweitert
+- Repository liefert fuer die Monatsvorschau jetzt Tabellenzeilen ueber alle vorhandenen `EmployeeMonthlyRecord`-Monate derselben Person; Monate ohne Eintraege bleiben als Platzhalterzeile sichtbar
+- Vorschau-Tabelle um Monatsspalte erweitert; ViewModel- und Service-Tests fuer den Verlauf ueber mehrere Monate erfolgreich ausgeführt
+- neuer Bereich `Einstellungen > Import` eingefuehrt und als erster Schnitt fuer CSV-basierte Import-Konfiguration aufgebaut
+- persistente Mapping-Konfigurationen fuer `Personendaten` und vorbereitet fuer `Stundendaten` modelliert; Speicherung erfolgt nun getrennt ueber `ImportConfigurationType`
+- CSV-Reader mit konfigurierbarem Trenner, optionaler Feldummantelung und einfachem Textqualifier fuer `"` bzw. `'` ergänzt
+- Personendaten-Import ueber Application-/Infrastructure-Schicht umgesetzt; Pflichtfeldpruefung, Header-Erkennung, Mapping-Speichern/Laden und Upsert per Personalnummer ergänzt
+- neue Tests fuer Mapping-Persistenz, CSV-Header, Muss-Felder und Personendaten-Upsert ergänzt
+- `dotnet build Lohnabrechnung.sln -m:1` erfolgreich ausgeführt; `dotnet test` bleibt in der Sandbox weiterhin am VSTest-Socket blockiert
+- `Einstellungen > Import > Stundendaten` von Platzhalter auf funktionalen CSV-Import erweitert
+- erster Stundendaten-Import verwendet den in der UI gewaelten Monat als Importkontext; CSV selbst liefert dafuer kein Datum
+- Importstatus je Monat in eigener Persistenz eingefuehrt, damit erneuter Import erkannt, bestaetigt ueberschrieben und ein importierter Monat wieder geloescht werden kann
+- Stundendaten-UI um CSV-Auswahl, Mapping speichern/laden, suchbare Spaltenzuordnung, Monatswahl, Liste importierter Monate und Bestaetigungsdialoge fuer Ueberschreiben/Loeschen erweitert
+- Application-Tests fuer Monatskontext, Importstatus, Ueberschreiben und Loeschen sowie ViewModel-Tests fuer Monatswahl und Mapping-Ladefluss ergänzt
+- `dotnet build Lohnabrechnung.sln -m:1` nach dem Stundenimport erfolgreich; `dotnet test tests/Payroll.Application.Tests/Payroll.Application.Tests.csproj --no-build -m:1` in der Sandbox weiter durch `SocketException (13): Permission denied` blockiert
+- globale Berechnungswerte in `Einstellungen > Berechnung` fachlich und technisch in drei getrennte historisierte Bereichsstaende zerlegt: `Allgemein`, `Stundenlohn`, `Monatslohn`
+- neue Bereichstabellen, getrennte Gueltigkeitsbereiche und je Bereich eigener History-/Neuanlage-Flow im Settings-UI ergänzt
+- bestehende `PayrollSettings` bleiben vorerst als Legacy-Projektion fuer die aktuelle Monats-/Snapshot-Logik erhalten; die neuen Bereichsstaende werden beim Speichern auf die aktuellen effektiven Werte zurueckgespiegelt
+- ViewModel- und Repository-Tests fuer getrennte Bereichsstaende, explizite Neuanlage und Ueberschneidungspruefung ergänzt; Desktop- und Testprojekt-Build im separaten Arbeitsstand erfolgreich

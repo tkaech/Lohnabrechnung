@@ -1,0 +1,11 @@
+<Application
+    x:Class="Payroll.Desktop.App"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedThemeVariant="Light">
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Payroll.Desktop/Styles/DesignSystem.axaml" />
+    <StyleInclude Source="avares://Payroll.Desktop/Styles/PrintDesignSystem.axaml" />
+  </Application.Styles>
+</Application>

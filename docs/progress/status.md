@@ -1,0 +1,208 @@
+# Status
+
+Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel-Analyse abgeleitet.
+
+## Session Abschluss
+- DB-Startpfad aus hart codierter Bootstrapper-Logik geloest und ueber `appsettings.json` bzw. `appsettings.Development.json` konfigurierbar gemacht
+- zusaetzliche Ueberschreibung des DB-Pfads per `PAYROLLAPP_DATABASE_PATH` oder Startparameter `--db-path=...` ergänzt
+- Desktop-Startup von automatischer Reset-/Seed-Logik befreit; Datenbanken werden nicht mehr geloescht oder mit Demo-Daten befuellt
+- EF-Migrationspfad fuer SQLite eingefuehrt und Startup auf `Database.Migrate()` umgestellt
+- Baseline-Logik fuer bestehende Datenbanken ohne `__EFMigrationsHistory` ergänzt, damit vorhandene Daten beim Umstieg auf Migrationen erhalten bleiben
+- Windows-Testpfad ueber `appsettings.json` auf `{LocalAppData}/PayrollApp/payroll.test.db` vorbereitet; beim ersten Start werden nur Konfigurationsdaten initialisiert, bestehende DBs bleiben bei spaeteren Starts unveraendert
+- `Einstellungen` um einen eigenen Unterbereich `Backup / Restore` erweitert
+- Backup/Restore als gekapselten Application-/Infrastructure-Service eingefuehrt, mit klarer Trennung der Sicherungsarten `nur Konfiguration`, `nur Nutzdaten` und `beides`
+- JSON-basierte Sicherungsdatei mit Zeitstempel-Dateiname und Restore-Validierung fuer passende Sicherungsart ergänzt
+- Restore so angebunden, dass Konfiguration zentral neu geladen und Nutzdaten anschliessend wieder in Mitarbeitenden- und Monatskontext synchronisiert werden
+- gezielte ViewModel- und SQLite-Tests fuer den neuen Backup-/Restore-Pfad ergänzt
+- `Employee` um referenzielle Felder `Abteilung`, `Anstellungskategorie` und `Anstellungsort` erweitert
+- Mitarbeitendenstamm um `Lohnart` (`Stundenlohn` | `Monatslohn`) erweitert; bestehende Stundenlohn-Logik bleibt aktiv, Monatslohn ist als fachliche Grundlage vorbereitet
+- Bereich `Einstellungen > Berechnung` in die Unterseiten `Allgemein`, `Stundenlohn` und vorbereitend `Monatslohn` gegliedert, damit allgemeine und lohnartbezogene Parameter kuenftig sauber getrennt gepflegt werden koennen
+- Lohnlauf-/Berechnungsdarstellung in `Lohnlaeufe` um eine strukturierte Herleitungsansicht erweitert: Eingaben, Regeln/Saetze, Rechenschritte und Konflikte werden jetzt aus derselben Preview-Quelle wie die Ergebniszeilen aufgebaut
+- Ergebniszeilen und Herleitungselemente teilen sich semantische Kennungen (`LinkKey`, Tag, Farbhilfe), damit Herkunft und Wiederverwendung fachlicher Werte in der UI nachvollziehbar bleiben, ohne Berechnungslogik in die UI zu duplizieren
+- globales UI-Design-System fuer Bildschirm und spaeteren Print logisch in zentrale Style-Bereiche gegliedert
+- zentrale Theme-Dateien fuer App-/Screen-Stile und getrennte Print-/Report-Stile eingefuehrt; Schrift, Farben, Brand-Text und spaetere Logo-Nutzung sind damit an einer Stelle steuerbar
+- `App.axaml` auf zentrale Style-Includes umgestellt und den Shell-Kopf auf zentrale Branding-/Theme-Ressourcen angebunden
+- `PayrollSettings` um eine zentrale mehrzeilige `Firmenadresse` fuer den PDF-Kopf erweitert; Wert ist im Settings-Tab pflegbar und wird nicht hart codiert
+- eigener PDF-Export fuer `Lohnlaeufe` ergänzt: Button `PDF erstellen` erzeugt fuer den gewaelten Mitarbeitenden und Monat ein Lohnblatt mit Titel, Kopfbereich, Metadaten, Payroll-Tabelle, Abzuegen, Total, Spesen und `Total Auszahlung`
+- PDF-Generierung in einen separaten Reporting-/Export-Service gekapselt und fachlich auf Basis der bestehenden Lohn-Voransicht, Mitarbeitendenstammdaten und zentralen Settings angebunden
+- PDF-Lohnblatt auf ein einfaches Template-System mit Platzhaltern umgestellt; Template wird geladen, mit Lohndaten/Settings befuellt und erst dann generisch gerendert statt die Blattinhalte direkt im Layoutcode zu verdrahten
+- Settings-Bereich in getrennte Unterbereiche fuer `Layout`, `Listen`, `Berechnung` und `Druck/PDF` gegliedert; das Druck-Template ist jetzt als zentraler Settings-Wert direkt in der UI pflegbar
+- zentrale Lookup-Listen fuer diese drei Werte in `Settings` mit CRUD-Pflege und Standardwerten eingefuehrt
+- Mitarbeitendenformular auf Auswahlfelder statt Freitext umgestellt; referentielle Integritaet wird ueber echte FK-Beziehungen in der Persistenz gesichert
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests fuer den neuen Employee-/Settings-Schnitt ergänzt bzw. angepasst
+- Lohn-Voransicht fuer den aktuell gewaehlten Mitarbeitenden und Monat in der Monatserfassung ergänzt, fachlich an der Excel-Struktur aus dem Register `BleR` orientiert
+- Voransicht berechnet jetzt Basislohn, ableitbare Zeitzuschlaege, drei Fahrzeitentschaedigungen, AHV-pflichtigen Bruttolohn, zentrale Abzuege, optionales BVG, Spesen und `Total Auszahlung`
+- `Total Auszahlung` in der Voransicht analog Excel auf 5 Rappen gerundet; `Spezialzuschlag gemaess Vertrag` ist jetzt als CHF-Betrag pro Arbeitsstunde im Vertragsstand modelliert und `Ferienentschaedigung` wird ueber zentrale altersabhaengige Settings-Saetze aus den globalen Settings berechnet
+- Monatserfassung um einen Snapshot der lohnrelevanten Berechnungsparameter pro `EmployeeMonthlyRecord` erweitert; Payroll-Vorschau und Berechnung verwenden fuer bestehende Monate jetzt die im Monat gespeicherten Parameter statt spaeter geaenderter globaler Settings
+- neue Unterseite `Monats-/Stundenerfassungen` im Bereich `Zeit- und Spesenerfassung` ergänzt; sie listet alle Mitarbeitenden fuer den gewaelten Abrechnungsmonat tabellarisch mit Filter `alle`, `ohne Monatserfassung` und `mit Monatserfassung`
+- Windows-Testlauf fuer `win-x64` auf einen eigenen SQLite-Pfad `{LocalAppData}/PayrollApp/payroll.windows-test.db` umgestellt; erster Start fuehrt Migrationen aus und seedet Testdaten, spaetere Starts verwenden dieselbe DB unveraendert weiter
+- Runtime-Optionen um konfigurierbares Testdaten-Seeding erweitert; aktivierbar ueber `appsettings` oder `PAYROLLAPP_SEED_TESTDATA`
+- Baseline-Logik fuer SQLite gehaertet, damit nur vollstaendige bestehende Schemata historisiert werden und halb angelegte Alt-DBs den neuen Windows-Testlauf nicht falsch als komplett markieren
+- SQLite-Dateien werden nicht mehr relativ im Programmverzeichnis angelegt, sondern plattformtauglich in einem expliziten Benutzerdatenordner abgelegt; bestehende Datenbanken werden bei Schemaabweichungen nicht mehr still geloescht
+- globale Payroll-Settings um zentrale Abzugsparameter fuer `AHV/IV/EO`, `ALV`, `Krankentaggeld/UVG` und `Aus- und Weiterbildung inkl. Ferien` erweitert
+- zentrale CHF-Ansatzwerte fuer `Pauschalzone 1`, `Pauschalzone 2` und `Regiezone 1` in `PayrollSettings` ergänzt und im Settings-Tab pflegbar gemacht
+- Payroll-Ableitung so angepasst, dass Fahrzeugentschaedigungen aus Mengen * Settings-Ansatz berechnet und prozentuale Sozialabzuege nicht mehr hart codiert, sondern aus den zentralen Settings gelesen werden
+- die drei Fahrzeugwerte `Pauschalzone 1`, `Pauschalzone 2` und `Regiezone 1` aus dem Spesenblock in die Zeitzeile verschoben, weil sie fachlich lohnrelevante Lohnbestandteile sind
+- Monatsmodell, EF-Persistenz, Monatsvorschau und Avalonia-UI so angepasst, dass Fahrzeugwerte jetzt pro `TimeEntry` und Spesen wieder als reines Monatstotal im `ExpenseEntry` erfasst werden
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests auf den neuen Schnitt `Zeiten + Fahrzeugwerte` versus `reine Spesen` angepasst
+- Monats-Spesenbereich von Listen-/Detailerfassung auf genau einen Monatsdatensatz mit vier Feldern pro Mitarbeitendem umgestellt
+- Fahrzeugentschaedigung im Monatskontext nicht mehr als eigener Unterbereich, sondern als drei feste Monatswerte innerhalb desselben `ExpenseEntry`
+- Domain, Application, EF-Persistenz, SQLite-Schema-Check und Avalonia-UI fuer den neuen Vier-Felder-Spesenblock minimal-invasiv angepasst
+- gezielte Domain-, Service-, ViewModel- und SQLite-Tests auf den neuen Monats-Spesenblock aktualisiert
+- Nacht-, Sonntags- und Feiertagszuschlag aus der individuellen Mitarbeitendenpflege entfernt und in einen zentralen Bereich `Einstellungen` verschoben
+- zentralen Settings-Pfad fuer lohnrelevante Zuschlagssaetze in Domain, Application, Persistence und UI ergänzt
+- Payroll-Ableitung fuer Zuschlaege fachlich beibehalten, aber die Herkunft der drei Prozent-Saetze von `EmploymentContract` auf zentrale Einstellungen umgestellt
+- Spesenlogik im Monatskontext fachlich auf genau ein Monatstotal `Diverse Spesen` reduziert; Eingabefelder fuer Typ und Beschreibung entfernt
+- Domain, Application, EF-Persistenz, Monatsvorschau und UI fuer vereinfachte Spesenerfassung mit nur Datum und Betrag angepasst
+- eindeutige Persistenzregel fuer genau einen `ExpenseEntry` pro `EmployeeMonthlyRecord` ergänzt; gezielte Domain-, Service-, ViewModel- und SQLite-Tests angepasst
+- Monatsvorschau auf Verlauf ueber alle vorhandenen Monate der selektierten Person erweitert; Tabelle zeigt jetzt Monat, Datum, Typ, Stunden/Betrag und Details
+- Monatsvorschau von reiner Summen-/Hinweisverdichtung auf tabellarische Monatsliste aller Zeit-, Spesen- und Fahrzeugeintraege des gewaehlten Monats umgestellt
+- Root Cause fuer verbleibende Speicherfehler im Monatsbereich identifiziert: neue Child-Entitaeten wie `TimeEntry` wurden im EF-Graph mit vorvergebener GUID als `Modified` statt `Added` behandelt
+- Monatsservice markiert neue Zeit-, Spesen- und Fahrzeugeintraege jetzt explizit als Inserts; reproduzierbarer SQLite/ViewModel-Test fuer den echten UI-Speicherpfad erfolgreich
+- langlebiger gemeinsamer `DbContext` im Desktop-Flow als Ursache fuer EF-Tracking-/Concurrency-Probleme im Monats-Speicherpfad eingegrenzt und durch explizites `ChangeTracker.Clear()` vor Monatsoperationen abgesichert
+- Monatsdaten akzeptieren im UI jetzt sowohl ISO-Datum `yyyy-MM-dd` als auch lokale Datumsformate; kulturabhaengiger Save-Fehler im de-CH-Kontext behoben
+- lokale Development-Datenbank wird bei veraltetem Schema ohne Monatstabellen jetzt automatisch neu erstellt, damit der Monatskontext nicht still scheitert
+- Fahrzeugentschaedigung im Monatserfassungsbereich als eigener editierbarer Unterbereich ergaenzt
+- Save-/Delete-Flow fuer Fahrzeugentschaedigung in Domain, Application-Service, ViewModel und Avalonia-UI umgesetzt
+- gezielte Application- und ViewModel-Tests fuer Fahrzeugentschaedigung ergaenzt; Desktop-Build sowie fokussierter Testlauf ausserhalb der Sandbox erfolgreich
+- erster belastbarer Vertikalschnitt fuer die gemeinsame Monatserfassung von Zeiten und Spesen implementiert
+- `EmployeeMonthlyRecord` als expliziter Monatsanker eingefuehrt und mit eindeutiger Employee+Jahr+Monat-Regel abgesichert
+- referentielle Integritaet fuer Zeit-, Spesen- und vorbereitete Fahrzeugentschaedigungsdaten ueber Parent-Child-Beziehungen, Fremdschluessel und Cascade-Delete umgesetzt
+- erster Application-Service fuer Monat laden/anlegen, Zeit-/Speseneintraege speichern/loeschen und Monatssummen aufgebaut
+- Avalonia-UI um einen ersten funktionalen Monatserfassungsbereich fuer Zeiten, Spesen und einfache Monatsvorschau erweitert
+- Monatserfassungs-UI anschliessend auf monatszentrierten Arbeitsfluss umgestellt: Monat links zuerst waehlen, Mitarbeitende daneben selektieren, Personendaten in separatem Tab statt oberhalb der Monatserfassung
+- Monatserfassungs-Flow weiter geschaerft: eigener Bereich `Zeit- und Spesenerfassung`, Monat zuerst, Mitarbeitendenliste darunter, rechts nur Erfassungsflaeche; Personendaten wieder als separater Bereich
+- Save-Flow fuer Zeiten und Spesen stabilisiert: Monatskontext wird bei Mitarbeitenden- oder Monatswechsel automatisch geladen bzw. bei Bedarf vor dem Speichern sichergestellt
+- zusaetzliche ViewModel-Tests fuer Bereichswechsel und automatisches Nachladen des Monatskontexts ergänzt; voller Solution-Testlauf erneut erfolgreich
+- Domain-, Application- und SQLite-Tests fuer Monatskontext, Datumsvalidierung, Uniqueness und Persistenz ergänzt; voller Solution-Testlauf erfolgreich
+- fachliches Sollbild fuer die kuenftige gemeinsame Monatserfassung von Zeiten und Spesen dokumentarisch verankert
+- Monatskontext pro Mitarbeitenden als naechster groesserer Arbeitsbereich in Kontext-, Planungs- und Progress-Dokumenten konsistent beschrieben
+- manuelle Erfassung vor Import sowie Ableitung von Jahresdarstellungen aus Monatsdaten explizit festgehalten
+- Monatsvorschau als Verdichtung und nicht als Rohdatenerfassung dokumentiert
+- Mitarbeitenden-UI in mehreren kleinen Schritten stabilisiert: Auswahl, Delete-Bestaetigung, Such-/Refresh-Freigaben und aktive Navigation funktionieren jetzt konsistent
+- Archivieren ist nur noch im Bearbeitungsmodus erreichbar; Sicherheitsabfrage und ihre Buttons sind funktionsfaehig
+- Suchfeld, Filter und Refresh sind wieder benutzbar und aktualisieren ihre Busy-abhaengigen Freigaben korrekt
+- ViewModel-Tests fuer kritische UI-Zustaende erweitert; Solution-Build erneut erfolgreich verifiziert
+- Busy-abhaengige UI-Bindings im Mitarbeitenden-ViewModel aktualisieren jetzt ihre IsEnabled-Zustaende korrekt nach Ladewechseln
+- Suche und Refresh der Mitarbeitendenliste sind jetzt auch waehrend des Bearbeitungsmodus verfuegbar
+- aktive Navigationsbuttons fuer die reale Mitarbeitendenseite werden nicht mehr kuenstlich deaktiviert
+- Delete-Bestaetigungsbuttons im Bearbeitungsmodus wieder aktiv geschaltet; fehlendes Command-Refresh beim Einblenden der Sicherheitsabfrage behoben
+- Archivieren ist in der Mitarbeitendenverwaltung jetzt nur noch aus dem Bearbeitungsmodus heraus möglich
+- UI-Blocker in der Mitarbeitendenauswahl analysiert; Ursache in asynchronem Selection-Handling und zu aggressivem Disable-Zustand der Liste eingegrenzt und behoben
+- Employee-Flow im ViewModel gezielt gegen instabile Zustandswechsel abgesichert
+- ViewModel-Tests fuer Initialauswahl, Selections waehrend Busy-Zustand, Abbrechen nach Neueingabe und Archivieren mit Reload ergänzt
+- Vertragshistorie fachlich als versionierbarer Vertragsstand präzisiert und naechste Payroll-Orchestrierung auf Basis der bestehenden Domain-Ableitung dokumentiert
+- Planungsdokumente an den tatsächlichen Projektstand angeglichen
+- PayrollRunLine-Ableitung fachlich präzisiert und offene Regeln explizit markiert
+- Erster vertikaler Funktionsschnitt für Mitarbeitendenverwaltung von Domain über Application und Infrastructure bis zur Avalonia-UI umgesetzt
+- Build der gesamten Solution erfolgreich verifiziert
+- Mitarbeitendenverwaltung zu einem nutzbaren Stammdatenmodul mit erweiterten Personendaten, strukturierter Adresse, Suche/Filter und bearbeitbarer Payroll-relevanter Stammdatenvorbereitung ausgebaut
+- Domain- und Application-Tests für das erweiterte Stammdatenmodul ergänzt und erfolgreich ausgeführt
+- UI der Mitarbeitendenverwaltung für normale Bildschirmhöhen benutzbarer gemacht und lokale Demo-Mitarbeitende für Entwicklung ergänzt
+- SQLite-Fehler beim Speichern und anschliessenden Laden der Mitarbeitendenliste analysiert und durch SQLite-kompatible Query-Pfade behoben
+- Mitarbeitendenverwaltung zu einer klaren Arbeitsoberflaeche mit Ansichtsmodus, explizitem Bearbeiten, konsistenter Aktionsleiste und vorbereiteter Modulnavigation umgebaut
+- Session-Abschluss und Übergabe erstellt; aktueller UI-Blocker fuer die nächste Session klar markiert
+
+## Fix
+- Stack definiert
+- Architektur definiert
+- Projektstruktur erstellt
+- Basisprojekte für Domain, Application, Infrastructure und Desktop angelegt
+- Teststruktur für Domain und Application angelegt
+- Excel-Analyse in Domain-Entscheidungen und Mapping überführt
+- Domain-Modell für Employee, EmploymentContract, TimeEntry, ExpenseEntry, VehicleCompensation, PayrollRun, PayrollRunLine, ContributionRate und TaxRule geschärft
+- Einheiten konsolidiert: Stunden als `decimal`, Zuschläge als Stunden, Spesen in CHF, BVG als fixer CHF-Betrag, Fahrzeugentschädigung zentral
+- Offene Fachfragen zu Zuschlägen, Spesenarten, BVG, Quellensteuer und Secplan-Domain-Abgrenzung entschieden und dokumentiert
+- Ableitungslogik für PayrollRunLine fachlich definiert und als kleines Domain-Modell mit Derivation-Service umgesetzt
+- PayrollRunLine trennt jetzt direkte Übernahmen und berechnete Werte explizit
+- Arbeitsstunden sowie Nacht-, Sonntags- und Feiertagsstunden sind als getrennte Eingaben für die Payroll-Ableitung modelliert
+- Excel-basierte Präzisierung der offenen Payroll-Regeln vorgenommen: NSF als Sammelbegriff bestätigt, weitere Spezialpositionen identifiziert, offene Regeln explizit getrennt
+- Mehrdeutige Ueberlappung von Spezialstunden wird jetzt fachlich erkannt und nicht stillschweigend berechnet
+- Erster vertikaler Funktionsschnitt für Mitarbeitendenverwaltung umgesetzt
+- Domain für `Employee` und `EmploymentContract` um Bearbeitungslogik ergänzt
+- Application-Service für Mitarbeitende auflisten, anlegen und bearbeiten umgesetzt
+- EF-Core-/SQLite-Persistenz für Mitarbeitende und Verträge angebunden
+- Einfache Avalonia-UI für Mitarbeiterliste und Erfassungs-/Bearbeitungsformular umgesetzt
+- Unit Tests für Domainlogik ergänzt
+- Application-Tests für Mitarbeitendenverwaltung ergänzt
+- Solution Build erfolgreich
+- `Employee` um weitere Stammdaten, Kontaktfelder und vorbereitete payroll-relevante Personenmerkmale ergänzt
+- Adressdaten als eigene strukturierte Komponente modelliert
+- EF-Core-Mapping für erweiterte Mitarbeitendenstammdaten und Adresse ergänzt
+- Employee-Repository unterstützt jetzt Suche nach Mitarbeitenden sowie Filter nach aktiv/inaktiv
+- Avalonia-UI für Mitarbeitendenverwaltung um Suchfeld, Aktivitätsfilter und erweitertes Stammdatenformular ergänzt
+- Domain-Tests für Employee-Profilvalidierung ergänzt
+- Application-Tests für Suche/Filter und erweitertes Speichern ergänzt
+- `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false` ausserhalb der Sandbox erfolgreich ausgeführt
+- Scroll-Verhalten der Mitarbeitendenverwaltung über Card-Template und Formularlayout verbessert, so dass Liste und Formular auf normaler Bildschirmhöhe nutzbar bleiben
+- Statusbereich und Aktionsleiste im Formular fixiert, während die Felder separat scrollen
+- Lokale Entwicklungsdatenbank `payroll.localdev.db` mit 10 Demo-Mitarbeitenden ergänzt
+- Demo-Daten bewusst von produktiver Datenbank `payroll.db` getrennt
+- Seed-Test für lokale Demo-Daten ergänzt
+- SQLite-inkompatible Listenabfrage mit `OrderByDescending(...).FirstOrDefault()` innerhalb einer Projektion entfernt
+- Mitarbeitendenliste lädt jetzt zuerst Mitarbeitende und bestimmt den neuesten Vertragsstand danach im Speicher
+- Speichern nutzt für die Ermittlung des neuesten Vertrags ebenfalls einen robusten, SQLite-kompatiblen Ladepfad
+- zusätzlicher Repository-Test gegen echte SQLite-In-Memory-Datenbank ergänzt
+- Formular arbeitet jetzt standardmaessig im Ansichtsmodus; Bearbeitung startet erst ueber `Neu` oder `Bearbeiten`
+- expliziter Editierfluss `Neu`, `Bearbeiten`, `Speichern`, `Abbrechen` ergänzt
+- Loeschfunktion mit Sicherheitsabfrage umgesetzt und fachlich als Archivieren/Deaktivieren statt physischem Loeschen modelliert
+- Archivieren ist jetzt bewusst an den Bearbeitungsmodus gekoppelt und nicht mehr direkt aus der reinen Ansicht heraus möglich
+- Navigationsstruktur mit klaren Platzhaltern fuer Zeiten, Spesen, Lohnlaeufe, AHV/Abzuege, Quellensteuer, Reporting und Einstellungen vorbereitet
+- UI-Design-System fuer Shell-Struktur und Aktionsleisten konkretisiert
+- `EmployeeMonthlyRecord` als Monatsanker-Entitaet in Domain, Persistence und Application eingefuehrt
+- `TimeEntry`, `ExpenseEntry` und `VehicleCompensation` an den Monatsanker angebunden
+- Unique Constraint fuer Monatskontext pro Mitarbeitenden und Monat ergänzt
+- Unique Constraint fuer Zeiteintrag pro Monatskontext und Datum ergänzt
+- Unique Constraint fuer genau ein monatliches Spesentotal pro Monatskontext ergänzt
+- Monatsservice und Repository fuer Monatskontext, Zeit- und Spesenerfassung ergänzt
+- erster funktionaler UI-Schnitt fuer Monatserfassung innerhalb der Desktop-App ergänzt
+- Fahrzeugentschaedigung fachlich getrennt gehalten und im Monatskontext vorerst sichtbar gemacht
+- Fahrzeugentschaedigung im Monatskontext jetzt auch editierbar, selektierbar und loeschbar gemacht
+- voller `dotnet test Lohnabrechnung.sln -maxcpucount:1 -nodeReuse:false -v minimal` ausserhalb der Sandbox erfolgreich
+- neuer Bereich `Einstellungen > Import` als erster Schnitt umgesetzt; Personendaten-Import per CSV mit speicherbaren Mapping-Konfigurationen und vorbereiteter Stundendaten-Unterseite angebunden
+- Import-Mappings nun fachlich getrennt per persistentem `ImportConfigurationType` gespeichert; Personendaten-Import arbeitet per Personalnummer als Upsert statt Doppelanlage
+- `Einstellungen > Import > Stundendaten` auf denselben CSV-/Mapping-Mechanismus wie der Personenimport gehoben und fuer den ersten funktionalen Stundenimport vervollstaendigt
+- Stundendaten-Import verwendet einen explizit gewaelten Importmonat als Kontext statt eines Datums aus der CSV; importierte Stunden werden diesem Monat zugeordnet
+- eigene Persistenz fuer Importstatus pro Monat eingefuehrt; bereits importierte Monate koennen erkannt, ueberschrieben und samt importierten Stundendaten wieder geloescht werden
+- Avalonia-UI fuer Stundendaten-Import mit CSV-Laden, Mapping speichern/laden, Importmonat, Monatsliste und Ueberschreiben-/Loeschen-Bestaetigung erweitert
+- gezielte Application- und ViewModel-Tests fuer Importmonat, Monatsstatus, Ueberschreiben, Loeschen und Mapping-Ladefluss ergänzt; Solution-Build erfolgreich, `dotnet test` in der Sandbox weiter socket-limitiert
+
+## Offen
+- Vertragshistorie als historisierte `EmploymentContract`-Versionen fachlich konkretisieren
+- Monatserfassung von personenzentrierter Einzelform weiter in Richtung excel-artiger Monatsliste fuer mehrere Mitarbeitende schärfen
+- Ersten kleinen Payroll-Orchestrierungsschritt in der Application-Schicht definieren
+- Statuswechsel wie `Geprueft` oder `in Lohnlauf uebernommen` fachlich scharfziehen
+- Fachliche Details aus Spezialfällen der Excel-Datei weiter präzisieren
+- Payroll-Orchestrierung in der Application-Schicht auf das neue Domain-Modell ausrichten
+- Secplan-Import fachlich klären
+- Fachliche Codierung und Versionierung für Bewilligung, Steuerstatus und Quellensteuer-Merkmale präzisieren
+- Optional: erweiterte Listenfunktionen wie Sortierung oder kompaktere Kartenansicht prüfen, falls die Mitarbeitendenzahl weiter wächst
+- Optional: Repository-Queries bei wachsender Datenmenge weiter optimieren, ohne wieder provider-spezifische LINQ-Muster einzuführen
+- Weitere Bereiche schrittweise auf die neue Shell- und Aktionsstruktur aufsetzen
+
+## Risiken
+- Excel enthält verteilte Speziallogik; einzelne Ausnahmefälle aus Unfall-, KTG- oder Sondertabellen können im aktuellen Domain-Modell noch fehlen
+- Überlappung oder Kumulation von Nacht-, Sonntags- und Feiertagsstunden ist fachlich weiterhin nicht abschliessend geklärt; das System markiert solche Fälle jetzt explizit
+- Pro-Rata-Regeln für fixen BVG bei Teilmonaten sind noch offen
+- Weitere Excel-Spezialpositionen wie Fahrzeitentschädigung, Mehrzeit/Unterzeit, Weiterbildung und Unfalltaggeld sind identifiziert, aber noch nicht in die Ableitung integriert
+- Die UI bearbeitet weiterhin nur den aktuellen bzw. neuesten Vertragsstand eines Mitarbeitenden, noch keine volle Vertragshistorie
+- Mehrere neue payroll-relevante Personendaten sind bewusst als vorbereitete Freitext-/Optionsfelder modelliert; die fachliche Codierung ist noch nicht abschliessend entschieden
+- Demo-Daten werden absichtlich nur im lokalen Development-Modus gesät; für andere Umgebungen braucht es weiterhin echte oder separat bereitgestellte Daten
+- Die aktuelle SQLite-kompatible Lösung bevorzugt Robustheit vor maximaler Query-Kompaktheit und lädt Vertragsstände für Listen bewusst separat
+- Die neue Mitarbeitenden-Loeschaktion archiviert bewusst nur logisch; falls spaeter echte Archivierungsregeln je Datenabhaengigkeit noetig werden, muessen diese explizit erweitert werden
+- `dotnet test` bleibt in der Sandbox weiterhin durch eine Socket-Einschraenkung blockiert; auch die neuen Stundenimport-Tests konnten hier nur bis zum erfolgreichen Build verifiziert werden
+- der neue CSV-Import verarbeitet bewusst nur einfache Zeilen-CSV ohne mehrzeilige, quoted Felder; fuer komplexere Quelldateien braucht es spaeter einen robusteren Reader
+- bestehende lokale SQLite-Dateien ausserhalb des automatisch neu aufgebauten Development-Schemas koennen bei kuenftigen Modellwechseln weiterhin explizite Migrationsstrategie brauchen
+- der Desktop nutzt weiterhin einen gemeinsam gehaltenen `DbContext`; die Monatsoperationen sind jetzt defensiv abgesichert, langfristig waere ein klarer DbContext-per-Operation-Ansatz robuster
+
+## Bekannte Einschränkungen
+- Mitarbeitendenverwaltung deckt aktuell Stammdaten, Kontakt, Adresse und einen bearbeitbaren Vertragsstand ab
+- gemeinsame Monatserfassung fuer Zeiten und Spesen ist als erster Vertikalschnitt umgesetzt; fuer Stundendaten existiert jetzt zusaetzlich ein erster CSV-Import mit Monatskontext, aber noch ohne Monatsabschluss und tiefe Payroll-Orchestrierung
+- die aktuelle Monatserfassung ist jetzt als eigener Erfassungsbereich fuer Zeiten, Spesen und Fahrzeugentschaedigung benutzbar und speicherbar, arbeitet aber noch pro selektierter Person und noch nicht als echte tabellarische Mehrpersonen-Erfassung
+- die aktuelle Monatserfassung fuehrt Spesen wieder als reines Monatstotal; die drei Fahrzeugwerte werden in derselben Zeile wie Stunden und Zuschlagsstunden erfasst
+- die Monatsvorschau zeigt jetzt die Eintraege aller vorhandenen Monate der aktuell selektierten Person tabellarisch untereinander
+- Noch keine vollstaendige Payroll-Orchestrierung auf Basis der vorhandenen Domainregeln
+- Vertragshistorie ist fachlich vorbereitet, aber noch nicht als eigener Bearbeitungsfluss umgesetzt
+- `dotnet test` ist in dieser Sandbox weiterhin nicht verlässlich lokal ausfuehrbar
+- der neue Stundendaten-Import ist bewusst nur als vorbereitete Struktur in `Einstellungen > Import` vorhanden; Importlogik fuer Zeitdaten fehlt noch
+- `Einstellungen > Berechnung` historisiert die globalen Werte jetzt getrennt nach `Allgemein`, `Stundenlohn` und `Monatslohn`; die Monats-/Snapshot-Aufloesung je Bereich verwendet vorerst weiterhin die aktuelle Legacy-Projektion in `PayrollSettings`
