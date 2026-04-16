@@ -15,16 +15,6 @@ namespace Payroll.Desktop.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
-    private enum WorkspaceSection
-    {
-        TimeAndExpenses,
-        PayrollRuns,
-        Reporting,
-        Employees,
-        Settings,
-        Help
-    }
-
     private const string ActivityFilterAll = "Alle";
     private const string ActivityFilterActive = "Aktiv";
     private const string ActivityFilterInactive = "Inaktiv";
@@ -56,6 +46,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ReportingService _reportingService;
     private readonly MonthlyRecordService _monthlyRecordService;
     private readonly SqlExplorerViewModel _sqlExplorer;
+    private MainNavigationItemViewModel? _selectedMainNavigationItem;
+    private SettingsNavigationItemViewModel? _selectedSettingsNavigationItem;
     private EmployeeListItemViewModel? _selectedEmployee;
     private Guid? _currentEmployeeId;
     private Guid? _pendingEmployeeId;
@@ -187,8 +179,6 @@ public sealed class MainWindowViewModel : ViewModelBase
     private IReadOnlyCollection<PayrollGeneralSettingsVersionDto> _generalSettingsHistory = [];
     private IReadOnlyCollection<PayrollHourlySettingsVersionDto> _hourlySettingsHistory = [];
     private IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto> _monthlySalarySettingsHistory = [];
-    private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
-
     public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
         : this(
             employeeService,
@@ -222,6 +212,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         DepartmentOptions = [];
         EmploymentCategoryOptions = [];
         EmploymentLocationOptions = [];
+        MainNavigationItems = [];
+        SettingsNavigationItems = [];
         PayrollPreviewHelpOptions = [];
         ContractHistory = [];
         SettingsVersionHistory = [];
@@ -251,6 +243,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             "Doppelte Anfuehrungszeichen (\")",
             "Einfache Anfuehrungszeichen (')"
         ];
+        InitializeMainNavigation();
+        InitializeSettingsNavigation();
         RefreshCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         SearchCommand = new DelegateCommand(RefreshAsync, () => CanSearchEmployees);
         NewEmployeeCommand = new DelegateCommand(BeginCreateEmployee, () => CanStartCreate);
@@ -298,6 +292,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         RemoveEmploymentCategoryOptionCommand = new DelegateCommand(RemoveEmploymentCategoryOption, () => CanRemoveEmploymentCategoryOption);
         AddEmploymentLocationOptionCommand = new DelegateCommand(AddEmploymentLocationOption, () => CanManageSettingsOptions);
         RemoveEmploymentLocationOptionCommand = new DelegateCommand(RemoveEmploymentLocationOption, () => CanRemoveEmploymentLocationOption);
+        SelectMainNavigationSection(MainSection.TimeAndExpenses);
         BackupDirectoryPath = _backupRestoreService.GetDefaultBackupDirectory();
         BackupFileName = _backupRestoreService.CreateDefaultFileName(DateTimeOffset.Now);
         MonthlyRecord.PropertyChanged += OnMonthlyRecordPropertyChanged;
@@ -314,6 +309,57 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string StartupArgumentsHelp => StartupArgumentsHelpText;
     public MonthlyRecordViewModel MonthlyRecord { get; }
     public SqlExplorerViewModel SqlExplorer => _sqlExplorer;
+    public MainNavigationItemViewModel? SelectedMainNavigationItem
+    {
+        get => _selectedMainNavigationItem;
+        set
+        {
+            if (!SetProperty(ref _selectedMainNavigationItem, value))
+            {
+                return;
+            }
+
+            SyncMainNavigationSelection();
+            RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
+            RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
+            RaisePropertyChanged(nameof(IsReportingWorkspace));
+            RaisePropertyChanged(nameof(IsEmployeeWorkspace));
+            RaisePropertyChanged(nameof(IsSettingsWorkspace));
+            RaisePropertyChanged(nameof(IsHelpWorkspace));
+            RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
+            RaisePropertyChanged(nameof(ShowPayrollRunsWorkspace));
+            RaisePropertyChanged(nameof(ShowReportingWorkspace));
+            RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
+            RaisePropertyChanged(nameof(ShowSettingsWorkspace));
+            RaisePropertyChanged(nameof(ShowHelpWorkspace));
+            RaisePropertyChanged(nameof(ShowEmployeeSelectionArea));
+            RaisePropertyChanged(nameof(ShowPrimaryWorkspaceArea));
+            RaisePropertyChanged(nameof(ShowPrimaryWorkspaceHeader));
+            RaisePropertyChanged(nameof(CanSaveSettings));
+            RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+            RaiseActionStateChanged();
+        }
+    }
+    public SettingsNavigationItemViewModel? SelectedSettingsNavigationItem
+    {
+        get => _selectedSettingsNavigationItem;
+        set
+        {
+            if (!SetProperty(ref _selectedSettingsNavigationItem, value))
+            {
+                return;
+            }
+
+            RaisePropertyChanged(nameof(ShowSettingsSystemDbSection));
+            RaisePropertyChanged(nameof(ShowSettingsLayoutSection));
+            RaisePropertyChanged(nameof(ShowSettingsListsSection));
+            RaisePropertyChanged(nameof(ShowSettingsCalculationSection));
+            RaisePropertyChanged(nameof(ShowSettingsSqlSection));
+            RaisePropertyChanged(nameof(ShowSettingsPrintSection));
+            RaisePropertyChanged(nameof(ShowSettingsBackupSection));
+            RaisePropertyChanged(nameof(ShowSettingsImportSection));
+        }
+    }
     public string AppLogoText
     {
         get => _appLogoText;
@@ -337,6 +383,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<EditableSettingOptionViewModel> DepartmentOptions { get; }
     public ObservableCollection<EditableSettingOptionViewModel> EmploymentCategoryOptions { get; }
     public ObservableCollection<EditableSettingOptionViewModel> EmploymentLocationOptions { get; }
+    public ObservableCollection<MainNavigationItemViewModel> MainNavigationItems { get; }
+    public ObservableCollection<SettingsNavigationItemViewModel> SettingsNavigationItems { get; }
     public ObservableCollection<PayrollPreviewHelpToggleViewModel> PayrollPreviewHelpOptions { get; }
     public ObservableCollection<EmploymentContractHistoryItemViewModel> ContractHistory { get; }
     public ObservableCollection<PayrollCalculationSettingsVersionItemViewModel> SettingsVersionHistory { get; }
@@ -403,18 +451,26 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand RemoveEmploymentCategoryOptionCommand { get; }
     public DelegateCommand AddEmploymentLocationOptionCommand { get; }
     public DelegateCommand RemoveEmploymentLocationOptionCommand { get; }
-    public bool IsTimeAndExpensesWorkspace => _currentSection == WorkspaceSection.TimeAndExpenses;
-    public bool IsPayrollRunsWorkspace => _currentSection == WorkspaceSection.PayrollRuns;
-    public bool IsReportingWorkspace => _currentSection == WorkspaceSection.Reporting;
-    public bool IsEmployeeWorkspace => _currentSection == WorkspaceSection.Employees;
-    public bool IsSettingsWorkspace => _currentSection == WorkspaceSection.Settings;
-    public bool IsHelpWorkspace => _currentSection == WorkspaceSection.Help;
+    public bool IsTimeAndExpensesWorkspace => IsSelectedMainSection(MainSection.TimeAndExpenses);
+    public bool IsPayrollRunsWorkspace => IsSelectedMainSection(MainSection.PayrollRuns);
+    public bool IsReportingWorkspace => IsSelectedMainSection(MainSection.Reporting);
+    public bool IsEmployeeWorkspace => IsSelectedMainSection(MainSection.Employees);
+    public bool IsSettingsWorkspace => IsSelectedMainSection(MainSection.Settings);
+    public bool IsHelpWorkspace => IsSelectedMainSection(MainSection.Help);
     public bool ShowTimeAndExpensesWorkspace => IsTimeAndExpensesWorkspace;
     public bool ShowPayrollRunsWorkspace => IsPayrollRunsWorkspace;
     public bool ShowReportingWorkspace => IsReportingWorkspace;
     public bool ShowEmployeeWorkspace => IsEmployeeWorkspace;
     public bool ShowSettingsWorkspace => IsSettingsWorkspace;
     public bool ShowHelpWorkspace => IsHelpWorkspace;
+    public bool ShowSettingsSystemDbSection => IsSelectedSettingsSection(SettingsSection.SystemDb);
+    public bool ShowSettingsLayoutSection => IsSelectedSettingsSection(SettingsSection.Layout);
+    public bool ShowSettingsListsSection => IsSelectedSettingsSection(SettingsSection.Lists);
+    public bool ShowSettingsCalculationSection => IsSelectedSettingsSection(SettingsSection.Calculation);
+    public bool ShowSettingsSqlSection => IsSelectedSettingsSection(SettingsSection.Sql);
+    public bool ShowSettingsPrintSection => IsSelectedSettingsSection(SettingsSection.Print);
+    public bool ShowSettingsBackupSection => IsSelectedSettingsSection(SettingsSection.BackupRestore);
+    public bool ShowSettingsImportSection => IsSelectedSettingsSection(SettingsSection.Import);
     public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace && !IsHelpWorkspace;
     public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace && !IsHelpWorkspace;
     public bool ShowPrimaryWorkspaceHeader => !IsTimeAndExpensesWorkspace && !IsEmployeeWorkspace;
@@ -3501,59 +3557,85 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void SwitchToTimeAndExpensesWorkspace()
     {
-        SetWorkspaceSection(WorkspaceSection.TimeAndExpenses);
+        SelectMainNavigationSection(MainSection.TimeAndExpenses);
     }
 
     private void SwitchToEmployeesWorkspace()
     {
-        SetWorkspaceSection(WorkspaceSection.Employees);
+        SelectMainNavigationSection(MainSection.Employees);
     }
 
     private void SwitchToPayrollRunsWorkspace()
     {
-        SetWorkspaceSection(WorkspaceSection.PayrollRuns);
+        SelectMainNavigationSection(MainSection.PayrollRuns);
     }
 
     private void SwitchToReportingWorkspace()
     {
-        SetWorkspaceSection(WorkspaceSection.Reporting);
+        SelectMainNavigationSection(MainSection.Reporting);
     }
 
     private void SwitchToSettingsWorkspace()
     {
-        SetWorkspaceSection(WorkspaceSection.Settings);
+        SelectMainNavigationSection(MainSection.Settings);
     }
 
     private void SwitchToHelpWorkspace()
     {
-        SetWorkspaceSection(WorkspaceSection.Help);
+        SelectMainNavigationSection(MainSection.Help);
     }
 
-    private void SetWorkspaceSection(WorkspaceSection section)
+    private void SelectMainNavigationSection(MainSection section)
     {
-        if (_currentSection == section)
+        var targetItem = MainNavigationItems.FirstOrDefault(item => item.Section == section);
+        if (targetItem is null || ReferenceEquals(SelectedMainNavigationItem, targetItem))
         {
             return;
         }
 
-        _currentSection = section;
-        RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
-        RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
-        RaisePropertyChanged(nameof(IsReportingWorkspace));
-        RaisePropertyChanged(nameof(IsEmployeeWorkspace));
-        RaisePropertyChanged(nameof(IsSettingsWorkspace));
-        RaisePropertyChanged(nameof(IsHelpWorkspace));
-        RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
-        RaisePropertyChanged(nameof(ShowPayrollRunsWorkspace));
-        RaisePropertyChanged(nameof(ShowReportingWorkspace));
-        RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
-        RaisePropertyChanged(nameof(ShowSettingsWorkspace));
-        RaisePropertyChanged(nameof(ShowHelpWorkspace));
-        RaisePropertyChanged(nameof(ShowEmployeeSelectionArea));
-        RaisePropertyChanged(nameof(ShowPrimaryWorkspaceArea));
-        RaisePropertyChanged(nameof(ShowPrimaryWorkspaceHeader));
-        RaisePropertyChanged(nameof(CanSaveSettings));
-        RaisePropertyChanged(nameof(CanCreatePayrollPdf));
-        RaiseActionStateChanged();
+        SelectedMainNavigationItem = targetItem;
+    }
+
+    private void InitializeMainNavigation()
+    {
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Employees, "Mitarbeitende", true, SwitchToEmployeesWorkspace));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.TimeAndExpenses, "Zeit- und Spesenerfassung", true, SwitchToTimeAndExpensesWorkspace));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.PayrollRuns, "Lohnlaeufe", true, SwitchToPayrollRunsWorkspace));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.AhvAndDeductions, "AHV / Abzuege", false, null));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.WithholdingTax, "Quellensteuer", false, null));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Reporting, "Reporting", true, SwitchToReportingWorkspace));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Settings, "Einstellungen", true, SwitchToSettingsWorkspace));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Help, "Hilfe", true, SwitchToHelpWorkspace));
+    }
+
+    private void InitializeSettingsNavigation()
+    {
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.SystemDb, "System / DB"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.Layout, "Layout"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.Lists, "Listen"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.Calculation, "Berechnung"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.Sql, "SQL"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.Print, "Druck / PDF"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.BackupRestore, "Backup / Restore"));
+        SettingsNavigationItems.Add(new SettingsNavigationItemViewModel(SettingsSection.Import, "Import"));
+        SelectedSettingsNavigationItem = SettingsNavigationItems[0];
+    }
+
+    private bool IsSelectedSettingsSection(SettingsSection section)
+    {
+        return SelectedSettingsNavigationItem?.Section == section;
+    }
+
+    private bool IsSelectedMainSection(MainSection section)
+    {
+        return SelectedMainNavigationItem?.Section == section;
+    }
+
+    private void SyncMainNavigationSelection()
+    {
+        foreach (var item in MainNavigationItems)
+        {
+            item.IsSelected = ReferenceEquals(item, SelectedMainNavigationItem);
+        }
     }
 }

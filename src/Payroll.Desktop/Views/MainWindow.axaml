@@ -36,46 +36,26 @@
 
     <Border Grid.Row="1" Classes="surface-panel" Padding="12" Margin="0,0,0,16">
       <Grid ColumnDefinitions="Auto,*">
-        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-          <Button Classes="nav-active" Content="Mitarbeitende" IsVisible="{Binding IsEmployeeWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Mitarbeitende" Command="{Binding ShowEmployeesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-          <Button Classes="nav-active" Content="Zeit- und Spesenerfassung" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Zeit- und Spesenerfassung" Command="{Binding ShowTimeAndExpensesCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-          <Button Classes="nav-active" Content="Lohnlaeufe" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Lohnlaeufe" Command="{Binding ShowPayrollRunsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-          <Button Classes="nav-placeholder" Content="AHV / Abzuege" IsEnabled="False" />
-          <Button Classes="nav-placeholder" Content="Quellensteuer" IsEnabled="False" />
-          <Button Classes="nav-active" Content="Reporting" IsVisible="{Binding IsReportingWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Reporting" Command="{Binding ShowReportingCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-          <Button Classes="nav-active" Content="Einstellungen" IsVisible="{Binding IsSettingsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Einstellungen" Command="{Binding ShowSettingsCommand}" IsVisible="{Binding IsHelpWorkspace}" />
-          <Button Classes="nav-active" Content="Hilfe" IsVisible="{Binding IsHelpWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsTimeAndExpensesWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsPayrollRunsWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsReportingWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsEmployeeWorkspace}" />
-          <Button Classes="nav-placeholder" Content="Hilfe" Command="{Binding ShowHelpCommand}" IsVisible="{Binding IsSettingsWorkspace}" />
-        </StackPanel>
+        <ListBox Grid.Column="0"
+                 BorderThickness="0"
+                 Background="Transparent"
+                 ItemsSource="{Binding MainNavigationItems}"
+                 SelectedItem="{Binding SelectedMainNavigationItem, Mode=TwoWay}">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="10" />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Button Content="{Binding Label}"
+                      Command="{Binding ActivateCommand}"
+                      IsEnabled="{Binding IsEnabled}"
+                      Classes.nav-active="{Binding IsSelected}"
+                      Classes.nav-placeholder="{Binding IsNotSelected}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
         <Grid Grid.Column="1" ColumnDefinitions="210,92,34,34" HorizontalAlignment="Right" Margin="12,0,0,0" IsVisible="{Binding ShowEmployeeSelectionArea}">
           <TextBox
               IsEnabled="{Binding CanSearchEmployees}"
@@ -164,24 +144,21 @@
                 <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="10" VerticalAlignment="Top">
                   <StackPanel Spacing="8">
                     <TextBlock FontWeight="SemiBold" Text="Bereiche" />
-                    <ListBox x:Name="SettingsNavigationList"
-                             BorderThickness="0"
+                    <ListBox BorderThickness="0"
                              Background="Transparent"
-                             SelectionChanged="OnSettingsSectionSelectionChanged">
-                      <ListBoxItem IsSelected="True" Tag="SettingsSystemDbSection" Content="System / DB" />
-                      <ListBoxItem Tag="SettingsLayoutSection" Content="Layout" />
-                      <ListBoxItem Tag="SettingsListsSection" Content="Listen" />
-                      <ListBoxItem Tag="SettingsCalculationSection" Content="Berechnung" />
-                      <ListBoxItem Tag="SettingsSqlSection" Content="SQL" />
-                      <ListBoxItem Tag="SettingsPrintSection" Content="Druck / PDF" />
-                      <ListBoxItem Tag="SettingsBackupSection" Content="Backup / Restore" />
-                      <ListBoxItem Tag="SettingsImportSection" Content="Import" />
+                             ItemsSource="{Binding SettingsNavigationItems}"
+                             SelectedItem="{Binding SelectedSettingsNavigationItem, Mode=TwoWay}">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate>
+                          <TextBlock Text="{Binding Label}" />
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
                     </ListBox>
                   </StackPanel>
                 </Border>
 
                 <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="0">
-              <Border x:Name="SettingsSystemDbSection">
+              <Border IsVisible="{Binding ShowSettingsSystemDbSection}">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="Aktive Datenbank" />
                   <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
@@ -206,7 +183,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsLayoutSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsLayoutSection}">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="App allgemein" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Zentrale Screen-Werte fuer Schrift, Farben und Logo. Diese Werte steuern das laufende Programm." TextWrapping="Wrap" />
@@ -247,7 +224,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsListsSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsListsSection}">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="Mitarbeitenden-Listen" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Abteilungen, Anstellungskategorien und Anstellungsorte werden zentral gepflegt und im Mitarbeitendenformular als Auswahl verwendet." TextWrapping="Wrap" />
@@ -301,7 +278,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsCalculationSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsCalculationSection}">
                 <StackPanel Spacing="20" Margin="0,12,0,0">
                   <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="12">
@@ -510,7 +487,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsSqlSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsSqlSection}">
                 <StackPanel DataContext="{Binding SqlExplorer}" Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="SQL-Explorer" />
                   <TextBlock Foreground="#FF5F6B7A"
@@ -632,7 +609,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsPrintSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsPrintSection}">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="Druck / Print" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Getrennte Werte fuer Ausdrucke und den PDF-Export. Das Druck-Template kann hier direkt angepasst werden." TextWrapping="Wrap" />
@@ -683,7 +660,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsBackupSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsBackupSection}">
                 <StackPanel Spacing="16" Margin="0,12,0,0">
                   <StackPanel Spacing="8">
                     <TextBlock FontWeight="SemiBold" Text="Backup erstellen" />
@@ -729,7 +706,7 @@
                 </StackPanel>
               </Border>
 
-              <Border x:Name="SettingsImportSection" IsVisible="False">
+              <Border IsVisible="{Binding ShowSettingsImportSection}">
                 <StackPanel Spacing="20" Margin="0,12,0,0">
                   <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="12">
@@ -952,9 +929,7 @@
               </StackPanel>
             </Border>
 
-            <TabControl>
-              <TabItem Header="Template-Hilfe">
-                <StackPanel Spacing="12" Margin="0,12,0,0">
+            <StackPanel Spacing="12" Margin="0,12,0,0">
                   <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="8">
                       <TextBlock FontWeight="SemiBold" Text="Einstellungen im Ueberblick" />
@@ -1084,9 +1059,7 @@
                       </Grid>
                     </StackPanel>
                   </Border>
-                </StackPanel>
-              </TabItem>
-            </TabControl>
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
       </controls:AppSectionCard>
