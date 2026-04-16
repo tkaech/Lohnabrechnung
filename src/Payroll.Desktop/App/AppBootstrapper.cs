@@ -39,6 +39,7 @@ public sealed class AppBootstrapper
         EnsureConfigurationSeeded(payrollSettingsService);
         EnsureTestDataSeeded(dbContext, runtimeOptions.SeedTestData);
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var sqlExplorerViewModel = new SqlExplorerViewModel(dbContext);
         var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
         var backupRestoreService = new BackupRestoreService(() => CreateDbContext(databasePath), employeeService, monthlyRecordService, payrollSettingsService, backupDirectory);
         var pdfExportService = new PdfExportService();
@@ -53,6 +54,7 @@ public sealed class AppBootstrapper
             payrollSettingsService,
             reportingService,
             monthlyRecordService,
+            sqlExplorerViewModel,
             monthlyRecordViewModel,
             workspaceLabel,
             databasePath,

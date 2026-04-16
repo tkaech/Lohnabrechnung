@@ -145,11 +145,43 @@
       </controls:AppSectionCard>
 
       <controls:AppSectionCard Grid.Column="0" Grid.ColumnSpan="2" Header="Einstellungen" Margin="8,0,0,0" IsVisible="{Binding ShowSettingsWorkspace}">
-        <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <Grid RowDefinitions="Auto,Auto" MinHeight="0">
-          <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
-            <TabControl>
-              <TabItem Header="System / DB">
+        <Grid RowDefinitions="Auto,*" MinHeight="0">
+          <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
+              <StackPanel Spacing="2">
+                <TextBlock FontWeight="SemiBold" Text="Berechnungs- und Systemeinstellungen" />
+                <TextBlock Foreground="#FF5F6B7A"
+                           Text="Die Bereiche werden links ueber eine feste Liste geoeffnet. Rechts bleibt der bestehende Inhalt des gewaehlten Bereichs sichtbar."
+                           TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="1" Classes="primary-action" Command="{Binding SaveSettingsCommand}" Content="Einstellungen speichern" />
+            </Grid>
+          </Border>
+
+          <ScrollViewer Grid.Row="1" MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <Border Background="#FFF8FAFC" CornerRadius="8" Padding="16">
+              <Grid ColumnDefinitions="220,*" MinHeight="0">
+                <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="10" VerticalAlignment="Top">
+                  <StackPanel Spacing="8">
+                    <TextBlock FontWeight="SemiBold" Text="Bereiche" />
+                    <ListBox x:Name="SettingsNavigationList"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             SelectionChanged="OnSettingsSectionSelectionChanged">
+                      <ListBoxItem IsSelected="True" Tag="SettingsSystemDbSection" Content="System / DB" />
+                      <ListBoxItem Tag="SettingsLayoutSection" Content="Layout" />
+                      <ListBoxItem Tag="SettingsListsSection" Content="Listen" />
+                      <ListBoxItem Tag="SettingsCalculationSection" Content="Berechnung" />
+                      <ListBoxItem Tag="SettingsSqlSection" Content="SQL" />
+                      <ListBoxItem Tag="SettingsPrintSection" Content="Druck / PDF" />
+                      <ListBoxItem Tag="SettingsBackupSection" Content="Backup / Restore" />
+                      <ListBoxItem Tag="SettingsImportSection" Content="Import" />
+                    </ListBox>
+                  </StackPanel>
+                </Border>
+
+                <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="0">
+              <Border x:Name="SettingsSystemDbSection">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="Aktive Datenbank" />
                   <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
@@ -172,9 +204,9 @@
                   <TextBlock Foreground="#FF5F6B7A" Text="ENV-Override: `PAYROLLAPP_DATABASE_PATH=/voller/pfad/zur/datei.db`" TextWrapping="Wrap" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Appsettings: `src/Payroll.Desktop/appsettings.json` und `appsettings.Development.json`." TextWrapping="Wrap" />
                 </StackPanel>
-              </TabItem>
+              </Border>
 
-              <TabItem Header="Layout">
+              <Border x:Name="SettingsLayoutSection" IsVisible="False">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="App allgemein" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Zentrale Screen-Werte fuer Schrift, Farben und Logo. Diese Werte steuern das laufende Programm." TextWrapping="Wrap" />
@@ -213,9 +245,9 @@
                 </StackPanel>
                   </Grid>
                 </StackPanel>
-              </TabItem>
+              </Border>
 
-              <TabItem Header="Listen">
+              <Border x:Name="SettingsListsSection" IsVisible="False">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="Mitarbeitenden-Listen" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Abteilungen, Anstellungskategorien und Anstellungsorte werden zentral gepflegt und im Mitarbeitendenformular als Auswahl verwendet." TextWrapping="Wrap" />
@@ -267,11 +299,13 @@
                     </StackPanel>
                   </Grid>
                 </StackPanel>
-              </TabItem>
+              </Border>
 
-              <TabItem Header="Berechnung">
-                <TabControl Margin="0,12,0,0">
-                  <TabItem Header="Allgemein">
+              <Border x:Name="SettingsCalculationSection" IsVisible="False">
+                <StackPanel Spacing="20" Margin="0,12,0,0">
+                  <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                      <TextBlock FontSize="18" FontWeight="SemiBold" Text="Allgemein" />
                     <StackPanel Spacing="12" Margin="0,12,0,0">
                       <Grid ColumnDefinitions="150,150,Auto,Auto,*" RowDefinitions="Auto">
                         <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
@@ -353,9 +387,12 @@
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
                     </StackPanel>
-                  </TabItem>
+                    </StackPanel>
+                  </Border>
 
-                  <TabItem Header="Stundenlohn">
+                  <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                      <TextBlock FontSize="18" FontWeight="SemiBold" Text="Stundenlohn" />
                     <StackPanel Spacing="12" Margin="0,12,0,0">
                       <Grid ColumnDefinitions="150,150,Auto,Auto,*" RowDefinitions="Auto">
                         <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
@@ -441,9 +478,12 @@
                         </StackPanel>
                       </Grid>
                     </StackPanel>
-                  </TabItem>
+                    </StackPanel>
+                  </Border>
 
-                  <TabItem Header="Monatslohn">
+                  <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                      <TextBlock FontSize="18" FontWeight="SemiBold" Text="Monatslohn" />
                     <StackPanel Spacing="12" Margin="0,12,0,0">
                       <Grid ColumnDefinitions="150,150,Auto,Auto,*" RowDefinitions="Auto">
                         <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
@@ -465,11 +505,134 @@
                                    TextWrapping="Wrap" />
                       </Border>
                     </StackPanel>
-                  </TabItem>
-                </TabControl>
-              </TabItem>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Border>
 
-              <TabItem Header="Druck / PDF">
+              <Border x:Name="SettingsSqlSection" IsVisible="False">
+                <StackPanel DataContext="{Binding SqlExplorer}" Spacing="12" Margin="0,12,0,0">
+                  <TextBlock FontWeight="SemiBold" Text="SQL-Explorer" />
+                  <TextBlock Foreground="#FF5F6B7A"
+                             Text="Generischer Read-only-Zugriff auf freigegebene Tabellen. Kritische Tabellen bleiben sichtbar, aber bewusst nur lesend."
+                             TextWrapping="Wrap" />
+
+                  <Grid ColumnDefinitions="280,120,Auto" RowDefinitions="Auto">
+                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Tabelle" />
+                      <ComboBox ItemsSource="{Binding Tables}" SelectedItem="{Binding SelectedTable, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding DisplayName}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,8,0">
+                      <TextBlock Classes="section-caption" Text="Limit" />
+                      <ComboBox ItemsSource="{Binding LimitOptions}" SelectedItem="{Binding SelectedLimit, Mode=TwoWay}" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Margin="8,22,0,0" Command="{Binding ReloadCommand}" Content="Neu laden" />
+                  </Grid>
+
+                  <Border Background="#FFF8FAFC" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="section-caption" Text="Policy" />
+                      <TextBlock FontWeight="SemiBold" Text="{Binding SelectedTable.PolicyDisplay}" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="{Binding SelectedTablePolicyHint}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Background="#FFFFF4E5" BorderBrush="#FFF1C18A" BorderThickness="1" CornerRadius="8" Padding="10" IsVisible="{Binding ShowCriticalPolicyWarning}">
+                    <TextBlock Foreground="#FF6B4A1F"
+                               Text="Diese Tabelle ist kritisch. Historisierung, Snapshots oder Berechnungsbezuege koennen durch direkte Mutation ungueltig werden."
+                               TextWrapping="Wrap" />
+                  </Border>
+
+                  <TextBlock Foreground="#FF5F6B7A" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+
+                  <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                      <StackPanel Spacing="0">
+                        <ItemsControl ItemsSource="{Binding Columns}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Border Width="{Binding Width}" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Background="#FFF8FAFC" Padding="8,6">
+                                <StackPanel Spacing="2">
+                                  <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Classes="section-caption" Text="{Binding ColumnHint}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ItemsControl ItemsSource="{Binding Columns}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Border Width="{Binding Width}" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Background="#FFFFFFFF" Padding="6">
+                                <TextBox Text="{Binding FilterValue, Mode=TwoWay}" Watermark="{Binding FilterWatermark}" />
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}" MinHeight="220">
+                          <ListBox.ItemTemplate>
+                            <DataTemplate>
+                              <ItemsControl ItemsSource="{Binding Cells}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                  </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate>
+                                    <Border Width="{Binding Width}" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="8,6">
+                                      <TextBlock Text="{Binding Value}" TextTrimming="CharacterEllipsis" />
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </DataTemplate>
+                          </ListBox.ItemTemplate>
+                        </ListBox>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </Border>
+
+                  <Border Background="#FFF8FAFC" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
+                    <StackPanel Spacing="8">
+                      <TextBlock FontWeight="SemiBold" Text="Detailansicht" />
+                      <TextBlock Foreground="#FF5F6B7A"
+                                 Text="Ausgewaehlte Zeile als Key/Value-Ansicht. Der Explorer bleibt in Schritt 1 strikt read-only."
+                                 TextWrapping="Wrap" />
+                      <ItemsControl ItemsSource="{Binding SelectedRowDetails}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Grid ColumnDefinitions="260,*" Margin="0,0,0,6">
+                              <TextBlock FontWeight="SemiBold" Text="{Binding Label}" />
+                              <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Border>
+
+              <Border x:Name="SettingsPrintSection" IsVisible="False">
                 <StackPanel Spacing="12" Margin="0,12,0,0">
                   <TextBlock FontWeight="SemiBold" Text="Druck / Print" />
                   <TextBlock Foreground="#FF5F6B7A" Text="Getrennte Werte fuer Ausdrucke und den PDF-Export. Das Druck-Template kann hier direkt angepasst werden." TextWrapping="Wrap" />
@@ -518,9 +681,9 @@
                     <TextBox Text="{Binding SettingsPrintTemplate, Mode=TwoWay}" AcceptsReturn="True" Height="320" TextWrapping="Wrap" FontFamily="Courier New, DejaVu Sans Mono, Consolas" />
                   </StackPanel>
                 </StackPanel>
-              </TabItem>
+              </Border>
 
-              <TabItem Header="Backup / Restore">
+              <Border x:Name="SettingsBackupSection" IsVisible="False">
                 <StackPanel Spacing="16" Margin="0,12,0,0">
                   <StackPanel Spacing="8">
                     <TextBlock FontWeight="SemiBold" Text="Backup erstellen" />
@@ -564,11 +727,13 @@
                     </Grid>
                   </StackPanel>
                 </StackPanel>
-              </TabItem>
+              </Border>
 
-              <TabItem Header="Import">
-                <TabControl Margin="0,12,0,0">
-                  <TabItem Header="Personendaten">
+              <Border x:Name="SettingsImportSection" IsVisible="False">
+                <StackPanel Spacing="20" Margin="0,12,0,0">
+                  <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                      <TextBlock FontSize="18" FontWeight="SemiBold" Text="Personendaten" />
                     <StackPanel Spacing="12" Margin="0,12,0,0">
                       <TextBlock FontWeight="SemiBold" Text="CSV-Datei laden" />
                       <TextBlock Foreground="#FF5F6B7A" Text="CSV-Datei waehlen, Aufbau pruefen und anschliessend die Spalten auf die Felder des Lohnprogramms abbilden." TextWrapping="Wrap" />
@@ -653,9 +818,12 @@
                       <TextBlock Foreground="#FF5F6B7A" Text="{Binding PersonImportStatusMessage}" TextWrapping="Wrap" />
                       <Button HorizontalAlignment="Right" Classes="primary-action" Content="Personendaten importieren" Click="OnOpenPersonImportPreviewClick" />
                     </StackPanel>
-                  </TabItem>
+                    </StackPanel>
+                  </Border>
 
-                  <TabItem Header="Stundendaten">
+                  <Border Background="#FFFFFFFF" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                      <TextBlock FontSize="18" FontWeight="SemiBold" Text="Stundendaten" />
                     <StackPanel Spacing="12" Margin="0,12,0,0">
                       <TextBlock FontWeight="SemiBold" Text="CSV-Datei laden" />
                       <TextBlock Foreground="#FF5F6B7A" Text="CSV-Datei waehlen, Spalten fuer den Stundenimport zuordnen und den Importmonat explizit festlegen. Das Datum kommt nicht aus der CSV, sondern aus dem Importkontext." TextWrapping="Wrap" />
@@ -763,18 +931,15 @@
                       <TextBlock Foreground="#FF5F6B7A" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
                       <Button HorizontalAlignment="Right" Classes="primary-action" Content="Stundendaten importieren" Click="OnImportTimeDataClick" IsEnabled="{Binding CanImportTimeData}" />
                     </StackPanel>
-                  </TabItem>
-                </TabControl>
-              </TabItem>
-            </TabControl>
-          </Border>
-
-          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
-            <TextBlock Foreground="#FF5F6B7A" VerticalAlignment="Center" Text="Die Werte gelten zentral fuer die spaetere Lohnberechnung und werden nicht mehr in Berechnungen hart codiert." TextWrapping="Wrap" />
-            <Button Grid.Column="1" Classes="primary-action" Command="{Binding SaveSettingsCommand}" Content="Einstellungen speichern" />
-          </Grid>
-          </Grid>
-        </ScrollViewer>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </ScrollViewer>
+        </Grid>
       </controls:AppSectionCard>
 
       <controls:AppSectionCard Grid.Column="0" Grid.ColumnSpan="2" Header="Hilfe" Margin="8,0,0,0" IsVisible="{Binding ShowHelpWorkspace}">

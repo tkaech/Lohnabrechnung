@@ -55,6 +55,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly PayrollSettingsService _payrollSettingsService;
     private readonly ReportingService _reportingService;
     private readonly MonthlyRecordService _monthlyRecordService;
+    private readonly SqlExplorerViewModel _sqlExplorer;
     private EmployeeListItemViewModel? _selectedEmployee;
     private Guid? _currentEmployeeId;
     private Guid? _pendingEmployeeId;
@@ -189,6 +190,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     private WorkspaceSection _currentSection = WorkspaceSection.TimeAndExpenses;
 
     public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
+        : this(
+            employeeService,
+            importService,
+            backupRestoreService,
+            payrollSettingsService,
+            reportingService,
+            monthlyRecordService,
+            new SqlExplorerViewModel(),
+            monthlyRecord,
+            workspaceLabel,
+            databasePath,
+            environmentName)
+    {
+    }
+
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
     {
         _employeeService = employeeService;
         _importService = importService;
@@ -196,6 +213,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _payrollSettingsService = payrollSettingsService;
         _reportingService = reportingService;
         _monthlyRecordService = monthlyRecordService;
+        _sqlExplorer = sqlExplorer;
         MonthlyRecord = monthlyRecord;
         WorkspaceLabel = workspaceLabel;
         DatabasePathDisplay = string.IsNullOrWhiteSpace(databasePath) ? "Kein Pfad verfuegbar." : databasePath;
@@ -295,6 +313,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string EnvironmentNameDisplay { get; }
     public string StartupArgumentsHelp => StartupArgumentsHelpText;
     public MonthlyRecordViewModel MonthlyRecord { get; }
+    public SqlExplorerViewModel SqlExplorer => _sqlExplorer;
     public string AppLogoText
     {
         get => _appLogoText;
@@ -1434,6 +1453,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
+        await SqlExplorer.InitializeAsync();
         await LoadSettingsAsync();
         await LoadImportConfigurationsAsync();
         await LoadImportedTimeMonthsAsync();

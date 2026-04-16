@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SelectSettingsSection("SettingsSystemDbSection");
         Opened += OnOpened;
         Deactivated += OnDeactivated;
     }
@@ -207,6 +208,39 @@ public sealed partial class MainWindow : Window
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
         {
             monthlyRecord.CloseAllPickers();
+        }
+    }
+
+    private void OnSettingsSectionSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox { SelectedItem: ListBoxItem { Tag: string sectionName } })
+        {
+            return;
+        }
+
+        SelectSettingsSection(sectionName);
+    }
+
+    private void SelectSettingsSection(string sectionName)
+    {
+        var sectionNames = new[]
+        {
+            "SettingsSystemDbSection",
+            "SettingsLayoutSection",
+            "SettingsListsSection",
+            "SettingsCalculationSection",
+            "SettingsSqlSection",
+            "SettingsPrintSection",
+            "SettingsBackupSection",
+            "SettingsImportSection"
+        };
+
+        foreach (var currentSectionName in sectionNames)
+        {
+            if (this.FindControl<Control>(currentSectionName) is { } section)
+            {
+                section.IsVisible = string.Equals(currentSectionName, sectionName, StringComparison.Ordinal);
+            }
         }
     }
 
