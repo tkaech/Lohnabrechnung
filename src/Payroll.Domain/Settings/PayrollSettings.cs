@@ -19,6 +19,11 @@ public sealed class PayrollSettings : AuditableEntity
     public const string DefaultAppBackgroundColorHex = "#FFF5F7FA";
     public const string DefaultAppAccentColorHex = "#FF14324A";
     public const string DefaultAppLogoText = "PA";
+    public const decimal DefaultAppPagePadding = 20m;
+    public const decimal DefaultAppPanelPadding = 12m;
+    public const decimal DefaultAppSectionSpacing = 12m;
+    public const decimal DefaultAppPanelCornerRadius = 8m;
+    public const decimal DefaultAppTableCellVerticalPadding = 6m;
     public const string DefaultPrintFontFamily = "Helvetica";
     public const decimal DefaultPrintFontSize = 9m;
     public const string DefaultPrintTextColorHex = "#FF000000";
@@ -42,6 +47,11 @@ public sealed class PayrollSettings : AuditableEntity
         AppAccentColorHex = DefaultAppAccentColorHex;
         AppLogoText = DefaultAppLogoText;
         AppLogoPath = string.Empty;
+        AppPagePadding = DefaultAppPagePadding;
+        AppPanelPadding = DefaultAppPanelPadding;
+        AppSectionSpacing = DefaultAppSectionSpacing;
+        AppPanelCornerRadius = DefaultAppPanelCornerRadius;
+        AppTableCellVerticalPadding = DefaultAppTableCellVerticalPadding;
         PrintFontFamily = DefaultPrintFontFamily;
         PrintFontSize = DefaultPrintFontSize;
         PrintTextColorHex = DefaultPrintTextColorHex;
@@ -86,6 +96,11 @@ public sealed class PayrollSettings : AuditableEntity
             DefaultAppAccentColorHex,
             DefaultAppLogoText,
             string.Empty,
+            DefaultAppPagePadding,
+            DefaultAppPanelPadding,
+            DefaultAppSectionSpacing,
+            DefaultAppPanelCornerRadius,
+            DefaultAppTableCellVerticalPadding,
             DefaultPrintFontFamily,
             DefaultPrintFontSize,
             DefaultPrintTextColorHex,
@@ -119,6 +134,11 @@ public sealed class PayrollSettings : AuditableEntity
     public string AppAccentColorHex { get; private set; } = string.Empty;
     public string AppLogoText { get; private set; } = string.Empty;
     public string AppLogoPath { get; private set; } = string.Empty;
+    public decimal AppPagePadding { get; private set; }
+    public decimal AppPanelPadding { get; private set; }
+    public decimal AppSectionSpacing { get; private set; }
+    public decimal AppPanelCornerRadius { get; private set; }
+    public decimal AppTableCellVerticalPadding { get; private set; }
     public string PrintFontFamily { get; private set; } = string.Empty;
     public decimal PrintFontSize { get; private set; }
     public string PrintTextColorHex { get; private set; } = string.Empty;
@@ -164,6 +184,11 @@ public sealed class PayrollSettings : AuditableEntity
         string? appAccentColorHex,
         string? appLogoText,
         string? appLogoPath,
+        decimal appPagePadding,
+        decimal appPanelPadding,
+        decimal appSectionSpacing,
+        decimal appPanelCornerRadius,
+        decimal appTableCellVerticalPadding,
         string? printFontFamily,
         decimal printFontSize,
         string? printTextColorHex,
@@ -180,6 +205,11 @@ public sealed class PayrollSettings : AuditableEntity
         AppAccentColorHex = NormalizeStringOrDefault(appAccentColorHex, DefaultAppAccentColorHex);
         AppLogoText = NormalizeStringOrDefault(appLogoText, DefaultAppLogoText);
         AppLogoPath = NormalizeOptional(appLogoPath) ?? string.Empty;
+        AppPagePadding = ClampLayoutValue(appPagePadding, 4m, 24m, DefaultAppPagePadding);
+        AppPanelPadding = ClampLayoutValue(appPanelPadding, 4m, 16m, DefaultAppPanelPadding);
+        AppSectionSpacing = ClampLayoutValue(appSectionSpacing, 2m, 20m, DefaultAppSectionSpacing);
+        AppPanelCornerRadius = ClampLayoutValue(appPanelCornerRadius, 0m, 16m, DefaultAppPanelCornerRadius);
+        AppTableCellVerticalPadding = ClampLayoutValue(appTableCellVerticalPadding, 2m, 12m, DefaultAppTableCellVerticalPadding);
         PrintFontFamily = NormalizeStringOrDefault(printFontFamily, DefaultPrintFontFamily);
         PrintFontSize = Guard.AgainstNegative(printFontSize, nameof(printFontSize)) == 0m ? DefaultPrintFontSize : printFontSize;
         PrintTextColorHex = NormalizeStringOrDefault(printTextColorHex, DefaultPrintTextColorHex);
@@ -188,6 +218,27 @@ public sealed class PayrollSettings : AuditableEntity
         PrintLogoText = NormalizeStringOrDefault(printLogoText, DefaultPrintLogoText);
         PrintLogoPath = NormalizeOptional(printLogoPath) ?? string.Empty;
         Touch();
+    }
+
+    private static decimal ClampLayoutValue(decimal value, decimal min, decimal max, decimal fallback)
+    {
+        var sanitized = Guard.AgainstNegative(value, nameof(value));
+        if (sanitized == 0m)
+        {
+            sanitized = fallback;
+        }
+
+        if (sanitized < min)
+        {
+            return min;
+        }
+
+        if (sanitized > max)
+        {
+            return max;
+        }
+
+        return sanitized;
     }
 
     public void UpdateDeductionAndVehicleRates(

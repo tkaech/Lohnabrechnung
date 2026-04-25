@@ -28,6 +28,13 @@ public static class ThemeSettingsApplier
         resources["Theme.Color.TextMuted"] = CreateBrush(settings.AppMutedTextColorHex, Payroll.Domain.Settings.PayrollSettings.DefaultAppMutedTextColorHex);
         resources["Theme.Color.AppBackground"] = CreateBrush(settings.AppBackgroundColorHex, Payroll.Domain.Settings.PayrollSettings.DefaultAppBackgroundColorHex);
         resources["Theme.Color.Brand"] = CreateBrush(settings.AppAccentColorHex, Payroll.Domain.Settings.PayrollSettings.DefaultAppAccentColorHex);
+        resources["Theme.Layout.PagePadding"] = new Thickness((double)settings.AppPagePadding);
+        resources["Theme.Layout.PanelPadding"] = new Thickness((double)settings.AppPanelPadding);
+        resources["Theme.Layout.SectionSpacing"] = (double)settings.AppSectionSpacing;
+        resources["Theme.Layout.SectionSpacing.TopMargin"] = new Thickness(0d, (double)settings.AppSectionSpacing, 0d, 0d);
+        resources["Theme.Layout.PanelCornerRadius"] = new CornerRadius((double)settings.AppPanelCornerRadius);
+        resources["Theme.Layout.TableCellVerticalPadding"] = (double)settings.AppTableCellVerticalPadding;
+        resources["Theme.Layout.TableCellPadding"] = new Thickness(8d, (double)settings.AppTableCellVerticalPadding);
 
         resources["Print.FontFamily"] = CreateFontFamily(settings.PrintFontFamily, Payroll.Domain.Settings.PayrollSettings.DefaultPrintFontFamily);
         resources["Print.FontSize.Body"] = (double)settings.PrintFontSize;

@@ -1,16 +1,20 @@
 using System.Data.Common;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Payroll.Application.AnnualSalary;
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
 using Payroll.Application.Imports;
+using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
+using Payroll.Infrastructure.AnnualSalary;
 using Payroll.Infrastructure.BackupRestore;
 using Payroll.Infrastructure.Employees;
 using Payroll.Infrastructure.Imports;
+using Payroll.Infrastructure.Layout;
 using Payroll.Infrastructure.MonthlyRecords;
 using Payroll.Infrastructure.Persistence;
 using Payroll.Infrastructure.Reporting;
@@ -39,12 +43,18 @@ public sealed class AppBootstrapper
         EnsureConfigurationSeeded(payrollSettingsService);
         EnsureTestDataSeeded(dbContext, runtimeOptions.SeedTestData);
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var annualSalaryRepository = new AnnualSalaryRepository(dbContext);
+        var annualSalaryService = new AnnualSalaryService(annualSalaryRepository);
         var sqlExplorerViewModel = new SqlExplorerViewModel(dbContext);
         var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
         var backupRestoreService = new BackupRestoreService(() => CreateDbContext(databasePath), employeeService, monthlyRecordService, payrollSettingsService, backupDirectory);
         var pdfExportService = new PdfExportService();
         var reportingService = new ReportingService(employeeService, monthlyRecordService, payrollSettingsService, pdfExportService);
         var monthlyRecordViewModel = new MonthlyRecordViewModel(monthlyRecordService);
+        var workspaceRootPath = ResolveWorkspaceRoot();
+        var layoutParameterFileRepository = new LayoutParameterFileRepository(workspaceRootPath);
+        var layoutParameterFileService = new LayoutParameterFileService(layoutParameterFileRepository);
+        var layoutParameterFilesViewModel = new LayoutParameterFilesViewModel(layoutParameterFileService);
         var workspaceLabel = $"Datenbank unter `{databasePath}`. Schema wird ueber EF-Migrationen aktualisiert; bestehende Daten bleiben erhalten.";
 
         return new MainWindowViewModel(
@@ -56,9 +66,52 @@ public sealed class AppBootstrapper
             monthlyRecordService,
             sqlExplorerViewModel,
             monthlyRecordViewModel,
+            layoutParameterFilesViewModel,
             workspaceLabel,
             databasePath,
-            runtimeOptions.EnvironmentName);
+            runtimeOptions.EnvironmentName,
+            annualSalaryService);
+    }
+
+    private static string ResolveWorkspaceRoot()
+    {
+        foreach (var candidate in new[]
+                 {
+                     Directory.GetCurrentDirectory(),
+                     AppContext.BaseDirectory
+                 })
+        {
+            var resolved = FindWorkspaceRoot(candidate);
+            if (resolved is not null)
+            {
+                return resolved;
+            }
+        }
+
+        throw new InvalidOperationException("Workspace-Root fuer Layout-Parameterdateien konnte nicht ermittelt werden.");
+    }
+
+    private static string? FindWorkspaceRoot(string startDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(startDirectory))
+        {
+            return null;
+        }
+
+        var current = new DirectoryInfo(Path.GetFullPath(startDirectory));
+        while (current is not null)
+        {
+            var designSystemPath = Path.Combine(current.FullName, "src", "Payroll.Desktop", "Styles", "DesignSystem.axaml");
+            var printDesignSystemPath = Path.Combine(current.FullName, "src", "Payroll.Desktop", "Styles", "PrintDesignSystem.axaml");
+            if (File.Exists(designSystemPath) && File.Exists(printDesignSystemPath))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
     }
 
     private static string BuildConnectionString(string databasePath)
@@ -332,6 +385,36 @@ public sealed class AppBootstrapper
                 "PayrollSettings",
                 "PayrollPreviewHelpVisibilityJson",
                 "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"PayrollPreviewHelpVisibilityJson\" TEXT NOT NULL DEFAULT '';");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "AppPagePadding",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"AppPagePadding\" TEXT NOT NULL DEFAULT 20;");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "AppPanelPadding",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"AppPanelPadding\" TEXT NOT NULL DEFAULT 12;");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "AppSectionSpacing",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"AppSectionSpacing\" TEXT NOT NULL DEFAULT 12;");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "AppPanelCornerRadius",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"AppPanelCornerRadius\" TEXT NOT NULL DEFAULT 8;");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "AppTableCellVerticalPadding",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"AppTableCellVerticalPadding\" TEXT NOT NULL DEFAULT 6;");
 
             EnsureTable(
                 connection,

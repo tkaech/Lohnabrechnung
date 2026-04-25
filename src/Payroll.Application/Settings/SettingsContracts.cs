@@ -58,7 +58,12 @@ public sealed record PayrollSettingsDto(
     Guid? CurrentMonthlySalarySettingsVersionId = null,
     DateOnly MonthlySalarySettingsValidFrom = default,
     DateOnly? MonthlySalarySettingsValidTo = null,
-    IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto>? MonthlySalarySettingsHistory = null);
+    IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto>? MonthlySalarySettingsHistory = null,
+    decimal AppPagePadding = 20m,
+    decimal AppPanelPadding = 12m,
+    decimal AppSectionSpacing = 12m,
+    decimal AppPanelCornerRadius = 8m,
+    decimal AppTableCellVerticalPadding = 6m);
 
 public sealed record PayrollGeneralSettingsVersionDto(
     Guid VersionId,
@@ -135,4 +140,9 @@ public sealed record SavePayrollSettingsCommand(
     DateOnly? HourlySettingsValidTo = null,
     Guid? EditingMonthlySalarySettingsVersionId = null,
     DateOnly MonthlySalarySettingsValidFrom = default,
-    DateOnly? MonthlySalarySettingsValidTo = null);
+    DateOnly? MonthlySalarySettingsValidTo = null,
+    decimal AppPagePadding = 20m,
+    decimal AppPanelPadding = 12m,
+    decimal AppSectionSpacing = 12m,
+    decimal AppPanelCornerRadius = 8m,
+    decimal AppTableCellVerticalPadding = 6m);

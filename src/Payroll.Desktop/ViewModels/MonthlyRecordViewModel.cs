@@ -41,8 +41,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _payrollPreviewTitle = "Lohn-Voransicht";
     private string _payrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
     private bool _isPayrollPreviewDerivationVisible;
-    private bool _isTimeMonthPickerOpen;
-    private bool _isExpenseMonthPickerOpen;
     private bool _isTimeDatePickerOpen;
     private IReadOnlyCollection<MonthlyPayrollPreviewLineDto> _rawPayrollPreviewLines = [];
     private IReadOnlyDictionary<string, PayrollPreviewHelpOptionDto> _payrollPreviewHelpOptions = new Dictionary<string, PayrollPreviewHelpOptionDto>(StringComparer.Ordinal);
@@ -184,18 +182,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     public string TimePayrollMonth => ExpensePayrollMonth;
 
-    public bool IsTimeMonthPickerOpen
-    {
-        get => _isTimeMonthPickerOpen;
-        set => SetProperty(ref _isTimeMonthPickerOpen, value);
-    }
-
-    public bool IsExpenseMonthPickerOpen
-    {
-        get => _isExpenseMonthPickerOpen;
-        set => SetProperty(ref _isExpenseMonthPickerOpen, value);
-    }
-
     public bool IsTimeDatePickerOpen
     {
         get => _isTimeDatePickerOpen;
@@ -264,19 +250,11 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }
     }
 
-    public void ToggleTimeMonthPicker() => SetPickerStates(!IsTimeMonthPickerOpen, false, false);
+    public void ToggleTimeDatePicker() => IsTimeDatePickerOpen = !IsTimeDatePickerOpen;
 
-    public void ToggleExpenseMonthPicker() => SetPickerStates(false, !IsExpenseMonthPickerOpen, false);
+    public void EnsureTimeDatePickerOpen() => IsTimeDatePickerOpen = true;
 
-    public void ToggleTimeDatePicker() => SetPickerStates(false, false, !IsTimeDatePickerOpen);
-
-    public void EnsureTimeMonthPickerOpen() => SetPickerStates(true, false, false);
-
-    public void EnsureExpenseMonthPickerOpen() => SetPickerStates(false, true, false);
-
-    public void EnsureTimeDatePickerOpen() => SetPickerStates(false, false, true);
-
-    public void CloseAllPickers() => SetPickerStates(false, false, false);
+    public void CloseAllPickers() => IsTimeDatePickerOpen = false;
 
     public string ContextTitle
     {
@@ -592,8 +570,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         if (changed)
         {
             SyncSelectedMonthText(normalizedMonth);
-            IsTimeMonthPickerOpen = false;
-            IsExpenseMonthPickerOpen = false;
             RaisePropertyChanged(nameof(ExpensePayrollMonth));
             RaisePropertyChanged(nameof(TimePayrollMonth));
             RaisePropertyChanged(nameof(SelectedMonthPickerDate));
@@ -1097,13 +1073,6 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             _selectedMonthText = formattedMonth;
             RaisePropertyChanged(nameof(SelectedMonthText));
         }
-    }
-
-    private void SetPickerStates(bool timeMonthOpen, bool expenseMonthOpen, bool timeDateOpen)
-    {
-        IsTimeMonthPickerOpen = timeMonthOpen;
-        IsExpenseMonthPickerOpen = expenseMonthOpen;
-        IsTimeDatePickerOpen = timeDateOpen;
     }
 
     private static IReadOnlyCollection<MonthlyPreviewRowViewModel> BuildPreviewRows(IReadOnlyCollection<MonthlyPreviewRowDto> rows)

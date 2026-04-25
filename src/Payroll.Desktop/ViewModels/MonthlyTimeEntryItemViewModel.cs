@@ -17,6 +17,7 @@ public sealed class MonthlyTimeEntryItemViewModel
     public required decimal VehicleRegiezone1Chf { get; init; }
     public required bool IsCurrentMonth { get; init; }
     public string? Note { get; init; }
+    public bool HasNote => !string.IsNullOrWhiteSpace(Note);
     public required string Summary { get; init; }
     public ObservableCollection<TimeEntryCellViewModel> Cells { get; } = [];
 

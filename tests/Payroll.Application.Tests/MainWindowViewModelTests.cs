@@ -1,6 +1,7 @@
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
 using Payroll.Application.Imports;
+using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
@@ -383,6 +384,7 @@ public sealed class MainWindowViewModelTests
                 new TestPdfExportService()),
             monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
             "Test");
         viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -418,6 +420,7 @@ public sealed class MainWindowViewModelTests
                 new TestPdfExportService()),
             new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
             new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            CreateLayoutParameterFilesViewModel(),
             "Test");
 
         await viewModel.InitializeAsync();
@@ -565,6 +568,7 @@ public sealed class MainWindowViewModelTests
                 new TestPdfExportService()),
             new MonthlyRecordService(new InMemoryMonthlyRecordRepository()),
             new MonthlyRecordViewModel(new MonthlyRecordService(new InMemoryMonthlyRecordRepository())),
+            CreateLayoutParameterFilesViewModel(),
             "Test");
 
         await viewModel.InitializeAsync();
@@ -628,6 +632,7 @@ public sealed class MainWindowViewModelTests
                 new TestPdfExportService()),
             monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
             "Test");
 
         await viewModel.InitializeAsync();
@@ -712,6 +717,7 @@ public sealed class MainWindowViewModelTests
                 new TestPdfExportService()),
             monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
             "Test");
 
         await viewModel.InitializeAsync();
@@ -747,7 +753,13 @@ public sealed class MainWindowViewModelTests
                 new TestPdfExportService()),
             monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
             "Test");
+    }
+
+    private static LayoutParameterFilesViewModel CreateLayoutParameterFilesViewModel()
+    {
+        return new LayoutParameterFilesViewModel(new LayoutParameterFileService(new InMemoryLayoutParameterFileRepository()));
     }
 
     private static ImportService CreateImportService(IEmployeeRepository employeeRepository)
@@ -1452,6 +1464,47 @@ public sealed class MainWindowViewModelTests
         public Task<string> ExportPayrollStatementAsync(PayrollStatementPdfDocument document, CancellationToken cancellationToken = default)
         {
             return Task.FromResult("/tmp/Lohnblatt_Test.pdf");
+        }
+    }
+
+    private sealed class InMemoryLayoutParameterFileRepository : ILayoutParameterFileRepository
+    {
+        public Task<IReadOnlyCollection<LayoutParameterFileSummaryDto>> ListFilesAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyCollection<LayoutParameterFileSummaryDto>>(
+            [
+                new LayoutParameterFileSummaryDto("design-system", "Design System", "src/Payroll.Desktop/Styles/DesignSystem.axaml", DateTimeOffset.UtcNow)
+            ]);
+        }
+
+        public Task<LayoutParameterFileDocumentDto> GetFileAsync(string key, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new LayoutParameterFileDocumentDto(
+                key,
+                "Design System",
+                "src/Payroll.Desktop/Styles/DesignSystem.axaml",
+                "<Styles />",
+                []));
+        }
+
+        public Task<LayoutParameterFileDocumentDto> SaveAsync(SaveLayoutParameterFileCommand command, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new LayoutParameterFileDocumentDto(
+                command.Key,
+                "Design System",
+                "src/Payroll.Desktop/Styles/DesignSystem.axaml",
+                command.Content,
+                []));
+        }
+
+        public Task<LayoutParameterFileDocumentDto> RestoreBackupAsync(RestoreLayoutParameterFileBackupCommand command, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new LayoutParameterFileDocumentDto(
+                command.Key,
+                "Design System",
+                "src/Payroll.Desktop/Styles/DesignSystem.axaml",
+                "<Styles />",
+                []));
         }
     }
 }

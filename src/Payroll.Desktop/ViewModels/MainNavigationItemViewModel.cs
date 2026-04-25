@@ -5,7 +5,7 @@ public enum MainSection
     Employees,
     TimeAndExpenses,
     PayrollRuns,
-    AhvAndDeductions,
+    AnnualSalary,
     WithholdingTax,
     Reporting,
     Settings,

@@ -64,6 +64,11 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.AppAccentColorHex,
             command.AppLogoText,
             command.AppLogoPath,
+            command.AppPagePadding,
+            command.AppPanelPadding,
+            command.AppSectionSpacing,
+            command.AppPanelCornerRadius,
+            command.AppTableCellVerticalPadding,
             command.PrintFontFamily,
             command.PrintFontSize,
             command.PrintTextColorHex,
@@ -360,7 +365,12 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             currentMonthlySalary?.Id,
             currentMonthlySalary?.ValidFrom ?? default,
             currentMonthlySalary?.ValidTo,
-            BuildMonthlySalaryHistory(monthlySalaryVersions, currentMonthlySalary?.Id));
+            BuildMonthlySalaryHistory(monthlySalaryVersions, currentMonthlySalary?.Id),
+            settings.AppPagePadding,
+            settings.AppPanelPadding,
+            settings.AppSectionSpacing,
+            settings.AppPanelCornerRadius,
+            settings.AppTableCellVerticalPadding);
     }
 
     private static IReadOnlyCollection<PayrollGeneralSettingsVersionDto> BuildGeneralHistory(

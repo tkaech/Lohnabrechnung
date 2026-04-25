@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Avalonia.Media.Imaging;
+using Payroll.Application.AnnualSalary;
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
 using Payroll.Application.Imports;
+using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
@@ -45,7 +47,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly PayrollSettingsService _payrollSettingsService;
     private readonly ReportingService _reportingService;
     private readonly MonthlyRecordService _monthlyRecordService;
+    private readonly AnnualSalaryService? _annualSalaryService;
     private readonly SqlExplorerViewModel _sqlExplorer;
+    private readonly LayoutParameterFilesViewModel _layoutParameterFiles;
+    private readonly LayoutParameterHelpViewModel _layoutParameterHelp;
     private MainNavigationItemViewModel? _selectedMainNavigationItem;
     private SettingsNavigationItemViewModel? _selectedSettingsNavigationItem;
     private EmployeeListItemViewModel? _selectedEmployee;
@@ -118,6 +123,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsAppAccentColorHex = string.Empty;
     private string _settingsAppLogoText = string.Empty;
     private string _settingsAppLogoPath = string.Empty;
+    private string _settingsAppPagePadding = string.Empty;
+    private string _settingsAppPanelPadding = string.Empty;
+    private string _settingsAppSectionSpacing = string.Empty;
+    private string _settingsAppPanelCornerRadius = string.Empty;
+    private string _settingsAppTableCellVerticalPadding = string.Empty;
     private string _settingsPrintFontFamily = string.Empty;
     private string _settingsPrintFontSize = string.Empty;
     private string _settingsPrintTextColorHex = string.Empty;
@@ -176,10 +186,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _selectedMonthCaptureFilter = MonthCaptureFilterAll;
     private string _monthCaptureSummary = "Keine Stundenerfassungen geladen.";
     private IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto> _allMonthCaptureOverviewRows = [];
+    private string _annualSalaryYear = DateTime.Today.Year.ToString();
+    private string _annualSalaryTitle = "Jahreslohn";
+    private string _annualSalarySummary = "Mitarbeitenden und Jahr waehlen.";
+    private AnnualSalaryTotalsDto? _annualSalaryTotals;
     private IReadOnlyCollection<PayrollGeneralSettingsVersionDto> _generalSettingsHistory = [];
     private IReadOnlyCollection<PayrollHourlySettingsVersionDto> _hourlySettingsHistory = [];
     private IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto> _monthlySalarySettingsHistory = [];
-    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null)
         : this(
             employeeService,
             importService,
@@ -189,13 +203,15 @@ public sealed class MainWindowViewModel : ViewModelBase
             monthlyRecordService,
             new SqlExplorerViewModel(),
             monthlyRecord,
+            layoutParameterFiles,
             workspaceLabel,
             databasePath,
-            environmentName)
+            environmentName,
+            annualSalaryService)
     {
     }
 
-    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, string workspaceLabel, string? databasePath = null, string? environmentName = null)
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null)
     {
         _employeeService = employeeService;
         _importService = importService;
@@ -203,7 +219,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         _payrollSettingsService = payrollSettingsService;
         _reportingService = reportingService;
         _monthlyRecordService = monthlyRecordService;
+        _annualSalaryService = annualSalaryService;
         _sqlExplorer = sqlExplorer;
+        _layoutParameterFiles = layoutParameterFiles;
+        _layoutParameterHelp = new LayoutParameterHelpViewModel();
         MonthlyRecord = monthlyRecord;
         WorkspaceLabel = workspaceLabel;
         DatabasePathDisplay = string.IsNullOrWhiteSpace(databasePath) ? "Kein Pfad verfuegbar." : databasePath;
@@ -224,6 +243,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         TimeImportFieldMappings = [];
         ImportedTimeMonths = [];
         MonthCaptureOverviewRows = [];
+        AnnualSalaryMonths = [];
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
         MonthCaptureFilters = [MonthCaptureFilterAll, MonthCaptureFilterWithoutMonth, MonthCaptureFilterWithMonth];
         WithholdingTaxOptions = [WithholdingTaxUnknown, WithholdingTaxYes, WithholdingTaxNo];
@@ -270,6 +290,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ShowTimeAndExpensesCommand = new DelegateCommand(SwitchToTimeAndExpensesWorkspace, () => !IsTimeAndExpensesWorkspace);
         ShowPayrollRunsCommand = new DelegateCommand(SwitchToPayrollRunsWorkspace, () => !IsPayrollRunsWorkspace);
         ShowReportingCommand = new DelegateCommand(SwitchToReportingWorkspace, () => !IsReportingWorkspace);
+        LoadAnnualSalaryCommand = new DelegateCommand(LoadAnnualSalaryAsync, () => CanLoadAnnualSalary);
         ShowEmployeesCommand = new DelegateCommand(SwitchToEmployeesWorkspace, () => !IsEmployeeWorkspace);
         ShowSettingsCommand = new DelegateCommand(SwitchToSettingsWorkspace, () => !IsSettingsWorkspace);
         ShowHelpCommand = new DelegateCommand(SwitchToHelpWorkspace, () => !IsHelpWorkspace);
@@ -308,6 +329,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string EnvironmentNameDisplay { get; }
     public string StartupArgumentsHelp => StartupArgumentsHelpText;
     public MonthlyRecordViewModel MonthlyRecord { get; }
+    public LayoutParameterFilesViewModel LayoutParameterFiles => _layoutParameterFiles;
+    public LayoutParameterHelpViewModel LayoutParameterHelp => _layoutParameterHelp;
     public SqlExplorerViewModel SqlExplorer => _sqlExplorer;
     public MainNavigationItemViewModel? SelectedMainNavigationItem
     {
@@ -322,12 +345,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             SyncMainNavigationSelection();
             RaisePropertyChanged(nameof(IsTimeAndExpensesWorkspace));
             RaisePropertyChanged(nameof(IsPayrollRunsWorkspace));
+            RaisePropertyChanged(nameof(IsAnnualSalaryWorkspace));
             RaisePropertyChanged(nameof(IsReportingWorkspace));
             RaisePropertyChanged(nameof(IsEmployeeWorkspace));
             RaisePropertyChanged(nameof(IsSettingsWorkspace));
             RaisePropertyChanged(nameof(IsHelpWorkspace));
             RaisePropertyChanged(nameof(ShowTimeAndExpensesWorkspace));
             RaisePropertyChanged(nameof(ShowPayrollRunsWorkspace));
+            RaisePropertyChanged(nameof(ShowAnnualSalaryWorkspace));
             RaisePropertyChanged(nameof(ShowReportingWorkspace));
             RaisePropertyChanged(nameof(ShowEmployeeWorkspace));
             RaisePropertyChanged(nameof(ShowSettingsWorkspace));
@@ -395,6 +420,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<ImportFieldMappingRowViewModel> TimeImportFieldMappings { get; }
     public ObservableCollection<ImportedMonthStatusItemViewModel> ImportedTimeMonths { get; }
     public ObservableCollection<MonthlyTimeCaptureOverviewRowDto> MonthCaptureOverviewRows { get; }
+    public ObservableCollection<AnnualSalaryMonthDto> AnnualSalaryMonths { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> MonthCaptureFilters { get; }
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
@@ -429,6 +455,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand ShowTimeAndExpensesCommand { get; }
     public DelegateCommand ShowPayrollRunsCommand { get; }
     public DelegateCommand ShowReportingCommand { get; }
+    public DelegateCommand LoadAnnualSalaryCommand { get; }
     public DelegateCommand ShowEmployeesCommand { get; }
     public DelegateCommand ShowSettingsCommand { get; }
     public DelegateCommand ShowHelpCommand { get; }
@@ -453,12 +480,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand RemoveEmploymentLocationOptionCommand { get; }
     public bool IsTimeAndExpensesWorkspace => IsSelectedMainSection(MainSection.TimeAndExpenses);
     public bool IsPayrollRunsWorkspace => IsSelectedMainSection(MainSection.PayrollRuns);
+    public bool IsAnnualSalaryWorkspace => IsSelectedMainSection(MainSection.AnnualSalary);
     public bool IsReportingWorkspace => IsSelectedMainSection(MainSection.Reporting);
     public bool IsEmployeeWorkspace => IsSelectedMainSection(MainSection.Employees);
     public bool IsSettingsWorkspace => IsSelectedMainSection(MainSection.Settings);
     public bool IsHelpWorkspace => IsSelectedMainSection(MainSection.Help);
     public bool ShowTimeAndExpensesWorkspace => IsTimeAndExpensesWorkspace;
     public bool ShowPayrollRunsWorkspace => IsPayrollRunsWorkspace;
+    public bool ShowAnnualSalaryWorkspace => IsAnnualSalaryWorkspace;
     public bool ShowReportingWorkspace => IsReportingWorkspace;
     public bool ShowEmployeeWorkspace => IsEmployeeWorkspace;
     public bool ShowSettingsWorkspace => IsSettingsWorkspace;
@@ -474,9 +503,45 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool ShowEmployeeSelectionArea => !IsSettingsWorkspace && !IsHelpWorkspace;
     public bool ShowPrimaryWorkspaceArea => !IsSettingsWorkspace && !IsHelpWorkspace;
     public bool ShowPrimaryWorkspaceHeader => !IsTimeAndExpensesWorkspace && !IsEmployeeWorkspace;
+    public bool CanLoadAnnualSalary => !IsBusy
+        && _annualSalaryService is not null
+        && _currentEmployeeId.HasValue
+        && int.TryParse(AnnualSalaryYear, out var year)
+        && year is >= 1900 and <= 9999;
     public string MonthCaptureMonthLabel => MonthlyRecord.SelectedMonth.HasValue
         ? $"{MonthlyRecord.SelectedMonth.Value:MM/yyyy}"
         : "-";
+    public string AnnualSalaryYear
+    {
+        get => _annualSalaryYear;
+        set
+        {
+            if (SetProperty(ref _annualSalaryYear, value))
+            {
+                RaisePropertyChanged(nameof(CanLoadAnnualSalary));
+                LoadAnnualSalaryCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string AnnualSalaryTitle
+    {
+        get => _annualSalaryTitle;
+        private set => SetProperty(ref _annualSalaryTitle, value);
+    }
+
+    public string AnnualSalarySummary
+    {
+        get => _annualSalarySummary;
+        private set => SetProperty(ref _annualSalarySummary, value);
+    }
+
+    public AnnualSalaryTotalsDto? AnnualSalaryTotals
+    {
+        get => _annualSalaryTotals;
+        private set => SetProperty(ref _annualSalaryTotals, value);
+    }
+
     public string MonthCaptureSummary
     {
         get => _monthCaptureSummary;
@@ -1151,6 +1216,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _settingsAppLogoPath, value);
     }
 
+    public string SettingsAppPagePadding
+    {
+        get => _settingsAppPagePadding;
+        set => SetProperty(ref _settingsAppPagePadding, value);
+    }
+
+    public string SettingsAppPanelPadding
+    {
+        get => _settingsAppPanelPadding;
+        set => SetProperty(ref _settingsAppPanelPadding, value);
+    }
+
+    public string SettingsAppSectionSpacing
+    {
+        get => _settingsAppSectionSpacing;
+        set => SetProperty(ref _settingsAppSectionSpacing, value);
+    }
+
+    public string SettingsAppPanelCornerRadius
+    {
+        get => _settingsAppPanelCornerRadius;
+        set => SetProperty(ref _settingsAppPanelCornerRadius, value);
+    }
+
+    public string SettingsAppTableCellVerticalPadding
+    {
+        get => _settingsAppTableCellVerticalPadding;
+        set => SetProperty(ref _settingsAppTableCellVerticalPadding, value);
+    }
+
     public string SettingsPrintFontFamily
     {
         get => _settingsPrintFontFamily;
@@ -1498,6 +1593,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanCreateBackup));
                 RaisePropertyChanged(nameof(CanRestoreBackup));
                 RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+                RaisePropertyChanged(nameof(CanLoadAnnualSalary));
                 RaisePropertyChanged(nameof(CanManageSettingsOptions));
                 RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
                 RaisePropertyChanged(nameof(CanRemoveEmploymentCategoryOption));
@@ -1510,6 +1606,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public async Task InitializeAsync()
     {
         await SqlExplorer.InitializeAsync();
+        await LayoutParameterFiles.InitializeAsync();
         await LoadSettingsAsync();
         await LoadImportConfigurationsAsync();
         await LoadImportedTimeMonthsAsync();
@@ -2027,7 +2124,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             hourlySettingsValidToOverride.HasValue ? DateOnly.FromDateTime(hourlySettingsValidToOverride.Value.Date) : SettingsHourlyValidTo.HasValue && hourlySettingsValidToOverride is null ? DateOnly.FromDateTime(SettingsHourlyValidTo.Value.Date) : null,
             editingMonthlySalarySettingsVersionId ?? _loadedCurrentMonthlySalarySettingsVersionId,
             DateOnly.FromDateTime(monthlySalaryValidFrom.Date),
-            monthlySalarySettingsValidToOverride.HasValue ? DateOnly.FromDateTime(monthlySalarySettingsValidToOverride.Value.Date) : SettingsMonthlySalaryValidTo.HasValue && monthlySalarySettingsValidToOverride is null ? DateOnly.FromDateTime(SettingsMonthlySalaryValidTo.Value.Date) : null);
+            monthlySalarySettingsValidToOverride.HasValue ? DateOnly.FromDateTime(monthlySalarySettingsValidToOverride.Value.Date) : SettingsMonthlySalaryValidTo.HasValue && monthlySalarySettingsValidToOverride is null ? DateOnly.FromDateTime(SettingsMonthlySalaryValidTo.Value.Date) : null,
+            ParseClampedDecimal(SettingsAppPagePadding, nameof(SettingsAppPagePadding), 4m, 24m),
+            ParseClampedDecimal(SettingsAppPanelPadding, nameof(SettingsAppPanelPadding), 4m, 16m),
+            ParseClampedDecimal(SettingsAppSectionSpacing, nameof(SettingsAppSectionSpacing), 2m, 20m),
+            ParseClampedDecimal(SettingsAppPanelCornerRadius, nameof(SettingsAppPanelCornerRadius), 0m, 16m),
+            ParseClampedDecimal(SettingsAppTableCellVerticalPadding, nameof(SettingsAppTableCellVerticalPadding), 2m, 12m));
     }
 
     private async Task LoadPersonImportCsvAsync()
@@ -2730,6 +2832,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         RefreshCommand.RaiseCanExecuteChanged();
         SearchCommand.RaiseCanExecuteChanged();
+        LoadAnnualSalaryCommand.RaiseCanExecuteChanged();
         NewEmployeeCommand.RaiseCanExecuteChanged();
         EditEmployeeCommand.RaiseCanExecuteChanged();
         SaveCommand.RaiseCanExecuteChanged();
@@ -2774,6 +2877,48 @@ public sealed class MainWindowViewModel : ViewModelBase
         RemoveEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
         AddEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
         RemoveEmploymentLocationOptionCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task LoadAnnualSalaryAsync()
+    {
+        if (!CanLoadAnnualSalary)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(LoadAnnualSalaryCoreAsync);
+    }
+
+    private async Task LoadAnnualSalaryCoreAsync()
+    {
+        if (_annualSalaryService is null || !_currentEmployeeId.HasValue)
+        {
+            AnnualSalaryMonths.Clear();
+            AnnualSalaryTotals = null;
+            AnnualSalaryTitle = "Jahreslohn";
+            AnnualSalarySummary = "Mitarbeitenden und Jahr waehlen.";
+            return;
+        }
+
+        if (!int.TryParse(AnnualSalaryYear, out var year) || year is < 1900 or > 9999)
+        {
+            AnnualSalarySummary = "Jahr ist ungueltig.";
+            return;
+        }
+
+        var overview = await _annualSalaryService.GetOverviewAsync(
+            new AnnualSalaryOverviewQuery(_currentEmployeeId.Value, year));
+
+        AnnualSalaryMonths.Clear();
+        foreach (var month in overview.Months)
+        {
+            AnnualSalaryMonths.Add(month);
+        }
+
+        AnnualSalaryTotals = overview.Totals;
+        AnnualSalaryTitle = $"Jahreslohn {overview.Year} | {overview.LastName} {overview.FirstName} | {overview.PersonnelNumber}";
+        AnnualSalarySummary = "Aggregiert aus vorhandenen Monatsdaten. PDF-Erzeugung ist noch offen.";
+        StatusMessage = $"Jahreslohn {overview.Year} geladen.";
     }
 
     private async Task LoadImportConfigurationsAsync()
@@ -2904,6 +3049,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         _currentEmployeeId = employee.EmployeeId;
         _returnEmployeeId = employee.EmployeeId;
         await MonthlyRecord.SetEmployeeAsync(employee.EmployeeId, employee.FirstName + " " + employee.LastName);
+        if (IsAnnualSalaryWorkspace)
+        {
+            await LoadAnnualSalaryCoreAsync();
+        }
+
         SetInteractionState(isEditing: false, isCreatingNew: false);
         return true;
     }
@@ -3026,6 +3176,23 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (!NumericFormatManager.TryParseDecimal(value, out var parsedValue))
         {
             throw new InvalidOperationException($"{fieldName} muss eine gueltige Zahl sein.");
+        }
+
+        return parsedValue;
+    }
+
+    private static decimal ParseClampedDecimal(string value, string fieldName, decimal min, decimal max)
+    {
+        var parsedValue = ParseRequiredDecimal(value, fieldName);
+
+        if (parsedValue < min)
+        {
+            return min;
+        }
+
+        if (parsedValue > max)
+        {
+            return max;
         }
 
         return parsedValue;
@@ -3383,6 +3550,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsAppAccentColorHex = settings.AppAccentColorHex;
         SettingsAppLogoText = settings.AppLogoText;
         SettingsAppLogoPath = settings.AppLogoPath;
+        SettingsAppPagePadding = NumericFormatManager.FormatDecimal(settings.AppPagePadding, "0.##");
+        SettingsAppPanelPadding = NumericFormatManager.FormatDecimal(settings.AppPanelPadding, "0.##");
+        SettingsAppSectionSpacing = NumericFormatManager.FormatDecimal(settings.AppSectionSpacing, "0.##");
+        SettingsAppPanelCornerRadius = NumericFormatManager.FormatDecimal(settings.AppPanelCornerRadius, "0.##");
+        SettingsAppTableCellVerticalPadding = NumericFormatManager.FormatDecimal(settings.AppTableCellVerticalPadding, "0.##");
         SettingsPrintFontFamily = settings.PrintFontFamily;
         SettingsPrintFontSize = NumericFormatManager.FormatDecimal(settings.PrintFontSize, "0.##");
         SettingsPrintTextColorHex = settings.PrintTextColorHex;
@@ -3407,6 +3579,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsVehiclePauschalzone2RateChf = NumericFormatManager.FormatDecimal(settings.VehiclePauschalzone2RateChf, "0.##");
         SettingsVehicleRegiezone1RateChf = NumericFormatManager.FormatDecimal(settings.VehicleRegiezone1RateChf, "0.##");
         ApplyPayrollPreviewHelpOptions(settings.PayrollPreviewHelpOptions);
+        LayoutParameterHelp.ApplyCurrentValues(BuildCurrentLayoutParameterHelpValues(settings));
         AppLogoText = settings.AppLogoText;
         AppLogoImage = TryLoadLogo(settings.AppLogoPath);
         ApplyOptions(DepartmentOptions, settings.Departments, ref _selectedDepartmentOption, nameof(SelectedDepartmentOption), ref _selectedSettingsDepartment, nameof(SelectedSettingsDepartment));
@@ -3428,6 +3601,26 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static string ToThousandsSeparatorValue(string? label)
     {
         return label == ThousandsSeparatorSpaceLabel ? " " : Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildCurrentLayoutParameterHelpValues(PayrollSettingsDto settings)
+    {
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Theme.Layout.PagePadding"] = NumericFormatManager.FormatDecimal(settings.AppPagePadding, "0.##"),
+            ["Theme.Layout.PanelPadding"] = NumericFormatManager.FormatDecimal(settings.AppPanelPadding, "0.##"),
+            ["Theme.Layout.SectionSpacing"] = NumericFormatManager.FormatDecimal(settings.AppSectionSpacing, "0.##"),
+            ["Theme.Layout.PanelCornerRadius"] = NumericFormatManager.FormatDecimal(settings.AppPanelCornerRadius, "0.##"),
+            ["Theme.Layout.TableCellVerticalPadding"] = NumericFormatManager.FormatDecimal(settings.AppTableCellVerticalPadding, "0.##"),
+            ["AppFontFamily"] = settings.AppFontFamily,
+            ["AppFontSize"] = NumericFormatManager.FormatDecimal(settings.AppFontSize, "0.##"),
+            ["AppTextColorHex"] = settings.AppTextColorHex,
+            ["AppMutedTextColorHex"] = settings.AppMutedTextColorHex,
+            ["AppBackgroundColorHex"] = settings.AppBackgroundColorHex,
+            ["AppAccentColorHex"] = settings.AppAccentColorHex,
+            ["AppLogoText"] = settings.AppLogoText,
+            ["AppLogoPath"] = settings.AppLogoPath
+        };
     }
 
     private static string ToThousandsSeparatorLabel(string? value)
@@ -3570,6 +3763,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectMainNavigationSection(MainSection.PayrollRuns);
     }
 
+    private void SwitchToAnnualSalaryWorkspace()
+    {
+        SelectMainNavigationSection(MainSection.AnnualSalary);
+        _ = LoadAnnualSalaryAsync();
+    }
+
     private void SwitchToReportingWorkspace()
     {
         SelectMainNavigationSection(MainSection.Reporting);
@@ -3601,7 +3800,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Employees, "Mitarbeitende", true, SwitchToEmployeesWorkspace));
         MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.TimeAndExpenses, "Zeit- und Spesenerfassung", true, SwitchToTimeAndExpensesWorkspace));
         MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.PayrollRuns, "Lohnlaeufe", true, SwitchToPayrollRunsWorkspace));
-        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.AhvAndDeductions, "AHV / Abzuege", false, null));
+        MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.AnnualSalary, "Jahreslohn", true, SwitchToAnnualSalaryWorkspace));
         MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.WithholdingTax, "Quellensteuer", false, null));
         MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Reporting, "Reporting", true, SwitchToReportingWorkspace));
         MainNavigationItems.Add(new MainNavigationItemViewModel(MainSection.Settings, "Einstellungen", true, SwitchToSettingsWorkspace));

@@ -282,7 +282,21 @@ public sealed class BackupRestoreService : IBackupRestoreService
             settings.PayrollPreviewHelpOptions,
             settings.Departments,
             settings.EmploymentCategories,
-            settings.EmploymentLocations),
+            settings.EmploymentLocations,
+            null,
+            default,
+            null,
+            null,
+            default,
+            null,
+            null,
+            default,
+            null,
+            settings.AppPagePadding,
+            settings.AppPanelPadding,
+            settings.AppSectionSpacing,
+            settings.AppPanelCornerRadius,
+            settings.AppTableCellVerticalPadding),
             cancellationToken);
     }
 

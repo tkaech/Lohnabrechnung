@@ -10,6 +10,8 @@ Projekt wird neu aufgebaut und das Domain-Modell wird schrittweise aus der Excel
 - Baseline-Logik fuer bestehende Datenbanken ohne `__EFMigrationsHistory` ergänzt, damit vorhandene Daten beim Umstieg auf Migrationen erhalten bleiben
 - Windows-Testpfad ueber `appsettings.json` auf `{LocalAppData}/PayrollApp/payroll.test.db` vorbereitet; beim ersten Start werden nur Konfigurationsdaten initialisiert, bestehende DBs bleiben bei spaeteren Starts unveraendert
 - `Einstellungen` um einen eigenen Unterbereich `Backup / Restore` erweitert
+- `Einstellungen > Layout` um einen separaten Editor fuer registrierte Layout-Parameterdateien erweitert; Dateiinhalt wird als Rohtext geladen, mit eigener Save-/Restore-Logik ausserhalb der bestehenden `PayrollSettings`-/SQLite-Settings bearbeitet und pro Datei auf maximal zwei Backups versioniert
+- tabellarische Listen-/Grid-Bereiche ueber einen wiederverwendbaren `table-list`-Style vereinheitlicht; die vertikale Zellverdichtung ist jetzt als zentraler Layout-Parameter in `Einstellungen > Layout` steuerbar und wird global auf vergleichbare Tabellenlisten angewandt
 - Backup/Restore als gekapselten Application-/Infrastructure-Service eingefuehrt, mit klarer Trennung der Sicherungsarten `nur Konfiguration`, `nur Nutzdaten` und `beides`
 - JSON-basierte Sicherungsdatei mit Zeitstempel-Dateiname und Restore-Validierung fuer passende Sicherungsart ergänzt
 - Restore so angebunden, dass Konfiguration zentral neu geladen und Nutzdaten anschliessend wieder in Mitarbeitenden- und Monatskontext synchronisiert werden

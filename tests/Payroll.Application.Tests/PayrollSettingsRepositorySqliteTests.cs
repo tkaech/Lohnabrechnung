@@ -82,6 +82,27 @@ public sealed class PayrollSettingsRepositorySqliteTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_PersistsAppTableCellVerticalPadding()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new PayrollSettingsRepository(dbContext);
+
+        await repository.SaveAsync(CreateCommand(), CancellationToken.None);
+        var loaded = await repository.GetAsync(CancellationToken.None);
+
+        Assert.Equal(4m, loaded.AppTableCellVerticalPadding);
+    }
+
+    [Fact]
     public async Task SaveAsync_WithExistingGeneralVersion_UpdatesCurrentStand()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -253,6 +274,11 @@ public sealed class PayrollSettingsRepositorySqliteTests
             null,
             editingMonthlySalarySettingsVersionId ?? currentMonthlySalarySettingsVersionId,
             monthlySalarySettingsValidFrom ?? new DateOnly(2026, 1, 1),
-            null);
+            null,
+            20m,
+            12m,
+            12m,
+            8m,
+            4m);
     }
 }

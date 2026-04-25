@@ -166,6 +166,11 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("AppLogoPath").IsRequired().HasMaxLength(1000).HasColumnType("TEXT");
             b.Property<string>("AppLogoText").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
             b.Property<string>("AppMutedTextColorHex").IsRequired().HasMaxLength(20).HasColumnType("TEXT");
+            b.Property<decimal>("AppPanelCornerRadius").HasColumnType("TEXT");
+            b.Property<decimal>("AppPagePadding").HasColumnType("TEXT");
+            b.Property<decimal>("AppPanelPadding").HasColumnType("TEXT");
+            b.Property<decimal>("AppSectionSpacing").HasColumnType("TEXT");
+            b.Property<decimal>("AppTableCellVerticalPadding").HasColumnType("TEXT");
             b.Property<string>("AppTextColorHex").IsRequired().HasMaxLength(20).HasColumnType("TEXT");
             b.Property<decimal>("AlvRate").HasColumnType("TEXT");
             b.Property<string>("CompanyAddress").IsRequired().HasMaxLength(2000).HasColumnType("TEXT");

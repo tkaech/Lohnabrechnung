@@ -54,7 +54,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnTimeEntryHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is not ListBox { SelectedItem: MonthlyTimeEntryItemViewModel entry })
+        if (sender is not ListBox listBox || listBox.SelectedItem is not MonthlyTimeEntryItemViewModel entry)
         {
             return;
         }
@@ -62,6 +62,7 @@ public sealed partial class MainWindow : Window
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
         {
             await monthlyRecord.ActivateMonthFromTimeEntryAsync(entry);
+            EnsureTimeEntryListSelection(listBox, entry.TimeEntryId);
         }
     }
 
@@ -93,7 +94,7 @@ public sealed partial class MainWindow : Window
 
     private async void OnExpenseEntryHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is not ListBox { SelectedItem: MonthlyExpenseEntryItemViewModel entry })
+        if (sender is not ListBox listBox || listBox.SelectedItem is not MonthlyExpenseEntryItemViewModel entry)
         {
             return;
         }
@@ -101,62 +102,39 @@ public sealed partial class MainWindow : Window
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
         {
             await monthlyRecord.ActivateMonthFromExpenseEntryAsync(entry);
+            EnsureExpenseEntryListSelection(listBox, entry.ExpenseEntryId);
         }
     }
 
-    private void OnTimeMonthInputPointerPressed(object? sender, PointerPressedEventArgs e)
+    private static void EnsureTimeEntryListSelection(ListBox listBox, Guid timeEntryId)
     {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
+        foreach (var item in listBox.Items)
         {
-            monthlyRecord.ToggleTimeMonthPicker();
+            if (item is MonthlyTimeEntryItemViewModel entry && entry.TimeEntryId == timeEntryId)
+            {
+                if (!ReferenceEquals(listBox.SelectedItem, entry))
+                {
+                    listBox.SelectedItem = entry;
+                }
+
+                return;
+            }
         }
     }
 
-    private void OnTimeMonthInputGotFocus(object? sender, GotFocusEventArgs e)
+    private static void EnsureExpenseEntryListSelection(ListBox listBox, Guid expenseEntryId)
     {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
+        foreach (var item in listBox.Items)
         {
-            monthlyRecord.EnsureTimeMonthPickerOpen();
-        }
-    }
+            if (item is MonthlyExpenseEntryItemViewModel entry && entry.ExpenseEntryId == expenseEntryId)
+            {
+                if (!ReferenceEquals(listBox.SelectedItem, entry))
+                {
+                    listBox.SelectedItem = entry;
+                }
 
-    private void OnExpenseMonthInputPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
-        {
-            monthlyRecord.ToggleExpenseMonthPicker();
-        }
-    }
-
-    private void OnExpenseMonthInputGotFocus(object? sender, GotFocusEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
-        {
-            monthlyRecord.EnsureExpenseMonthPickerOpen();
-        }
-    }
-
-    private void OnTimeDateInputPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
-        {
-            monthlyRecord.ToggleTimeDatePicker();
-        }
-    }
-
-    private void OnTimeDateInputGotFocus(object? sender, GotFocusEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
-        {
-            monthlyRecord.EnsureTimeDatePickerOpen();
-        }
-    }
-
-    private void OnTimeDatePickerSelectedDateChanged(object? sender, DatePickerSelectedValueChangedEventArgs e)
-    {
-        if (DataContext is MainWindowViewModel { MonthlyRecord: { IsTimeDatePickerOpen: true } monthlyRecord })
-        {
-            monthlyRecord.CloseAllPickers();
+                return;
+            }
         }
     }
 
@@ -199,11 +177,6 @@ public sealed partial class MainWindow : Window
 
     private void OnRootPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (IsWithinPickerSurface(e.Source))
-        {
-            return;
-        }
-
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
         {
             monthlyRecord.CloseAllPickers();
@@ -461,21 +434,4 @@ public sealed partial class MainWindow : Window
         return result == true;
     }
 
-    private static bool IsWithinPickerSurface(object? source)
-    {
-        var current = source as StyledElement;
-        while (current is not null)
-        {
-            if (current is Control control && control.Name is "TimeMonthFieldHost" or "TimeMonthInput" or "TimeMonthPopup"
-                or "ExpenseMonthFieldHost" or "ExpenseMonthInput" or "ExpenseMonthPopup"
-                or "TimeDateFieldHost" or "TimeDateInput" or "TimeDatePopup")
-            {
-                return true;
-            }
-
-            current = current.Parent as StyledElement;
-        }
-
-        return false;
-    }
 }

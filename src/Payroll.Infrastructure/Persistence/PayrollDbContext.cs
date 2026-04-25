@@ -107,6 +107,11 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(settings => settings.AppAccentColorHex).HasMaxLength(20).IsRequired();
             builder.Property(settings => settings.AppLogoText).HasMaxLength(200).IsRequired();
             builder.Property(settings => settings.AppLogoPath).HasMaxLength(1000).IsRequired();
+            builder.Property(settings => settings.AppPagePadding).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.AppPanelPadding).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.AppSectionSpacing).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.AppPanelCornerRadius).HasColumnType("TEXT").IsRequired();
+            builder.Property(settings => settings.AppTableCellVerticalPadding).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.PrintFontFamily).HasMaxLength(500).IsRequired();
             builder.Property(settings => settings.PrintFontSize).HasColumnType("TEXT").IsRequired();
             builder.Property(settings => settings.PrintTextColorHex).HasMaxLength(20).IsRequired();
