@@ -191,6 +191,31 @@ public sealed class PayrollSettingsRepositorySqliteTests
     }
 
     [Fact]
+    public async Task SaveAsync_RetroactiveHourlyVersion_IsLimitedBeforeExistingLaterVersion()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new PayrollSettingsRepository(dbContext);
+        _ = await repository.GetAsync(CancellationToken.None);
+
+        var saved = await repository.SaveAsync(CreateCommand(
+            editingHourlySettingsVersionId: null,
+            hourlySettingsValidFrom: new DateOnly(2026, 1, 1),
+            nightSupplementRate: 0.25m), CancellationToken.None);
+
+        Assert.Contains(saved.HourlySettingsHistory!, item => item.ValidFrom == new DateOnly(2026, 1, 1) && item.ValidTo == new DateOnly(2026, 3, 31));
+        Assert.Contains(saved.HourlySettingsHistory!, item => item.ValidFrom == new DateOnly(2026, 4, 1) && item.ValidTo is null);
+    }
+
+    [Fact]
     public async Task SaveAsync_MonthlySalaryArea_IsPreparedForHistory()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

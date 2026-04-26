@@ -3,6 +3,7 @@ using Payroll.Application.Employees;
 using Payroll.Application.Imports;
 using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
@@ -10,6 +11,8 @@ using Payroll.Desktop.ViewModels;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Imports;
 using Payroll.Domain.MonthlyRecords;
+using Payroll.Domain.Payroll;
+using Payroll.Domain.Settings;
 
 namespace Payroll.Application.Tests;
 
@@ -298,7 +301,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsReportingEmployeesSettingsAndHelp()
+    public void WorkspaceDefaultsToTimeAndExpenses_AndCanSwitchToPayrollRunsAnnualSalaryReportingEmployeesSettingsAndHelp()
     {
         var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
         var repository = new TestEmployeeRepository(employee);
@@ -315,6 +318,17 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.IsTimeAndExpensesWorkspace);
         Assert.False(viewModel.IsReportingWorkspace);
         Assert.False(viewModel.IsEmployeeWorkspace);
+        Assert.True(viewModel.ShowEmployeeSelectionArea);
+        Assert.True(viewModel.ShowPrimaryWorkspaceArea);
+
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+
+        Assert.True(viewModel.IsAnnualSalaryWorkspace);
+        Assert.True(viewModel.ShowAnnualSalaryWorkspace);
+        Assert.False(viewModel.IsPayrollRunsWorkspace);
+        Assert.False(viewModel.ShowPayrollRunsWorkspace);
+        Assert.False(viewModel.CanFinalizePayrollMonth);
+        Assert.False(viewModel.CanCreatePayrollPdf);
         Assert.True(viewModel.ShowEmployeeSelectionArea);
         Assert.True(viewModel.ShowPrimaryWorkspaceArea);
 
@@ -352,6 +366,34 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsHelpWorkspace);
         Assert.False(viewModel.ShowEmployeeSelectionArea);
         Assert.False(viewModel.ShowPrimaryWorkspaceArea);
+    }
+
+    [Fact]
+    public async Task PayrollRunsWorkspace_OpenStatusRaisesActionStateAfterEmployeeChange()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var repository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var viewModel = CreateViewModel(
+            repository,
+            payrollRunService: new PayrollRunService(new OpenPayrollRunRepository()));
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+        changedProperties.Clear();
+
+        viewModel.SelectedEmployee = viewModel.Employees.Single(item => item.EmployeeId == secondEmployee.EmployeeId);
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1001");
+
+        Assert.Equal("offen", viewModel.PayrollRunStatusDisplay);
+        Assert.True(viewModel.CanFinalizePayrollMonth);
+        Assert.True(viewModel.CanExecutePayrollMonthAction);
+        Assert.Equal("Monat abschliessen", viewModel.PayrollMonthActionLabel);
+        Assert.Contains(nameof(MainWindowViewModel.CanExecutePayrollMonthAction), changedProperties);
     }
 
     [Fact]
@@ -735,7 +777,10 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Stunden", viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn);
     }
 
-    private static MainWindowViewModel CreateViewModel(TestEmployeeRepository repository, InMemoryPayrollSettingsRepository? settingsRepository = null)
+    private static MainWindowViewModel CreateViewModel(
+        TestEmployeeRepository repository,
+        InMemoryPayrollSettingsRepository? settingsRepository = null,
+        PayrollRunService? payrollRunService = null)
     {
         settingsRepository ??= new InMemoryPayrollSettingsRepository();
         var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
@@ -754,7 +799,9 @@ public sealed class MainWindowViewModelTests
             monthlyRecordService,
             new MonthlyRecordViewModel(monthlyRecordService),
             CreateLayoutParameterFilesViewModel(),
-            "Test");
+            "Test",
+            annualSalaryService: null,
+            payrollRunService: payrollRunService);
     }
 
     private static LayoutParameterFilesViewModel CreateLayoutParameterFilesViewModel()
@@ -784,6 +831,48 @@ public sealed class MainWindowViewModelTests
             }
 
             await Task.Delay(20);
+        }
+    }
+
+    private sealed class OpenPayrollRunRepository : IPayrollRunRepository
+    {
+        public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<PayrollRun?>(null);
+        }
+
+        public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodForUpdateAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<PayrollRun?>(null);
+        }
+
+        public Task<bool> HasCancelledRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task<PayrollRunMonthlyInputDto?> LoadMonthlyInputAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<PayrollRunMonthlyInputDto?>(null);
+        }
+
+        public Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new PayrollSettings());
+        }
+
+        public Task<PayrollSettings> LoadPayrollSettingsForPeriodAsync(int year, int month, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new PayrollSettings());
+        }
+
+        public void Add(PayrollRun payrollRun)
+        {
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
         }
     }
 

@@ -198,6 +198,41 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.ToTable("PayrollSettings");
         });
 
+        modelBuilder.Entity("Payroll.Domain.Payroll.PayrollRun", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+            b.Property<DateTimeOffset?>("CancelledAtUtc").HasColumnType("TEXT");
+            b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("TEXT");
+            b.Property<DateOnly>("PaymentDate").HasColumnType("TEXT");
+            b.Property<string>("PeriodKey").IsRequired().HasMaxLength(7).HasColumnType("TEXT");
+            b.Property<string>("Status").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
+            b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");
+            b.HasKey("Id");
+            b.HasIndex("PeriodKey");
+            b.ToTable("PayrollRuns");
+        });
+
+        modelBuilder.Entity("Payroll.Domain.Payroll.PayrollRunLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+            b.Property<decimal>("AmountChf").HasColumnType("TEXT");
+            b.Property<string>("Code").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
+            b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("TEXT");
+            b.Property<string>("Description").IsRequired().HasMaxLength(200).HasColumnType("TEXT");
+            b.Property<Guid>("EmployeeId").HasColumnType("TEXT");
+            b.Property<string>("LineType").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
+            b.Property<Guid>("PayrollRunId").HasColumnType("TEXT");
+            b.Property<decimal?>("Quantity").HasColumnType("TEXT");
+            b.Property<decimal?>("RateChf").HasColumnType("TEXT");
+            b.Property<string>("Unit").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
+            b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");
+            b.Property<string>("ValueOrigin").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId");
+            b.HasIndex("PayrollRunId");
+            b.ToTable("PayrollRunLines");
+        });
+
         modelBuilder.Entity("Payroll.Domain.TimeTracking.TimeEntry", b =>
         {
             b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
@@ -264,6 +299,21 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
                 .IsRequired();
         });
 
+        modelBuilder.Entity("Payroll.Domain.Payroll.PayrollRunLine", b =>
+        {
+            b.HasOne("Payroll.Domain.Employees.Employee", null)
+                .WithMany()
+                .HasForeignKey("EmployeeId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+
+            b.HasOne("Payroll.Domain.Payroll.PayrollRun", null)
+                .WithMany("Lines")
+                .HasForeignKey("PayrollRunId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
         modelBuilder.Entity("Payroll.Domain.TimeTracking.TimeEntry", b =>
         {
             b.HasOne("Payroll.Domain.MonthlyRecords.EmployeeMonthlyRecord", null)
@@ -277,6 +327,11 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
         {
             b.Navigation("ExpenseEntry");
             b.Navigation("TimeEntries");
+        });
+
+        modelBuilder.Entity("Payroll.Domain.Payroll.PayrollRun", b =>
+        {
+            b.Navigation("Lines");
         });
 #pragma warning restore 612, 618
     }

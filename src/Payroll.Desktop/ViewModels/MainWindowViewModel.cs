@@ -4,9 +4,11 @@ using Avalonia.Media.Imaging;
 using Payroll.Application.AnnualSalary;
 using Payroll.Application.BackupRestore;
 using Payroll.Application.Employees;
+using Payroll.Application.Formatting;
 using Payroll.Application.Imports;
 using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
@@ -48,6 +50,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ReportingService _reportingService;
     private readonly MonthlyRecordService _monthlyRecordService;
     private readonly AnnualSalaryService? _annualSalaryService;
+    private readonly PayrollRunService? _payrollRunService;
     private readonly SqlExplorerViewModel _sqlExplorer;
     private readonly LayoutParameterFilesViewModel _layoutParameterFiles;
     private readonly LayoutParameterHelpViewModel _layoutParameterHelp;
@@ -190,10 +193,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _annualSalaryTitle = "Jahreslohn";
     private string _annualSalarySummary = "Mitarbeitenden und Jahr waehlen.";
     private AnnualSalaryTotalsDto? _annualSalaryTotals;
+    private string _payrollRunStatusDisplay = "offen";
     private IReadOnlyCollection<PayrollGeneralSettingsVersionDto> _generalSettingsHistory = [];
     private IReadOnlyCollection<PayrollHourlySettingsVersionDto> _hourlySettingsHistory = [];
     private IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto> _monthlySalarySettingsHistory = [];
-    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null)
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null, PayrollRunService? payrollRunService = null)
         : this(
             employeeService,
             importService,
@@ -207,11 +211,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             workspaceLabel,
             databasePath,
             environmentName,
-            annualSalaryService)
+            annualSalaryService,
+            payrollRunService)
     {
     }
 
-    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null)
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null, PayrollRunService? payrollRunService = null)
     {
         _employeeService = employeeService;
         _importService = importService;
@@ -220,6 +225,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _reportingService = reportingService;
         _monthlyRecordService = monthlyRecordService;
         _annualSalaryService = annualSalaryService;
+        _payrollRunService = payrollRunService;
         _sqlExplorer = sqlExplorer;
         _layoutParameterFiles = layoutParameterFiles;
         _layoutParameterHelp = new LayoutParameterHelpViewModel();
@@ -307,6 +313,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         CreateBackupCommand = new DelegateCommand(CreateBackupAsync, () => CanCreateBackup);
         RestoreBackupCommand = new DelegateCommand(RestoreBackupAsync, () => CanRestoreBackup);
         CreatePayrollPdfCommand = new DelegateCommand(CreatePayrollPdfAsync, () => CanCreatePayrollPdf);
+        FinalizePayrollMonthCommand = new DelegateCommand(FinalizePayrollMonthAsync, () => CanFinalizePayrollMonth);
+        CancelPayrollMonthCommand = new DelegateCommand(CancelPayrollMonthAsync, () => CanCancelPayrollMonth);
         AddDepartmentOptionCommand = new DelegateCommand(AddDepartmentOption, () => CanManageSettingsOptions);
         RemoveDepartmentOptionCommand = new DelegateCommand(RemoveDepartmentOption, () => CanRemoveDepartmentOption);
         AddEmploymentCategoryOptionCommand = new DelegateCommand(AddEmploymentCategoryOption, () => CanManageSettingsOptions);
@@ -362,6 +370,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             RaisePropertyChanged(nameof(ShowPrimaryWorkspaceHeader));
             RaisePropertyChanged(nameof(CanSaveSettings));
             RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+            RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
+            RaisePropertyChanged(nameof(CanCancelPayrollMonth));
+            RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
+            FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
+            CancelPayrollMonthCommand.RaiseCanExecuteChanged();
             RaiseActionStateChanged();
         }
     }
@@ -472,6 +485,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand CreateBackupCommand { get; }
     public DelegateCommand RestoreBackupCommand { get; }
     public DelegateCommand CreatePayrollPdfCommand { get; }
+    public DelegateCommand FinalizePayrollMonthCommand { get; }
+    public DelegateCommand CancelPayrollMonthCommand { get; }
     public DelegateCommand AddDepartmentOptionCommand { get; }
     public DelegateCommand RemoveDepartmentOptionCommand { get; }
     public DelegateCommand AddEmploymentCategoryOptionCommand { get; }
@@ -613,6 +628,43 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanCreateBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(BackupDirectoryPath) && !string.IsNullOrWhiteSpace(BackupFileName);
     public bool CanRestoreBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(RestoreFilePath);
     public bool CanCreatePayrollPdf => !IsBusy && IsPayrollRunsWorkspace && _currentEmployeeId.HasValue && MonthlyRecord.SelectedMonth.HasValue;
+    public bool CanFinalizePayrollMonth => !IsBusy
+        && IsPayrollRunsWorkspace
+        && _payrollRunService is not null
+        && _currentEmployeeId.HasValue
+        && MonthlyRecord.SelectedMonth.HasValue
+        && !PayrollRunIsFinalized;
+    public bool CanCancelPayrollMonth => !IsBusy
+        && IsPayrollRunsWorkspace
+        && _payrollRunService is not null
+        && _currentEmployeeId.HasValue
+        && MonthlyRecord.SelectedMonth.HasValue
+        && PayrollRunIsFinalized;
+    public bool CanExecutePayrollMonthAction => CanFinalizePayrollMonth || CanCancelPayrollMonth;
+    public bool PayrollRunIsFinalized => string.Equals(PayrollRunStatusDisplay, "abgeschlossen", StringComparison.OrdinalIgnoreCase);
+    public bool PayrollRunIsOpen => string.Equals(PayrollRunStatusDisplay, "offen", StringComparison.OrdinalIgnoreCase);
+    public bool PayrollRunIsCancelled => string.Equals(PayrollRunStatusDisplay, "storniert", StringComparison.OrdinalIgnoreCase);
+    public string PayrollMonthActionLabel => PayrollRunIsFinalized ? "Monat stornieren" : "Monat abschliessen";
+    public string PayrollRunStatusDisplay
+    {
+        get => _payrollRunStatusDisplay;
+        private set
+        {
+            if (SetProperty(ref _payrollRunStatusDisplay, value))
+            {
+                RaisePropertyChanged(nameof(PayrollRunIsFinalized));
+                RaisePropertyChanged(nameof(PayrollRunIsOpen));
+                RaisePropertyChanged(nameof(PayrollRunIsCancelled));
+                RaisePropertyChanged(nameof(PayrollMonthActionLabel));
+                RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
+                RaisePropertyChanged(nameof(CanCancelPayrollMonth));
+                RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
+                FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
+                CancelPayrollMonthCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public bool CanManageSettingsOptions => !IsBusy && IsSettingsWorkspace;
     public bool CanRemoveDepartmentOption => CanManageSettingsOptions && SelectedSettingsDepartment is not null;
     public bool CanRemoveEmploymentCategoryOption => CanManageSettingsOptions && SelectedSettingsEmploymentCategory is not null;
@@ -1593,6 +1645,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanCreateBackup));
                 RaisePropertyChanged(nameof(CanRestoreBackup));
                 RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+                RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
+                RaisePropertyChanged(nameof(CanCancelPayrollMonth));
+                RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
                 RaisePropertyChanged(nameof(CanLoadAnnualSalary));
                 RaisePropertyChanged(nameof(CanManageSettingsOptions));
                 RaisePropertyChanged(nameof(CanRemoveDepartmentOption));
@@ -1612,6 +1667,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         await LoadImportedTimeMonthsAsync();
         await RefreshAsync();
         await LoadMonthCaptureOverviewAsync();
+        await LoadPayrollRunStatusAsync();
 
         if (Employees.Count > 0 && _currentEmployeeId is null)
         {
@@ -1627,6 +1683,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             await ReloadEmployeesAsync();
             await RestoreSelectionAfterReloadAsync(selectedEmployeeId, selectFirstIfMissing: !_isEditing);
             await LoadMonthCaptureOverviewAsync();
+            await LoadPayrollRunStatusAsync();
             StatusMessage = $"{Employees.Count} Mitarbeitende geladen.";
         });
     }
@@ -2381,6 +2438,99 @@ public sealed class MainWindowViewModel : ViewModelBase
         });
     }
 
+    private async Task FinalizePayrollMonthAsync()
+    {
+        if (!CanFinalizePayrollMonth || _payrollRunService is null || !_currentEmployeeId.HasValue || !MonthlyRecord.SelectedMonth.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var selectedMonth = MonthlyRecord.SelectedMonth.Value;
+            await MonthlyRecord.ReloadCurrentMonthAsync();
+
+            var result = await _payrollRunService.FinalizeMonthAsync(
+                new FinalizePayrollMonthCommand(
+                    _currentEmployeeId.Value,
+                    selectedMonth.Year,
+                    selectedMonth.Month));
+
+            PayrollRunStatusDisplay = "abgeschlossen";
+            StatusMessage = $"Monat {selectedMonth:MM/yyyy} abgeschlossen ({result.LineCount} Positionen).";
+            await LoadAnnualSalaryCoreIfVisibleAsync();
+        });
+    }
+
+    private async Task CancelPayrollMonthAsync()
+    {
+        if (!CanCancelPayrollMonth || _payrollRunService is null || !_currentEmployeeId.HasValue || !MonthlyRecord.SelectedMonth.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var selectedMonth = MonthlyRecord.SelectedMonth.Value;
+
+            await _payrollRunService.CancelMonthAsync(
+                new CancelPayrollRunCommand(
+                    _currentEmployeeId.Value,
+                    selectedMonth.Year,
+                    selectedMonth.Month));
+
+            PayrollRunStatusDisplay = "storniert";
+            StatusMessage = $"Monat {selectedMonth:MM/yyyy} storniert.";
+            await LoadAnnualSalaryCoreIfVisibleAsync();
+        });
+    }
+
+    private async Task LoadAnnualSalaryCoreIfVisibleAsync()
+    {
+        if (IsAnnualSalaryWorkspace)
+        {
+            await LoadAnnualSalaryCoreAsync();
+        }
+    }
+
+    private async Task LoadPayrollRunStatusAsync()
+    {
+        if (_payrollRunService is null || !_currentEmployeeId.HasValue || !MonthlyRecord.SelectedMonth.HasValue)
+        {
+            PayrollRunStatusDisplay = "offen";
+            RaisePayrollRunActionStateChanged();
+            return;
+        }
+
+        try
+        {
+            var selectedMonth = MonthlyRecord.SelectedMonth.Value;
+            var status = await _payrollRunService.GetMonthlyStatusAsync(
+                new PayrollRunMonthlyStatusQuery(
+                    _currentEmployeeId.Value,
+                    selectedMonth.Year,
+                    selectedMonth.Month));
+
+            PayrollRunStatusDisplay = status.StatusDisplay;
+        }
+        catch
+        {
+            PayrollRunStatusDisplay = "offen";
+        }
+
+        RaisePayrollRunActionStateChanged();
+    }
+
+    private void RaisePayrollRunActionStateChanged()
+    {
+        RaisePropertyChanged(nameof(PayrollMonthActionLabel));
+        RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
+        RaisePropertyChanged(nameof(CanCancelPayrollMonth));
+        RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
+        FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
+        CancelPayrollMonthCommand.RaiseCanExecuteChanged();
+    }
+
     private async Task CreateBackupAsync()
     {
         await ExecuteBusyAsync(async () =>
@@ -2469,7 +2619,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 FullName = employee.FullName,
                 StatusSummary = employee.IsActive ? "Aktiv" : "Inaktiv",
                 ContactSummary = BuildContactSummary(employee.City, employee.Country, employee.Email),
-                ContractSummary = $"{employee.HourlyRateChf:0.00} CHF/h | BVG {employee.MonthlyBvgDeductionChf:0.00} CHF"
+                ContractSummary = $"{PayrollAmountFormatter.FormatChf(employee.HourlyRateChf)}/h | BVG {PayrollAmountFormatter.FormatChf(employee.MonthlyBvgDeductionChf)}"
             });
         }
 
@@ -2871,6 +3021,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         CreateBackupCommand.RaiseCanExecuteChanged();
         RestoreBackupCommand.RaiseCanExecuteChanged();
         CreatePayrollPdfCommand.RaiseCanExecuteChanged();
+        FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
+        CancelPayrollMonthCommand.RaiseCanExecuteChanged();
         AddDepartmentOptionCommand.RaiseCanExecuteChanged();
         RemoveDepartmentOptionCommand.RaiseCanExecuteChanged();
         AddEmploymentCategoryOptionCommand.RaiseCanExecuteChanged();
@@ -2916,8 +3068,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         AnnualSalaryTotals = overview.Totals;
-        AnnualSalaryTitle = $"Jahreslohn {overview.Year} | {overview.LastName} {overview.FirstName} | {overview.PersonnelNumber}";
-        AnnualSalarySummary = "Aggregiert aus vorhandenen Monatsdaten. PDF-Erzeugung ist noch offen.";
+        AnnualSalaryTitle = $"Jahreslohn {overview.LastName} {overview.FirstName} | {overview.PersonnelNumber}";
+        AnnualSalarySummary = "Auswertung aus gespeicherten Lohnlauf-Snapshots.";
         StatusMessage = $"Jahreslohn {overview.Year} geladen.";
     }
 
@@ -2982,6 +3134,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             RaisePropertyChanged(nameof(MonthCaptureMonthLabel));
             await LoadMonthCaptureOverviewAsync();
+            await LoadPayrollRunStatusAsync();
+            RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+            RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
+            RaisePropertyChanged(nameof(CanCancelPayrollMonth));
+            RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
+            CreatePayrollPdfCommand.RaiseCanExecuteChanged();
+            FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
+            CancelPayrollMonthCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -3049,6 +3209,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _currentEmployeeId = employee.EmployeeId;
         _returnEmployeeId = employee.EmployeeId;
         await MonthlyRecord.SetEmployeeAsync(employee.EmployeeId, employee.FirstName + " " + employee.LastName);
+        await LoadPayrollRunStatusAsync();
         if (IsAnnualSalaryWorkspace)
         {
             await LoadAnnualSalaryCoreAsync();
@@ -3761,6 +3922,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void SwitchToPayrollRunsWorkspace()
     {
         SelectMainNavigationSection(MainSection.PayrollRuns);
+        _ = LoadPayrollRunStatusAsync();
     }
 
     private void SwitchToAnnualSalaryWorkspace()

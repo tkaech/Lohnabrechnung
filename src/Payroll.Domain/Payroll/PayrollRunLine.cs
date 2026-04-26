@@ -4,6 +4,12 @@ namespace Payroll.Domain.Payroll;
 
 public sealed class PayrollRunLine : AuditableEntity
 {
+    private PayrollRunLine()
+    {
+        Code = string.Empty;
+        Description = string.Empty;
+    }
+
     private PayrollRunLine(
         Guid employeeId,
         PayrollLineType lineType,

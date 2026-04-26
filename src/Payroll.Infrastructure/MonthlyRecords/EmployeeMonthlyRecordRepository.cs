@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Payroll.Application.Formatting;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Settings;
 using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Persistence;
+using Payroll.Infrastructure.Settings;
 using System.Globalization;
 using System.Text.Json;
 
@@ -84,13 +86,21 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .AsNoTracking()
             .SingleAsync(item => item.Id == monthlyRecord.EmployeeId, cancellationToken);
 
+        var hasFinalizedPayrollRun = await HasFinalizedPayrollRunAsync(
+            monthlyRecord.EmployeeId,
+            monthlyRecord.Year,
+            monthlyRecord.Month,
+            cancellationToken);
         var contract = ResolveContractForMonth(
             monthlyRecord,
-            await LoadBestAvailableContractForMonthAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken));
+            await LoadRelevantContractAsync(monthlyRecord.EmployeeId, monthlyRecord.PeriodStart, monthlyRecord.PeriodEnd, cancellationToken),
+            hasFinalizedPayrollRun);
         var currentPayrollSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
         var payrollSettings = ResolvePayrollSettingsForMonth(
             monthlyRecord,
-            currentPayrollSettings);
+            currentPayrollSettings,
+            await TryLoadPayrollSettingsForMonthAsync(monthlyRecord.PeriodStart, cancellationToken),
+            hasFinalizedPayrollRun);
 
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
         var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
@@ -388,6 +398,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 or PayrollLineType.SundaySupplement
                 or PayrollLineType.HolidaySupplement
                 or PayrollLineType.SpecialSupplement
+                or PayrollLineType.VacationCompensation
                 or PayrollLineType.VehicleCompensation)
             .Sum(line => line.AmountChf);
         var totalChf = derivationLines
@@ -509,7 +520,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "-",
             "-",
             FormatAmount(contract is null ? null : ahvGrossChf, numberCulture, currencyCode),
-            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen und Fahrzeitentschaedigung.",
+            contract is null ? "Ohne gueltigen Vertrag nicht ableitbar." : "Basierend auf Basislohn, ableitbaren Zuschlaegen, Fahrzeitentschaedigung und Ferienentschaedigung.",
             true,
             "AHV_GROSS",
             "BRU",
@@ -646,7 +657,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                         record.Month,
                         entry.WorkDate,
                         "Fahrzeug",
-                        $"{entry.VehicleCompensationTotalChf:0.00} CHF",
+                        PayrollAmountFormatter.FormatChf(entry.VehicleCompensationTotalChf),
                         BuildVehiclePreviewDetails(entry))))
                 .Concat(record.ExpenseEntry is null
                     ? []
@@ -656,8 +667,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                     record.Month,
                     null,
                     "Spesen",
-                    $"{record.ExpenseEntry.ExpensesTotalChf:0.00} CHF",
-                    $"Diverse Spesen {record.ExpenseEntry.ExpensesTotalChf:0.00}")]
+                    PayrollAmountFormatter.FormatChf(record.ExpenseEntry.ExpensesTotalChf),
+                    $"Diverse Spesen {PayrollAmountFormatter.FormatChf(record.ExpenseEntry.ExpensesTotalChf)}")]
                 )
                 .OrderBy(entry => entry.EntryDate)
                 .ThenBy(entry => entry.EntryType)
@@ -893,7 +904,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("STEP_VEHICLE_R1", "Schritt", "Fahrzeitentschaedigung Regiezone", FormatMoney(GetVehicleAmount(derivationLines, "VEHICLE_R1"), numberCulture, currencyCode), $"{FormatQuantity(timeEntries.Sum(entry => entry.VehicleRegiezone1Chf), numberCulture)} x {FormatMoney(payrollSettings.VehicleRegiezone1RateChf, numberCulture, currencyCode)}", null, "VEHICLE_R1"),
             CreateDerivationItem("STEP_SUBTOTAL", "Schritt", "Zwischentotal", FormatMoney(subtotalChf, numberCulture, currencyCode), "Basislohn + Zeitzuschlaege + Spezialzuschlag + Fahrzeugentschaedigungen", "Erstes lohnrelevantes Zwischentotal vor weiteren Abzuegen.", "SUBTOTAL"),
             CreateDerivationItem("STEP_VACATION", "Schritt", "Ferienentschaedigung", vacationCompensationLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(vacationCompensationLine.AmountChf, numberCulture, currencyCode), $"{FormatPercentageRate(effectiveVacationCompensationRate, numberCulture)} x {FormatMoney(subtotalChf, numberCulture, currencyCode)}", BuildVacationCompensationStepDetail(employeeBirthDate, usesAge50PlusVacationCompensationRate, age50PlusEffectiveDate), "VACATION_COMP"),
-            CreateDerivationItem("STEP_AHV_GROSS", "Schritt", "AHV-pflichtiger Bruttolohn", FormatMoney(ahvGrossChf, numberCulture, currencyCode), "Basislohn + Zuschlaege + Fahrzeugentschaedigungen", "In der aktuellen Vorschau ohne separaten Ferienanteil ausgewiesen.", "AHV_GROSS"),
+            CreateDerivationItem("STEP_AHV_GROSS", "Schritt", "AHV-pflichtiger Bruttolohn", FormatMoney(ahvGrossChf, numberCulture, currencyCode), "Basislohn + Zuschlaege + Fahrzeugentschaedigungen + Ferienentschaedigung", "Gleiche Bruttolohnbasis wie PayrollRunLine und Jahresuebersicht.", "AHV_GROSS"),
             BuildDeductionDerivationItem("STEP_AHV", "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, "AHV_IV_EO", numberCulture, currencyCode),
             BuildDeductionDerivationItem("STEP_ALV", "ALV", derivationLines, "ALV", payrollSettings.AlvRate, "ALV", numberCulture, currencyCode),
             BuildDeductionDerivationItem("STEP_KTG", "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, "KTG_UVG", numberCulture, currencyCode),
@@ -934,7 +945,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return groups;
     }
 
-    private static IReadOnlyCollection<Payroll.Domain.Settings.PayrollPreviewHelpVisibility> DeserializePayrollPreviewHelpVisibilities(string? json)
+    private static IReadOnlyCollection<global::Payroll.Domain.Settings.PayrollPreviewHelpVisibility> DeserializePayrollPreviewHelpVisibilities(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
         {
@@ -943,7 +954,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
         try
         {
-            return JsonSerializer.Deserialize<Payroll.Domain.Settings.PayrollPreviewHelpVisibility[]>(json) ?? [];
+            return JsonSerializer.Deserialize<global::Payroll.Domain.Settings.PayrollPreviewHelpVisibility[]>(json) ?? [];
         }
         catch (JsonException)
         {
@@ -997,20 +1008,64 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             ?? new PayrollSettings();
     }
 
-    private static PayrollSettings ResolvePayrollSettingsForMonth(EmployeeMonthlyRecord monthlyRecord, PayrollSettings currentPayrollSettings)
+    private async Task<PayrollSettings?> TryLoadPayrollSettingsForMonthAsync(DateOnly referenceDate, CancellationToken cancellationToken)
     {
-        return monthlyRecord.PayrollParameterSnapshot.IsInitialized
+        var fallbackSettings = await LoadCurrentPayrollSettingsAsync(cancellationToken);
+        var generalVersions = await _dbContext.PayrollGeneralSettingsVersions
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+        var hourlyVersions = await _dbContext.PayrollHourlySettingsVersions
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        if (generalVersions.Count == 0 && hourlyVersions.Count == 0)
+        {
+            return null;
+        }
+
+        return PayrollSettingsVersionResolver.ResolveForDate(
+            fallbackSettings,
+            generalVersions,
+            hourlyVersions,
+            referenceDate);
+    }
+
+    private async Task<bool> HasFinalizedPayrollRunAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+    {
+        var periodKey = $"{year:D4}-{month:D2}";
+        return await _dbContext.PayrollRuns
+            .AsNoTracking()
+            .AnyAsync(
+                run => run.PeriodKey == periodKey
+                    && run.Status == PayrollRunStatus.Finalized
+                    && run.Lines.Any(line => line.EmployeeId == employeeId),
+                cancellationToken);
+    }
+
+    private static PayrollSettings ResolvePayrollSettingsForMonth(
+        EmployeeMonthlyRecord monthlyRecord,
+        PayrollSettings currentPayrollSettings,
+        PayrollSettings? effectivePayrollSettings,
+        bool hasFinalizedPayrollRun)
+    {
+        return (hasFinalizedPayrollRun || effectivePayrollSettings is null) && monthlyRecord.PayrollParameterSnapshot.IsInitialized
             ? monthlyRecord.PayrollParameterSnapshot.ToPayrollSettings()
-            : currentPayrollSettings;
+            : effectivePayrollSettings ?? currentPayrollSettings;
     }
 
     private static Domain.Employees.EmploymentContract? ResolveContractForMonth(
         EmployeeMonthlyRecord monthlyRecord,
-        Domain.Employees.EmploymentContract? currentContract)
+        Domain.Employees.EmploymentContract? relevantContract,
+        bool hasFinalizedPayrollRun)
     {
+        if (!hasFinalizedPayrollRun && relevantContract is not null)
+        {
+            return relevantContract;
+        }
+
         return monthlyRecord.EmploymentContractSnapshot.IsInitialized
             ? monthlyRecord.EmploymentContractSnapshot.ToEmploymentContract(monthlyRecord.EmployeeId)
-            : currentContract;
+            : relevantContract;
     }
 
     private static decimal GetVehicleAmount(IEnumerable<PayrollRunLine> derivationLines, string code)
@@ -1196,7 +1251,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
     private static string FormatMoney(decimal value, CultureInfo numberCulture, string currencyCode)
     {
-        return $"{value.ToString("#,##0.00", numberCulture)} {NormalizeCurrencyCode(currencyCode)}";
+        return PayrollAmountFormatter.FormatMoney(value, currencyCode);
     }
 
     private static string FormatDate(DateOnly? value)

@@ -5,6 +5,7 @@ using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.Employees;
 using Payroll.Domain.MonthlyRecords;
+using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.MonthlyRecords;
 using Payroll.Infrastructure.Persistence;
@@ -79,11 +80,12 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.NotNull(details);
         Assert.Single(details!.TimeEntries);
         Assert.NotNull(details.ExpenseEntry);
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260,00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.AmountDisplay == "247,63 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24,00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672,00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "18,50 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.AmountDisplay == "247.63 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "AHV-pflichtiger Bruttolohn" && line.AmountDisplay == "2'574.95 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountDisplay == "18.50 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Total Auszahlung");
         Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Grundlohn" && item.DisplayTag == "BAS");
         Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Total Auszahlung" && item.LinkKey == "TOTAL_PAYOUT");
@@ -145,9 +147,9 @@ public sealed class MonthlyRecordRepositorySqliteTests
         var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
 
         Assert.NotNull(details);
-        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.AmountDisplay == "8,13 CHF");
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.AmountDisplay == "8.13 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Stunden mit Zeitzuschlag" && line.RateDisplay == "Nacht 25 %");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672,00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Fahrzeitentschaedigung Pauschalzone 1" && line.AmountDisplay == "672.00 CHF");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "10,64 %");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.Detail == "Standardsatz fuer Ferienentschaedigung angewendet. Erhoehter Satz gilt ab 01.01.2040.");
     }
@@ -344,7 +346,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
-    public async Task GetDetailsAsync_UsesStoredMonthlyContractSnapshot_AfterContractChange()
+    public async Task GetDetailsAsync_UsesRelevantContractForOpenMonth_AfterRetroactiveContractChange()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -379,15 +381,66 @@ public sealed class MonthlyRecordRepositorySqliteTests
         await repository.SaveChangesAsync(CancellationToken.None);
 
         dbContext.EmploymentContracts.Remove(originalContract);
-        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 6, 1), null, 45m, 500m, 6m));
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 45m, 500m, 6m));
         await dbContext.SaveChangesAsync();
         dbContext.ChangeTracker.Clear();
 
         var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
 
         Assert.NotNull(details);
-        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260,00 CHF");
-        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24,00 CHF");
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "360.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "48.00 CHF");
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_UsesStoredMonthlyContractSnapshot_ForFinalizedMonth()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        var originalContract = new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m);
+        dbContext.EmploymentContracts.Add(originalContract);
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 0m, 0m, 0m, 0m, 0m, 0m, "Fruehdienst");
+        var finalizedRun = new PayrollRun("2026-04", new DateOnly(2026, 4, 30));
+        finalizedRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(employee.Id, PayrollLineType.BaseHours, "BASE", "Basislohn", 8m, 32.5m));
+        finalizedRun.FinalizeRun();
+        dbContext.PayrollRuns.Add(finalizedRun);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        dbContext.EmploymentContracts.Remove(originalContract);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 45m, 500m, 6m));
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "260.00 CHF");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountDisplay == "24.00 CHF");
     }
 
     [Fact]
@@ -583,7 +636,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
 
         Assert.Equal("Spesen gespeichert.", viewModel.ActionMessage);
         Assert.Equal("18,50", viewModel.ExpensesTotal);
-        Assert.Contains("Spesen 18,50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Contains("Spesen 18.50 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
     private static global::Payroll.Domain.Employees.Employee CreateEmployee(

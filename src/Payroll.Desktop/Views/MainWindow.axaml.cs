@@ -427,6 +427,49 @@ public sealed partial class MainWindow : Window
         await viewModel.DeleteImportedTimeMonthAsync();
     }
 
+    private async void OnFinalizePayrollMonthClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.CanCancelPayrollMonth)
+        {
+            var shouldCancel = await ShowConfirmationDialogAsync(
+                "Lohnlauf stornieren",
+                "Moechten Sie den abgeschlossenen Monat wirklich stornieren? Der Lohnlauf bleibt gespeichert, wird aber im Jahreslohn nicht mehr beruecksichtigt.",
+                "Stornieren");
+
+            if (!shouldCancel)
+            {
+                return;
+            }
+
+            if (viewModel.CancelPayrollMonthCommand.CanExecute(null))
+            {
+                viewModel.CancelPayrollMonthCommand.Execute(null);
+            }
+
+            return;
+        }
+
+        var shouldFinalize = await ShowConfirmationDialogAsync(
+            "Lohnlauf abschliessen",
+            "Moechten Sie den ausgewaehlten Monat wirklich finalisieren? Nach Abschluss kann der Monat nur noch per Storno aufgehoben werden.",
+            "Abschliessen");
+
+        if (!shouldFinalize)
+        {
+            return;
+        }
+
+        if (viewModel.FinalizePayrollMonthCommand.CanExecute(null))
+        {
+            viewModel.FinalizePayrollMonthCommand.Execute(null);
+        }
+    }
+
     private async Task<bool> ShowConfirmationDialogAsync(string title, string message, string confirmButtonText)
     {
         var dialog = new ConfirmationDialogWindow(title, message, confirmButtonText);

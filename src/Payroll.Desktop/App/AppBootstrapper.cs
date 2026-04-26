@@ -7,6 +7,7 @@ using Payroll.Application.Employees;
 using Payroll.Application.Imports;
 using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
@@ -16,6 +17,7 @@ using Payroll.Infrastructure.Employees;
 using Payroll.Infrastructure.Imports;
 using Payroll.Infrastructure.Layout;
 using Payroll.Infrastructure.MonthlyRecords;
+using Payroll.Infrastructure.Payroll;
 using Payroll.Infrastructure.Persistence;
 using Payroll.Infrastructure.Reporting;
 using Payroll.Infrastructure.Settings;
@@ -43,6 +45,8 @@ public sealed class AppBootstrapper
         EnsureConfigurationSeeded(payrollSettingsService);
         EnsureTestDataSeeded(dbContext, runtimeOptions.SeedTestData);
         var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var payrollRunRepository = new PayrollRunRepository(dbContext);
+        var payrollRunService = new PayrollRunService(payrollRunRepository);
         var annualSalaryRepository = new AnnualSalaryRepository(dbContext);
         var annualSalaryService = new AnnualSalaryService(annualSalaryRepository);
         var sqlExplorerViewModel = new SqlExplorerViewModel(dbContext);
@@ -70,7 +74,8 @@ public sealed class AppBootstrapper
             workspaceLabel,
             databasePath,
             runtimeOptions.EnvironmentName,
-            annualSalaryService);
+            annualSalaryService,
+            payrollRunService);
     }
 
     private static string ResolveWorkspaceRoot()
@@ -279,7 +284,9 @@ public sealed class AppBootstrapper
                    && TableExists(connection, "Employees")
                    && TableExists(connection, "EmployeeMonthlyRecords")
                    && TableExists(connection, "ImportMappingConfigurations")
-                   && TableExists(connection, "ImportExecutionStatuses");
+                   && TableExists(connection, "ImportExecutionStatuses")
+                   && TableExists(connection, "PayrollRuns")
+                   && TableExists(connection, "PayrollRunLines");
         }
         finally
         {
@@ -572,6 +579,12 @@ public sealed class AppBootstrapper
                 "EmployeeMonthlyRecords",
                 "EmploymentContractSnapshot_SpecialSupplementRateChf",
                 "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_SpecialSupplementRateChf\" TEXT NOT NULL DEFAULT 0;");
+
+            EnsureTableColumn(
+                connection,
+                "PayrollRuns",
+                "CancelledAtUtc",
+                "ALTER TABLE \"PayrollRuns\" ADD COLUMN \"CancelledAtUtc\" TEXT NULL;");
 
             EnsureTable(
                 connection,

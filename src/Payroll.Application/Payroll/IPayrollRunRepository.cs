@@ -1,0 +1,16 @@
+using Payroll.Domain.Payroll;
+using Payroll.Domain.Settings;
+
+namespace Payroll.Application.Payroll;
+
+public interface IPayrollRunRepository
+{
+    Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
+    Task<PayrollRun?> GetFinalizedRunForEmployeePeriodForUpdateAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
+    Task<bool> HasCancelledRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
+    Task<PayrollRunMonthlyInputDto?> LoadMonthlyInputAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken);
+    Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken);
+    Task<PayrollSettings> LoadPayrollSettingsForPeriodAsync(int year, int month, CancellationToken cancellationToken);
+    void Add(PayrollRun payrollRun);
+    Task SaveChangesAsync(CancellationToken cancellationToken);
+}

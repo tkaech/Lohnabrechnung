@@ -6,9 +6,15 @@ public sealed class PayrollRun : AuditableEntity
 {
     private readonly List<PayrollRunLine> _lines = [];
 
+    private PayrollRun()
+    {
+        PeriodKey = string.Empty;
+    }
+
     public string PeriodKey { get; private set; }
     public DateOnly PaymentDate { get; private set; }
     public PayrollRunStatus Status { get; private set; }
+    public DateTimeOffset? CancelledAtUtc { get; private set; }
     public IReadOnlyCollection<PayrollRunLine> Lines => _lines.AsReadOnly();
 
     public PayrollRun(string periodKey, DateOnly paymentDate)
@@ -22,13 +28,23 @@ public sealed class PayrollRun : AuditableEntity
     {
         ArgumentNullException.ThrowIfNull(line);
 
-        if (Status == PayrollRunStatus.Finalized)
+        if (Status is PayrollRunStatus.Finalized or PayrollRunStatus.Cancelled)
         {
             throw new InvalidOperationException("Finalized payroll runs cannot be modified.");
         }
 
         _lines.Add(line);
         Touch();
+    }
+
+    public void AddLines(IEnumerable<PayrollRunLine> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+
+        foreach (var line in lines)
+        {
+            AddLine(line);
+        }
     }
 
     public decimal GetTotalAmountChf()
@@ -52,7 +68,29 @@ public sealed class PayrollRun : AuditableEntity
 
     public void FinalizeRun()
     {
+        if (Status == PayrollRunStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Cancelled payroll runs cannot be finalized.");
+        }
+
         Status = PayrollRunStatus.Finalized;
+        Touch();
+    }
+
+    public void Cancel(DateTimeOffset cancelledAtUtc)
+    {
+        if (Status == PayrollRunStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Payroll run is already cancelled.");
+        }
+
+        if (Status != PayrollRunStatus.Finalized)
+        {
+            throw new InvalidOperationException("Only finalized payroll runs can be cancelled.");
+        }
+
+        Status = PayrollRunStatus.Cancelled;
+        CancelledAtUtc = cancelledAtUtc;
         Touch();
     }
 }

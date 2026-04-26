@@ -1275,22 +1275,44 @@
         <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
-              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" DataContext="{Binding MonthlyRecord}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
-                <controls:MonthPicker Grid.Row="1" SelectedDate="{Binding SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
-                <ToggleButton Grid.Column="2"
+                <controls:MonthPicker Grid.Row="1" SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
+                <StackPanel Grid.Column="2"
+                            Grid.RowSpan="2"
+                            MinWidth="120"
+                            Margin="0,0,8,0"
+                            VerticalAlignment="Center"
+                            Spacing="2">
+                  <TextBlock Classes="section-caption" Text="Status" />
+                  <TextBlock Classes="payroll-status"
+                             Classes.payroll-status-finalized="{Binding PayrollRunIsFinalized}"
+                             Classes.payroll-status-open="{Binding PayrollRunIsOpen}"
+                             Classes.payroll-status-cancelled="{Binding PayrollRunIsCancelled}"
+                             Text="{Binding PayrollRunStatusDisplay}" />
+                </StackPanel>
+                <ToggleButton Grid.Column="3"
                               Grid.RowSpan="2"
                               MinWidth="132"
                               Margin="0,0,8,0"
                               VerticalAlignment="Center"
-                              IsChecked="{Binding IsPayrollPreviewDerivationVisible, Mode=TwoWay}"
-                              IsEnabled="{Binding HasPayrollPreviewDerivationGroups}"
+                              IsChecked="{Binding MonthlyRecord.IsPayrollPreviewDerivationVisible, Mode=TwoWay}"
+                              IsEnabled="{Binding MonthlyRecord.HasPayrollPreviewDerivationGroups}"
                               Content="Herleitung anzeigen" />
-                <Button Grid.Column="3"
+                <Button Grid.Column="4"
+                        Grid.RowSpan="2"
+                        MinWidth="148"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center"
+                        Classes="primary-action"
+                        IsEnabled="{Binding CanExecutePayrollMonthAction}"
+                        Click="OnFinalizePayrollMonthClick"
+                        Content="{Binding PayrollMonthActionLabel}" />
+                <Button Grid.Column="5"
                         Grid.RowSpan="2"
                         VerticalAlignment="Center"
                         Classes="primary-action"
-                        Command="{Binding DataContext.CreatePayrollPdfCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        Command="{Binding CreatePayrollPdfCommand}"
                         Content="PDF erstellen" />
               </Grid>
               <StackPanel Spacing="4" IsVisible="{Binding ShowReportingWorkspace}">
@@ -1488,7 +1510,7 @@
                                   </Border>
                                   <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
                                     <TextBlock FontWeight="SemiBold"
-                                               Text="{Binding ExpensesTotalChf, StringFormat='{}{0:0.00} CHF'}" />
+                                               Text="{Binding ExpensesTotalChf, Converter={StaticResource ChfAmountConverter}}" />
                                   </Border>
                                 </Grid>
                               </DataTemplate>
@@ -1693,31 +1715,37 @@
 
                 <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
                   <StackPanel Spacing="0">
-                    <Grid ColumnDefinitions="72,94,122,122,96,96,96,96,122" Background="#FFF8FAFC">
+                    <Grid ColumnDefinitions="72,94,122,108,96,132,156,132,96,96,96,122" Background="#FFF8FAFC">
                       <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Monat" /></Border>
                       <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
                       <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Bruttolohn" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="AHV/ALV" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="NBU" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="BVG" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="QST" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Spesen" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nettolohn" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="AHV/IV/EO" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="ALV" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Krankentaggeld" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Aus-/Weiterbildung" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Total Sozialabzuege" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="BVG" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="QST" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Spesen" TextAlignment="Right" /></Border>
+                      <Border Grid.Column="11" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nettolohn" TextAlignment="Right" /></Border>
                     </Grid>
 
                     <ItemsControl ItemsSource="{Binding AnnualSalaryMonths}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                          <Grid ColumnDefinitions="72,94,122,122,96,96,96,96,122">
+                          <Grid ColumnDefinitions="72,94,122,108,96,132,156,132,96,96,96,122">
                             <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding MonthLabel}" /></Border>
-                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding StatusDisplay}" /></Border>
-                            <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding GrossSalaryChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AhvIvEoAlvDeductionChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding NbuDeductionChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding BvgDeductionChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding WithholdingTaxChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding ExpensesChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="{Binding NetSalaryChf, StringFormat='{}{0:0.00} CHF'}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Classes="payroll-status" Classes.payroll-status-finalized="{Binding IsFinalized}" Classes.payroll-status-open="{Binding IsOpen}" Text="{Binding StatusDisplay}" /></Border>
+                            <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding GrossSalaryChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AhvIvEoDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AlvDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding SicknessDailyAllowanceDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding TrainingAndEducationDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="{Binding TotalSocialDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding BvgDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding WithholdingTaxChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding ExpensesChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
+                            <Border Grid.Column="11" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="{Binding NetSalaryChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
                           </Grid>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
@@ -1733,12 +1761,12 @@
                     <TextBlock Grid.Column="3" Classes="section-caption" Text="Quellensteuer" />
                     <TextBlock Grid.Column="4" Classes="section-caption" Text="Spesen" />
                     <TextBlock Grid.Column="5" Classes="section-caption" Text="Nettolohn total" />
-                    <TextBlock Grid.Row="1" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.GrossSalaryChf, StringFormat='{}{0:0.00} CHF'}" />
-                    <TextBlock Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.SocialInsuranceDeductionChf, StringFormat='{}{0:0.00} CHF'}" />
-                    <TextBlock Grid.Row="1" Grid.Column="2" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.BvgDeductionChf, StringFormat='{}{0:0.00} CHF'}" />
-                    <TextBlock Grid.Row="1" Grid.Column="3" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.WithholdingTaxChf, StringFormat='{}{0:0.00} CHF'}" />
-                    <TextBlock Grid.Row="1" Grid.Column="4" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.ExpensesChf, StringFormat='{}{0:0.00} CHF'}" />
-                    <TextBlock Grid.Row="1" Grid.Column="5" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.NetSalaryChf, StringFormat='{}{0:0.00} CHF'}" />
+                    <TextBlock Grid.Row="1" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.GrossSalaryChf, Converter={StaticResource ChfAmountConverter}}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.SocialInsuranceDeductionChf, Converter={StaticResource ChfAmountConverter}}" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.BvgDeductionChf, Converter={StaticResource ChfAmountConverter}}" />
+                    <TextBlock Grid.Row="1" Grid.Column="3" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.WithholdingTaxChf, Converter={StaticResource ChfAmountConverter}}" />
+                    <TextBlock Grid.Row="1" Grid.Column="4" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.ExpensesChf, Converter={StaticResource ChfAmountConverter}}" />
+                    <TextBlock Grid.Row="1" Grid.Column="5" FontWeight="SemiBold" Text="{Binding AnnualSalaryTotals.NetSalaryChf, Converter={StaticResource ChfAmountConverter}}" />
                   </Grid>
                 </Border>
               </StackPanel>

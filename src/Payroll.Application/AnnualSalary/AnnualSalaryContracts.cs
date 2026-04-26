@@ -16,20 +16,30 @@ public sealed record AnnualSalaryOverviewDto(
 public sealed record AnnualSalaryMonthDto(
     int Month,
     string MonthLabel,
-    bool HasMonthData,
+    bool IsFinalized,
     decimal GrossSalaryChf,
-    decimal AhvIvEoAlvDeductionChf,
-    decimal NbuDeductionChf,
+    decimal AhvIvEoDeductionChf,
+    decimal AlvDeductionChf,
+    decimal SicknessDailyAllowanceDeductionChf,
+    decimal TrainingAndEducationDeductionChf,
+    decimal TotalSocialDeductionChf,
     decimal BvgDeductionChf,
     decimal WithholdingTaxChf,
     decimal ExpensesChf,
     decimal NetSalaryChf)
 {
-    public string StatusDisplay => HasMonthData ? "erfasst" : "-";
+    public string StatusDisplay => IsFinalized ? "abgeschlossen" : "offen";
+    public bool IsOpen => !IsFinalized;
+    public decimal AhvIvEoAlvDeductionChf => AhvIvEoDeductionChf + AlvDeductionChf;
+    public decimal NbuDeductionChf => SicknessDailyAllowanceDeductionChf;
 }
 
 public sealed record AnnualSalaryTotalsDto(
     decimal GrossSalaryChf,
+    decimal AhvIvEoDeductionChf,
+    decimal AlvDeductionChf,
+    decimal SicknessDailyAllowanceDeductionChf,
+    decimal TrainingAndEducationDeductionChf,
     decimal SocialInsuranceDeductionChf,
     decimal BvgDeductionChf,
     decimal WithholdingTaxChf,

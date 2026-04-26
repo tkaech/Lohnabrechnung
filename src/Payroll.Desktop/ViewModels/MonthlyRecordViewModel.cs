@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using Payroll.Application.Formatting;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
@@ -696,11 +697,11 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         ContextDescription = $"{details.Header.Month:00}/{details.Header.Year} | Monatserfassung fuer Zeiten und Spesen.";
         StatusSummary = $"Status: {FormatStatus(details.Header.Status)}";
         ContractSummary = details.Header.ContractValidFrom.HasValue
-            ? $"Vertragsstand: {details.Header.ContractValidFrom:dd.MM.yyyy} bis {FormatDate(details.Header.ContractValidTo)} | {details.Header.HourlyRateChf:0.00} CHF/h | BVG {details.Header.MonthlyBvgDeductionChf:0.00} CHF"
+            ? $"Vertragsstand: {details.Header.ContractValidFrom:dd.MM.yyyy} bis {FormatDate(details.Header.ContractValidTo)} | {PayrollAmountFormatter.FormatChf(details.Header.HourlyRateChf ?? 0m)}/h | BVG {PayrollAmountFormatter.FormatChf(details.Header.MonthlyBvgDeductionChf ?? 0m)}"
             : "Vertragsstand: kein passender Vertrag fuer den Monat gefunden.";
-        TotalsSummary = $"Stunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
+        TotalsSummary = $"Stunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {PayrollAmountFormatter.FormatChf(details.Header.TotalExpensesChf)} | Fahrzeug {PayrollAmountFormatter.FormatChf(details.Header.TotalVehicleCompensationChf)}";
         PreviewSummary = "Monatsvorschau zeigt alle vorhandenen Monate der selektierten Person tabellarisch untereinander.";
-        PreviewTotals = $"Arbeitsstunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {details.Header.TotalExpensesChf:0.00} CHF | Fahrzeug {details.Header.TotalVehicleCompensationChf:0.00} CHF";
+        PreviewTotals = $"Arbeitsstunden {details.Header.TotalWorkedHours:0.##} | Spezialstunden {details.Header.TotalSpecialHours:0.##} | Spesen {PayrollAmountFormatter.FormatChf(details.Header.TotalExpensesChf)} | Fahrzeug {PayrollAmountFormatter.FormatChf(details.Header.TotalVehicleCompensationChf)}";
         PreviewEntryCounts = $"Eintraege im aktuellen Monat: Zeiten {details.TimeEntries.Count} | Spesenblock {(details.ExpenseEntry is null ? 0 : 1)}";
         PayrollPreviewTitle = $"{details.Header.EmployeeLastName} {details.Header.EmployeeFirstName} | {details.Header.PersonnelNumber}";
         PayrollPreviewSummary = details.PayrollPreview.Lines.Count == 0
@@ -725,7 +726,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 VehicleRegiezone1Chf = entry.VehicleRegiezone1Chf,
                 IsCurrentMonth = true,
                 Note = entry.Note,
-                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
+                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {PayrollAmountFormatter.FormatChf(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf)}"
             };
             timeEntry.ApplyColumnOrder(TimeEntryColumns);
             TimeEntries.Add(timeEntry);
@@ -756,7 +757,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 VehicleRegiezone1Chf = entry.VehicleRegiezone1Chf,
                 IsCurrentMonth = isCurrentMonth,
                 Note = entry.Note,
-                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Monat {entry.WorkDate:MM/yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf):0.00} CHF"
+                Summary = $"{entry.WorkDate:dd.MM.yyyy} | Monat {entry.WorkDate:MM/yyyy} | Arbeit {entry.HoursWorked:0.##} h | Nacht {entry.NightHours:0.##} | Sonntag {entry.SundayHours:0.##} | Feiertag {entry.HolidayHours:0.##} | Fahrzeug {PayrollAmountFormatter.FormatChf(entry.VehiclePauschalzone1Chf + entry.VehiclePauschalzone2Chf + entry.VehicleRegiezone1Chf)}"
             };
             timeEntry.ApplyColumnOrder(TimeEntryColumns);
             TimeEntryHistory.Add(timeEntry);
@@ -771,7 +772,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 Year = entry.Year,
                 Month = entry.Month,
                 ExpensesTotalChf = entry.ExpensesTotalChf,
-                Summary = $"{entry.Month:00}/{entry.Year} | Diverse Spesen {entry.ExpensesTotalChf:0.00} CHF"
+                Summary = $"{entry.Month:00}/{entry.Year} | Diverse Spesen {PayrollAmountFormatter.FormatChf(entry.ExpensesTotalChf)}"
             });
         }
 

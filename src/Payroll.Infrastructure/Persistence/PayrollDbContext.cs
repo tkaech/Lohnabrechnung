@@ -3,6 +3,7 @@ using Payroll.Domain.Employees;
 using Payroll.Domain.Expenses;
 using Payroll.Domain.Imports;
 using Payroll.Domain.MonthlyRecords;
+using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Domain.TimeTracking;
 
@@ -18,6 +19,8 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<EmploymentContract> EmploymentContracts => Set<EmploymentContract>();
     public DbSet<EmployeeMonthlyRecord> EmployeeMonthlyRecords => Set<EmployeeMonthlyRecord>();
+    public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+    public DbSet<PayrollRunLine> PayrollRunLines => Set<PayrollRunLine>();
     public DbSet<PayrollSettings> PayrollSettings => Set<PayrollSettings>();
     public DbSet<PayrollGeneralSettingsVersion> PayrollGeneralSettingsVersions => Set<PayrollGeneralSettingsVersion>();
     public DbSet<PayrollHourlySettingsVersion> PayrollHourlySettingsVersions => Set<PayrollHourlySettingsVersion>();
@@ -223,6 +226,45 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(status => status.Month).IsRequired();
             builder.Property(status => status.ImportedAtUtc).IsRequired();
             builder.HasIndex(status => new { status.Type, status.Year, status.Month }).IsUnique();
+        });
+
+        modelBuilder.Entity<PayrollRun>(builder =>
+        {
+            builder.ToTable("PayrollRuns");
+            builder.HasKey(run => run.Id);
+            builder.Property(run => run.PeriodKey).HasMaxLength(7).IsRequired();
+            builder.Property(run => run.PaymentDate).IsRequired();
+            builder.Property(run => run.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(run => run.CancelledAtUtc);
+            builder.HasIndex(run => run.PeriodKey);
+
+            builder.HasMany(run => run.Lines)
+                .WithOne()
+                .HasForeignKey("PayrollRunId")
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PayrollRunLine>(builder =>
+        {
+            builder.ToTable("PayrollRunLines");
+            builder.HasKey(line => line.Id);
+            builder.Property<Guid>("PayrollRunId").IsRequired();
+            builder.Property(line => line.EmployeeId).IsRequired();
+            builder.Property(line => line.LineType).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(line => line.ValueOrigin).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(line => line.Code).HasMaxLength(50).IsRequired();
+            builder.Property(line => line.Description).HasMaxLength(200).IsRequired();
+            builder.Property(line => line.Unit).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(line => line.Quantity).HasColumnType("TEXT");
+            builder.Property(line => line.RateChf).HasColumnType("TEXT");
+            builder.Property(line => line.AmountChf).HasColumnType("TEXT").IsRequired();
+            builder.HasIndex("PayrollRunId");
+            builder.HasIndex(line => line.EmployeeId);
+
+            builder.HasOne<Employee>()
+                .WithMany()
+                .HasForeignKey(line => line.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<EmployeeMonthlyRecord>(builder =>
