@@ -3,6 +3,7 @@ namespace Payroll.Domain.Payroll;
 public enum PayrollLineType
 {
     BaseHours,
+    MonthlySalary,
     NightSupplement,
     SundaySupplement,
     HolidaySupplement,

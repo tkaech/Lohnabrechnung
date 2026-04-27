@@ -57,6 +57,69 @@ public sealed class MonthlyRecordViewModelTests
     }
 
     [Fact]
+    public async Task SelectingExistingEntries_KeepsOpenMonthCommandsExecutable()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Selina Auswahl");
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        await viewModel.SetEmployeeAsync(employeeId, "Selina Auswahl");
+        viewModel.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await WaitUntilAsync(() => viewModel.CanSaveTimeEntry);
+
+        viewModel.TimeDate = "2026-03-12";
+        viewModel.HoursWorked = "7.5";
+        viewModel.NightHours = "0";
+        viewModel.SundayHours = "0";
+        viewModel.HolidayHours = "0";
+        viewModel.VehiclePauschalzone1 = "0";
+        viewModel.VehiclePauschalzone2 = "0";
+        viewModel.VehicleRegiezone1 = "0";
+        viewModel.SaveTimeEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.TimeEntryHistory.Count == 1);
+
+        viewModel.ExpensesTotal = "42";
+        viewModel.SaveExpenseEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ExpenseEntryHistory.Count == 1);
+
+        viewModel.SelectedTimeEntry = viewModel.TimeEntryHistory.Single();
+        viewModel.SelectedExpenseEntry = viewModel.ExpenseEntryHistory.Single();
+
+        Assert.True(viewModel.NewTimeEntryCommand.CanExecute(null));
+        Assert.True(viewModel.SaveTimeEntryCommand.CanExecute(null));
+        Assert.True(viewModel.DeleteTimeEntryCommand.CanExecute(null));
+        Assert.True(viewModel.ResetExpenseValuesCommand.CanExecute(null));
+        Assert.True(viewModel.SaveExpenseEntryCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task SelectingMonthWhileBusy_ReloadsSelectedMonthAndKeepsCommandsExecutable()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Beat Busy");
+        var delay = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        repository.DelayNextDetailsRead = delay;
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        var initialLoad = viewModel.SetEmployeeAsync(employeeId, "Beat Busy");
+        await WaitUntilAsync(() => viewModel.IsBusy);
+
+        viewModel.SelectedMonthText = "03/2026";
+        delay.SetResult();
+        await initialLoad;
+
+        await WaitUntilAsync(() => viewModel.TimePayrollMonth == "03/2026" && viewModel.CanSaveTimeEntry);
+
+        Assert.True(viewModel.LoadMonthlyRecordCommand.CanExecute(null));
+        Assert.True(viewModel.NewTimeEntryCommand.CanExecute(null));
+        Assert.True(viewModel.SaveTimeEntryCommand.CanExecute(null));
+        Assert.True(viewModel.SaveExpenseEntryCommand.CanExecute(null));
+        Assert.Contains("03/2026", viewModel.ContextDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MonthlyExpenseValues_SaveAndReloadFlow_WorksWithinMonthlyContext()
     {
         var employeeId = Guid.NewGuid();
@@ -340,6 +403,8 @@ public sealed class MonthlyRecordViewModelTests
         private readonly Dictionary<(Guid EmployeeId, int Year, int Month), EmployeeMonthlyRecord> _records = [];
         private readonly Dictionary<string, string> _employeeNames = [];
 
+        public TaskCompletionSource? DelayNextDetailsRead { get; set; }
+
         public void RegisterEmployee(Guid employeeId, string employeeName)
         {
             _employeeNames[employeeId.ToString("N")] = employeeName;
@@ -363,12 +428,19 @@ public sealed class MonthlyRecordViewModelTests
             return Task.FromResult<EmployeeMonthlyRecord?>(record);
         }
 
-        public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
+        public async Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
+            var delay = DelayNextDetailsRead;
+            if (delay is not null)
+            {
+                DelayNextDetailsRead = null;
+                await delay.Task;
+            }
+
             var record = _records.Values.SingleOrDefault(item => item.Id == monthlyRecordId);
             if (record is null)
             {
-                return Task.FromResult<MonthlyRecordDetailsDto?>(null);
+                return null;
             }
 
             var employeeName = _employeeNames.TryGetValue(record.EmployeeId.ToString("N"), out var name)
@@ -424,7 +496,7 @@ public sealed class MonthlyRecordViewModelTests
                     Array.Empty<string>()),
                 BuildPayrollPreview(record));
 
-            return Task.FromResult<MonthlyRecordDetailsDto?>(details);
+            return details;
         }
 
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)

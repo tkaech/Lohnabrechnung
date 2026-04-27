@@ -16,16 +16,20 @@ public sealed class EmploymentContractSnapshot
         DateOnly validFrom,
         DateOnly? validTo,
         decimal hourlyRateChf,
+        decimal monthlySalaryAmountChf,
         decimal monthlyBvgDeductionChf,
-        decimal specialSupplementRateChf)
+        decimal specialSupplementRateChf,
+        EmployeeWageType wageType)
     {
         IsInitialized = true;
         CapturedAtUtc = capturedAtUtc;
         ValidFrom = validFrom;
         ValidTo = validTo;
         HourlyRateChf = hourlyRateChf;
+        MonthlySalaryAmountChf = monthlySalaryAmountChf;
         MonthlyBvgDeductionChf = monthlyBvgDeductionChf;
         SpecialSupplementRateChf = specialSupplementRateChf;
+        WageType = wageType;
     }
 
     public bool IsInitialized { get; private set; }
@@ -33,8 +37,10 @@ public sealed class EmploymentContractSnapshot
     public DateOnly ValidFrom { get; private set; }
     public DateOnly? ValidTo { get; private set; }
     public decimal HourlyRateChf { get; private set; }
+    public decimal MonthlySalaryAmountChf { get; private set; }
     public decimal MonthlyBvgDeductionChf { get; private set; }
     public decimal SpecialSupplementRateChf { get; private set; }
+    public EmployeeWageType WageType { get; private set; }
 
     public static EmploymentContractSnapshot Create(EmploymentContract contract)
     {
@@ -45,8 +51,10 @@ public sealed class EmploymentContractSnapshot
             contract.ValidFrom,
             contract.ValidTo,
             contract.HourlyRateChf,
+            contract.MonthlySalaryAmountChf,
             contract.MonthlyBvgDeductionChf,
-            contract.SpecialSupplementRateChf);
+            contract.SpecialSupplementRateChf,
+            contract.WageType);
     }
 
     public EmploymentContract ToEmploymentContract(Guid employeeId)
@@ -57,6 +65,8 @@ public sealed class EmploymentContractSnapshot
             ValidTo,
             HourlyRateChf,
             MonthlyBvgDeductionChf,
-            SpecialSupplementRateChf);
+            SpecialSupplementRateChf,
+            WageType,
+            MonthlySalaryAmountChf);
     }
 }

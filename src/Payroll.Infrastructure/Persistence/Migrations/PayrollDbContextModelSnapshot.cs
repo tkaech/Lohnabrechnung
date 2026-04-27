@@ -62,6 +62,7 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("TEXT");
             b.Property<Guid>("EmployeeId").HasColumnType("TEXT");
             b.Property<decimal>("HourlyRateChf").HasColumnType("TEXT");
+            b.Property<decimal>("MonthlySalaryAmountChf").HasColumnType("TEXT");
             b.Property<decimal>("MonthlyBvgDeductionChf").HasColumnType("TEXT");
             b.Property<decimal>("SpecialSupplementRateChf").HasColumnType("TEXT");
             b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");
@@ -94,6 +95,7 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset>("EmploymentContractSnapshot_CapturedAtUtc").HasColumnType("TEXT");
             b.Property<decimal>("EmploymentContractSnapshot_HourlyRateChf").HasColumnType("TEXT");
             b.Property<bool>("EmploymentContractSnapshot_IsInitialized").HasColumnType("INTEGER");
+            b.Property<decimal>("EmploymentContractSnapshot_MonthlySalaryAmountChf").HasColumnType("TEXT");
             b.Property<decimal>("EmploymentContractSnapshot_MonthlyBvgDeductionChf").HasColumnType("TEXT");
             b.Property<decimal>("EmploymentContractSnapshot_SpecialSupplementRateChf").HasColumnType("TEXT");
             b.Property<DateOnly>("EmploymentContractSnapshot_ValidFrom").HasColumnType("TEXT");

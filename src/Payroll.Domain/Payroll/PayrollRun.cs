@@ -24,6 +24,17 @@ public sealed class PayrollRun : AuditableEntity
         Status = PayrollRunStatus.Draft;
     }
 
+    public void UpdatePaymentDate(DateOnly paymentDate)
+    {
+        if (PaymentDate == paymentDate)
+        {
+            return;
+        }
+
+        PaymentDate = paymentDate;
+        Touch();
+    }
+
     public void AddLine(PayrollRunLine line)
     {
         ArgumentNullException.ThrowIfNull(line);

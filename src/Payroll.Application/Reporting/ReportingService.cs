@@ -30,6 +30,7 @@ public sealed class ReportingService
         Guid employeeId,
         int year,
         int month,
+        DateOnly paymentDate,
         CancellationToken cancellationToken = default)
     {
         var employee = await _employeeService.GetByIdAsync(employeeId, cancellationToken)
@@ -44,7 +45,7 @@ public sealed class ReportingService
         var monthLabel = ToAsciiLabel(SwissCulture.TextInfo.ToTitleCase(periodStart.ToString("MMMM yyyy", SwissCulture)));
         var serviceYears = CalculateServiceYears(employee.EntryDate, periodEnd);
         var fileNameWithoutExtension = $"Lohnblatt_{employee.PersonnelNumber}_{year}_{month:00}";
-        var placeholders = BuildTemplatePlaceholders(employee, monthlyRecord, settings, monthLabel, serviceYears);
+        var placeholders = BuildTemplatePlaceholders(employee, monthlyRecord, settings, monthLabel, serviceYears, paymentDate);
 
         var document = new PayrollStatementPdfDocument(
             fileNameWithoutExtension,
@@ -67,7 +68,7 @@ public sealed class ReportingService
             employee.DepartmentName,
             employee.EmploymentCategoryName,
             employee.EmploymentLocationName,
-            DateOnly.FromDateTime(DateTime.Today).ToString("dd.MM.yyyy", SwissCulture),
+            paymentDate.ToString("dd.MM.yyyy", SwissCulture),
             $"{monthlyRecord.Header.TotalWorkedHours:0.##}",
             $"{serviceYears}",
             monthlyRecord.PayrollPreview.Lines
@@ -89,7 +90,8 @@ public sealed class ReportingService
         MonthlyRecordDetailsDto monthlyRecord,
         PayrollSettingsDto settings,
         string monthLabel,
-        int serviceYears)
+        int serviceYears,
+        DateOnly paymentDate)
     {
         var lineByLabel = monthlyRecord.PayrollPreview.Lines.ToDictionary(line => line.Label, StringComparer.OrdinalIgnoreCase);
         var placeholders = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -124,7 +126,7 @@ public sealed class ReportingService
             ["Abteilung"] = Fallback(employee.DepartmentName),
             ["Anstellungskategorie"] = Fallback(employee.EmploymentCategoryName),
             ["Anstellungsort"] = Fallback(employee.EmploymentLocationName),
-            ["Abrechnungsdatum"] = DateOnly.FromDateTime(DateTime.Today).ToString("dd.MM.yyyy", SwissCulture),
+            ["Abrechnungsdatum"] = paymentDate.ToString("dd.MM.yyyy", SwissCulture),
             ["Gesamtstunden"] = $"{monthlyRecord.Header.TotalWorkedHours:0.##}",
             ["Dienstjahre"] = $"{serviceYears}",
             ["Hinweise"] = NormalizeMultiline(string.Join(Environment.NewLine, monthlyRecord.PayrollPreview.Notes), "-")

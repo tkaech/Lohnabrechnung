@@ -78,7 +78,7 @@ public sealed class ReportingServiceTests
         var pdfExportService = new CapturePdfExportService();
         var reportingService = new ReportingService(employeeService, monthlyRecordService, settingsService, pdfExportService);
 
-        var exportPath = await reportingService.CreatePayrollStatementPdfAsync(employee.Id, 2026, 3);
+        var exportPath = await reportingService.CreatePayrollStatementPdfAsync(employee.Id, 2026, 3, new DateOnly(2026, 4, 10));
 
         Assert.Equal("/tmp/report.pdf", exportPath);
         Assert.NotNull(pdfExportService.LastDocument);
@@ -90,7 +90,9 @@ public sealed class ReportingServiceTests
         Assert.Equal("Unterer Chaemletenweg 8", pdfExportService.LastDocument.EmployeeAddressLine1);
         Assert.Equal("6333 Huenenberg See", pdfExportService.LastDocument.EmployeeAddressLine3);
         Assert.Equal("Yvonne Kaech", pdfExportService.LastDocument.TemplatePlaceholders["MitarbeiterName"]);
-        Assert.Equal("42,00 CHF", pdfExportService.LastDocument.TemplatePlaceholders["Spesen"]);
+        Assert.Equal("10.04.2026", pdfExportService.LastDocument.PayrollDateLabel);
+        Assert.Equal("10.04.2026", pdfExportService.LastDocument.TemplatePlaceholders["Abrechnungsdatum"]);
+        Assert.Matches(@"42[,.]00 CHF", pdfExportService.LastDocument.TemplatePlaceholders["Spesen"]);
         Assert.Contains("Blesinger Sicherheits Dienste GmbH", pdfExportService.LastDocument.TemplatePlaceholders["Firmenadresse"], StringComparison.Ordinal);
         Assert.Contains(pdfExportService.LastDocument.Lines, line => line.Label == "Basislohn");
         Assert.Contains(pdfExportService.LastDocument.Lines, line => line.Label == "Total Auszahlung");

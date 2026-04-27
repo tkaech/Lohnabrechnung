@@ -572,6 +572,11 @@ public sealed class AppBootstrapper
             EnsureTableColumn(
                 connection,
                 "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_MonthlySalaryAmountChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_MonthlySalaryAmountChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
                 "EmploymentContractSnapshot_MonthlyBvgDeductionChf",
                 "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_MonthlyBvgDeductionChf\" TEXT NOT NULL DEFAULT 0;");
             EnsureTableColumn(
@@ -579,6 +584,47 @@ public sealed class AppBootstrapper
                 "EmployeeMonthlyRecords",
                 "EmploymentContractSnapshot_SpecialSupplementRateChf",
                 "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_SpecialSupplementRateChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "EmploymentContractSnapshot_WageType",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_WageType\" TEXT NOT NULL DEFAULT 'Hourly';");
+            EnsureTableColumn(
+                connection,
+                "EmploymentContracts",
+                "MonthlySalaryAmountChf",
+                "ALTER TABLE \"EmploymentContracts\" ADD COLUMN \"MonthlySalaryAmountChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmploymentContracts",
+                "WageType",
+                "ALTER TABLE \"EmploymentContracts\" ADD COLUMN \"WageType\" TEXT NOT NULL DEFAULT 'Hourly';");
+            EnsureTableColumn(
+                connection,
+                "DepartmentOptions",
+                "IsGavMandatory",
+                "ALTER TABLE \"DepartmentOptions\" ADD COLUMN \"IsGavMandatory\" INTEGER NOT NULL DEFAULT 0;");
+            if (TableExists(connection, "EmploymentContracts") && TableExists(connection, "Employees"))
+            {
+                using var wageTypeBackfillCommand = connection.CreateCommand();
+                wageTypeBackfillCommand.CommandText =
+                    """
+                    UPDATE "EmploymentContracts"
+                    SET "WageType" = (
+                        SELECT "Employees"."WageType"
+                        FROM "Employees"
+                        WHERE "Employees"."Id" = "EmploymentContracts"."EmployeeId"
+                    )
+                    WHERE "WageType" = 'Hourly'
+                      AND EXISTS (
+                        SELECT 1
+                        FROM "Employees"
+                        WHERE "Employees"."Id" = "EmploymentContracts"."EmployeeId"
+                          AND "Employees"."WageType" <> 'Hourly'
+                    );
+                    """;
+                wageTypeBackfillCommand.ExecuteNonQuery();
+            }
 
             EnsureTableColumn(
                 connection,

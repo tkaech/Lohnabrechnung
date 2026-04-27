@@ -52,7 +52,7 @@ public sealed class PayrollRunRepositorySqliteTests
         await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
 
         var service = new PayrollRunService(new PayrollRunRepository(dbContext));
-        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3));
+        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
 
         dbContext.ChangeTracker.Clear();
         var storedRun = await dbContext.PayrollRuns
@@ -60,10 +60,38 @@ public sealed class PayrollRunRepositorySqliteTests
             .SingleAsync(run => run.Id == result.PayrollRunId);
 
         Assert.Equal("2026-03", storedRun.PeriodKey);
+        Assert.Equal(new DateOnly(2026, 4, 5), storedRun.PaymentDate);
         Assert.Equal(PayrollRunStatus.Finalized, storedRun.Status);
         Assert.Equal(2, storedRun.Lines.Count);
         Assert.Contains(storedRun.Lines, line => line.Code == "BASE" && line.AmountChf == 100m);
         Assert.Contains(storedRun.Lines, line => line.Code == "EXP" && line.AmountChf == 5m);
+    }
+
+    [Fact]
+    public async Task PaymentDate_CanBeLoadedAndUpdatedForFinalizedPayrollRun()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = await CreateFinalizedMarchRunAsync(dbContext);
+        var service = new PayrollRunService(new PayrollRunRepository(dbContext));
+
+        var initialStatus = await service.GetMonthlyStatusAsync(new PayrollRunMonthlyStatusQuery(employee.Id, 2026, 3));
+        await service.UpdatePaymentDateAsync(new UpdatePayrollRunPaymentDateCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 12)));
+        dbContext.ChangeTracker.Clear();
+        var updatedStatus = await service.GetMonthlyStatusAsync(new PayrollRunMonthlyStatusQuery(employee.Id, 2026, 3));
+        var storedRun = await dbContext.PayrollRuns.SingleAsync(run => run.PeriodKey == "2026-03");
+
+        Assert.Equal(new DateOnly(2026, 4, 5), initialStatus.PaymentDate);
+        Assert.Equal(new DateOnly(2026, 4, 12), updatedStatus.PaymentDate);
+        Assert.Equal(new DateOnly(2026, 4, 12), storedRun.PaymentDate);
     }
 
     [Fact]
@@ -107,7 +135,7 @@ public sealed class PayrollRunRepositorySqliteTests
         dbContext.ChangeTracker.Clear();
 
         var service = new PayrollRunService(new PayrollRunRepository(dbContext));
-        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3));
+        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
 
         dbContext.ChangeTracker.Clear();
         var storedRun = await dbContext.PayrollRuns
@@ -115,6 +143,58 @@ public sealed class PayrollRunRepositorySqliteTests
             .SingleAsync(run => run.Id == result.PayrollRunId);
 
         Assert.Contains(storedRun.Lines, line => line.Code == "BASE" && line.RateChf == 30m && line.AmountChf == 300m);
+    }
+
+    [Fact]
+    public async Task FinalizeMonthAsync_MonthlyWageUsesMonthlySalaryAmountWithoutBaseHours()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new EmploymentContract(
+            employee.Id,
+            new DateOnly(2026, 1, 1),
+            null,
+            30m,
+            0m,
+            0m,
+            EmployeeWageType.Monthly,
+            5200m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 3, CancellationToken.None);
+        await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
+
+        var service = new PayrollRunService(new PayrollRunRepository(dbContext));
+        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
+
+        var storedRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == result.PayrollRunId);
+
+        Assert.Contains(storedRun.Lines, line => line.LineType == PayrollLineType.MonthlySalary && line.AmountChf == 5200m);
+        Assert.DoesNotContain(storedRun.Lines, line => line.LineType == PayrollLineType.BaseHours);
     }
 
     [Fact]
@@ -152,7 +232,7 @@ public sealed class PayrollRunRepositorySqliteTests
         await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
 
         var payrollRunService = new PayrollRunService(new PayrollRunRepository(dbContext));
-        await payrollRunService.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3));
+        await payrollRunService.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
 
         timeEntry.Update(new DateOnly(2026, 3, 31), 20m, 0m, 0m, 0m, null, 0m, 0m, 0m);
         await dbContext.SaveChangesAsync();
@@ -208,13 +288,13 @@ public sealed class PayrollRunRepositorySqliteTests
         var service = new PayrollRunService(new PayrollRunRepository(dbContext));
 
         var openStatus = await service.GetMonthlyStatusAsync(new PayrollRunMonthlyStatusQuery(employee.Id, 2026, 3));
-        await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3));
+        await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
         var finalizedStatus = await service.GetMonthlyStatusAsync(new PayrollRunMonthlyStatusQuery(employee.Id, 2026, 3));
 
         Assert.False(openStatus.IsFinalized);
         Assert.True(finalizedStatus.IsFinalized);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3)));
+            service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5))));
     }
 
     [Fact]
@@ -358,7 +438,7 @@ public sealed class PayrollRunRepositorySqliteTests
         var service = new PayrollRunService(new PayrollRunRepository(dbContext));
 
         await service.CancelMonthAsync(new CancelPayrollRunCommand(employee.Id, 2026, 3));
-        var newRun = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3));
+        var newRun = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
 
         dbContext.ChangeTracker.Clear();
         var storedRuns = await dbContext.PayrollRuns
@@ -501,7 +581,7 @@ public sealed class PayrollRunRepositorySqliteTests
         await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
 
         var service = new PayrollRunService(new PayrollRunRepository(dbContext));
-        await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3));
+        await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
 
         return employee;
     }

@@ -318,7 +318,10 @@
                       <ListBox ItemsSource="{Binding DepartmentOptions}" SelectedItem="{Binding SelectedSettingsDepartment, Mode=TwoWay}" MinHeight="120">
                         <ListBox.ItemTemplate>
                           <DataTemplate>
-                            <TextBox Text="{Binding Name, Mode=TwoWay}" />
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBox Text="{Binding Name, Mode=TwoWay}" />
+                              <CheckBox Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" IsChecked="{Binding IsGavMandatory, Mode=TwoWay}" Content="GAV" />
+                            </Grid>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
@@ -1275,10 +1278,14 @@
         <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
-              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
                 <controls:MonthPicker Grid.Row="1" SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
-                <StackPanel Grid.Column="2"
+                <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="4">
+                  <TextBlock Classes="section-caption" Text="Auszahlungsdatum" />
+                  <controls:AppDatePicker SelectedDate="{Binding PayrollPaymentDate, Mode=TwoWay}" Watermark="TT.MM.JJJJ" />
+                </StackPanel>
+                <StackPanel Grid.Column="3"
                             Grid.RowSpan="2"
                             MinWidth="120"
                             Margin="0,0,8,0"
@@ -1291,7 +1298,7 @@
                              Classes.payroll-status-cancelled="{Binding PayrollRunIsCancelled}"
                              Text="{Binding PayrollRunStatusDisplay}" />
                 </StackPanel>
-                <ToggleButton Grid.Column="3"
+                <ToggleButton Grid.Column="4"
                               Grid.RowSpan="2"
                               MinWidth="132"
                               Margin="0,0,8,0"
@@ -1299,7 +1306,7 @@
                               IsChecked="{Binding MonthlyRecord.IsPayrollPreviewDerivationVisible, Mode=TwoWay}"
                               IsEnabled="{Binding MonthlyRecord.HasPayrollPreviewDerivationGroups}"
                               Content="Herleitung anzeigen" />
-                <Button Grid.Column="4"
+                <Button Grid.Column="5"
                         Grid.RowSpan="2"
                         MinWidth="148"
                         Margin="0,0,8,0"
@@ -1308,7 +1315,7 @@
                         IsEnabled="{Binding CanExecutePayrollMonthAction}"
                         Click="OnFinalizePayrollMonthClick"
                         Content="{Binding PayrollMonthActionLabel}" />
-                <Button Grid.Column="5"
+                <Button Grid.Column="6"
                         Grid.RowSpan="2"
                         VerticalAlignment="Center"
                         Classes="primary-action"
@@ -2010,6 +2017,13 @@
                 <TextBlock Classes="section-caption" Text="BVG pro Monat" />
                 <Grid>
                   <TextBox Padding="54,6,8,6" IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding MonthlyBvgDeductionChf, Mode=TwoWay}" />
+                  <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
+                </Grid>
+              </StackPanel>
+              <StackPanel Grid.Row="21" Grid.Column="1" Spacing="4" Margin="6,10,0,0">
+                <TextBlock Classes="section-caption" Text="Monatslohn" />
+                <Grid>
+                  <TextBox Padding="54,6,8,6" IsReadOnly="{Binding AreFieldsReadOnly}" Text="{Binding MonthlySalaryAmountChf, Mode=TwoWay}" />
                   <TextBlock Margin="10,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" Text="{Binding CurrencyPrefix}" />
                 </Grid>
               </StackPanel>

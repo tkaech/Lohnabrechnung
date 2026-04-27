@@ -75,6 +75,94 @@ public sealed class PayrollRunLineDerivationServiceTests
     }
 
     [Fact]
+    public void DeriveForEmployee_GavMandatoryDepartmentSuppressesTrainingAndHolidayDeduction()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m);
+        var workSummary = new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            workSummary,
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Sicherheit", true));
+
+        Assert.DoesNotContain(result.Lines, line => line.Code == "AUSBILDUNG_FERIEN");
+    }
+
+    [Fact]
+    public void DeriveForEmployee_NonGavDepartmentKeepsTrainingAndHolidayDeduction()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m);
+        var workSummary = new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            workSummary,
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false));
+
+        Assert.Contains(result.Lines, line => line.Code == "AUSBILDUNG_FERIEN");
+    }
+
+    [Fact]
+    public void DeriveForEmployee_MonthlyWageTypeUsesSeparatePath()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m, EmployeeWageType.Monthly, 5000m);
+        var workSummary = new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            workSummary,
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Monthly, "Buero", false));
+
+        Assert.Empty(result.Issues);
+        Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.MonthlySalary && line.AmountChf == 5000m);
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.BaseHours);
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.VacationCompensation);
+        Assert.Equal(-361.8m, result.Lines.Where(line => line.LineType == PayrollLineType.SocialContribution).Sum(line => line.AmountChf));
+    }
+
+    [Fact]
+    public void DeriveForEmployee_MonthlyWageTypeReturnsIssueWhenMonthlyAmountIsMissing()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m, EmployeeWageType.Monthly);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Monthly, "Buero", false));
+
+        Assert.Contains(result.Issues, issue => issue.Code == "MONTHLY_SALARY_AMOUNT_MISSING");
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.MonthlySalary);
+    }
+
+    [Fact]
     public void DeriveForEmployee_ReturnsIssueWhenSupplementRateIsMissing()
     {
         var employeeId = Guid.NewGuid();
@@ -266,5 +354,20 @@ public sealed class PayrollRunLineDerivationServiceTests
 
         var vacationCompensationLine = Assert.Single(result.Lines, line => line.LineType == PayrollLineType.VacationCompensation);
         Assert.Equal(41.712m, vacationCompensationLine.AmountChf);
+    }
+
+    private static PayrollSettings CreatePayrollSettings()
+    {
+        return new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 1m,
+            vehiclePauschalzone2RateChf: 1m,
+            vehicleRegiezone1RateChf: 1m);
     }
 }

@@ -75,6 +75,7 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
     {
         var grossSalaryChf = lines
             .Where(line => line.LineType is PayrollLineType.BaseHours
+                or PayrollLineType.MonthlySalary
                 or PayrollLineType.NightSupplement
                 or PayrollLineType.SundaySupplement
                 or PayrollLineType.HolidaySupplement

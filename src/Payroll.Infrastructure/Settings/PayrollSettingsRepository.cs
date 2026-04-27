@@ -106,7 +106,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             hourlyVersion.VehiclePauschalzone2RateChf,
             hourlyVersion.VehicleRegiezone1RateChf);
 
-        await SyncOptionsAsync(_dbContext.DepartmentOptions, command.Departments, nameof(global::Payroll.Domain.Employees.Employee.DepartmentOptionId), "Abteilung", cancellationToken);
+        await SyncDepartmentOptionsAsync(command.Departments, cancellationToken);
         await SyncOptionsAsync(_dbContext.EmploymentCategoryOptions, command.EmploymentCategories, nameof(global::Payroll.Domain.Employees.Employee.EmploymentCategoryOptionId), "Anstellungskategorie", cancellationToken);
         await SyncOptionsAsync(_dbContext.EmploymentLocationOptions, command.EmploymentLocations, nameof(global::Payroll.Domain.Employees.Employee.EmploymentLocationOptionId), "Anstellungsort", cancellationToken);
 
@@ -351,7 +351,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             currentHourly?.VehiclePauschalzone2RateChf ?? settings.VehiclePauschalzone2RateChf,
             currentHourly?.VehicleRegiezone1RateChf ?? settings.VehicleRegiezone1RateChf,
             LoadPayrollPreviewHelpOptions(settings),
-            await LoadOptionsAsync(_dbContext.DepartmentOptions, cancellationToken),
+            await LoadDepartmentOptionsAsync(_dbContext.DepartmentOptions, cancellationToken),
             await LoadOptionsAsync(_dbContext.EmploymentCategoryOptions, cancellationToken),
             await LoadOptionsAsync(_dbContext.EmploymentLocationOptions, cancellationToken),
             currentGeneral?.Id,
@@ -557,7 +557,17 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             .OrderBy(item => EF.Property<string>(item, "Name"))
             .Select(item => new SettingOptionDto(
                 EF.Property<Guid>(item, "Id"),
-                EF.Property<string>(item, "Name")))
+                EF.Property<string>(item, "Name"),
+                false))
+            .ToArrayAsync(cancellationToken);
+    }
+
+    private static Task<SettingOptionDto[]> LoadDepartmentOptionsAsync(DbSet<DepartmentOption> options, CancellationToken cancellationToken)
+    {
+        return options
+            .AsNoTracking()
+            .OrderBy(item => item.Name)
+            .Select(item => new SettingOptionDto(item.Id, item.Name, item.IsGavMandatory))
             .ToArrayAsync(cancellationToken);
     }
 
@@ -621,6 +631,37 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         foreach (var removable in existingOptions.Where(item => removedIds.Contains(GetOptionId(item))))
         {
             options.Remove(removable);
+        }
+    }
+
+    private async Task SyncDepartmentOptionsAsync(
+        IReadOnlyCollection<SettingOptionDto> submittedOptions,
+        CancellationToken cancellationToken)
+    {
+        await SyncOptionsAsync(_dbContext.DepartmentOptions, submittedOptions, nameof(global::Payroll.Domain.Employees.Employee.DepartmentOptionId), "Abteilung", cancellationToken);
+        if (_dbContext.ChangeTracker.HasChanges())
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var submittedById = submittedOptions
+            .Where(item => item.OptionId != Guid.Empty)
+            .ToDictionary(item => item.OptionId, item => item.IsGavMandatory);
+        var submittedByName = submittedOptions
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().IsGavMandatory, StringComparer.OrdinalIgnoreCase);
+        var departments = await _dbContext.DepartmentOptions.ToListAsync(cancellationToken);
+        foreach (var department in departments)
+        {
+            if (submittedById.TryGetValue(department.Id, out var isGavMandatory))
+            {
+                department.UpdateGavMandatory(isGavMandatory);
+            }
+            else if (submittedByName.TryGetValue(department.Name, out isGavMandatory))
+            {
+                department.UpdateGavMandatory(isGavMandatory);
+            }
         }
     }
 

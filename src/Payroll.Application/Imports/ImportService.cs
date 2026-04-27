@@ -295,7 +295,8 @@ public sealed class ImportService
                     existingEmployee?.ContractValidTo,
                     ResolveHourlyRate(existingEmployee),
                     existingEmployee?.MonthlyBvgDeductionChf ?? 0m,
-                    existingEmployee?.SpecialSupplementRateChf ?? 0m);
+                    existingEmployee?.SpecialSupplementRateChf ?? 0m,
+                    existingEmployee?.MonthlySalaryAmountChf ?? 0m);
 
                 await _employeeRepository.SaveAsync(saveCommand, cancellationToken);
 

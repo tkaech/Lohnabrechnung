@@ -65,7 +65,8 @@ public sealed class EmployeeRepositorySqliteTests
                 null,
                 32.5m,
                 280m,
-                3.00m),
+                3.00m,
+                5100m),
             CancellationToken.None);
 
         var listedEmployees = await repository.ListAsync(
@@ -81,6 +82,9 @@ public sealed class EmployeeRepositorySqliteTests
         Assert.Equal("A", saved.EmploymentCategoryName);
         Assert.Equal("Schachenstr. 7, Emmenbruecke", saved.EmploymentLocationName);
         Assert.Equal(EmployeeWageType.Monthly, saved.WageType);
+        Assert.Equal(EmployeeWageType.Monthly, Assert.Single(saved.ContractHistory).WageType);
+        Assert.Equal(5100m, saved.MonthlySalaryAmountChf);
+        Assert.Equal(5100m, Assert.Single(saved.ContractHistory).MonthlySalaryAmountChf);
         Assert.Equal(3.00m, saved.SpecialSupplementRateChf);
     }
 

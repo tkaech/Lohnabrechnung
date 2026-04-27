@@ -12,8 +12,10 @@ public sealed class EmploymentContract : AuditableEntity
     public DateOnly ValidFrom { get; private set; }
     public DateOnly? ValidTo { get; private set; }
     public decimal HourlyRateChf { get; private set; }
+    public decimal MonthlySalaryAmountChf { get; private set; }
     public decimal MonthlyBvgDeductionChf { get; private set; }
     public decimal SpecialSupplementRateChf { get; private set; }
+    public EmployeeWageType WageType { get; private set; }
 
     public EmploymentContract(
         Guid employeeId,
@@ -21,7 +23,9 @@ public sealed class EmploymentContract : AuditableEntity
         DateOnly? validTo,
         decimal hourlyRateChf,
         decimal monthlyBvgDeductionChf,
-        decimal specialSupplementRateChf)
+        decimal specialSupplementRateChf,
+        EmployeeWageType wageType = EmployeeWageType.Hourly,
+        decimal monthlySalaryAmountChf = 0m)
     {
         Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
 
@@ -29,8 +33,10 @@ public sealed class EmploymentContract : AuditableEntity
         ValidFrom = validFrom;
         ValidTo = validTo;
         HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
+        MonthlySalaryAmountChf = Guard.AgainstNegative(monthlySalaryAmountChf, nameof(monthlySalaryAmountChf));
         MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
         SpecialSupplementRateChf = Guard.AgainstNegative(specialSupplementRateChf, nameof(specialSupplementRateChf));
+        WageType = wageType;
     }
 
     public bool IsActiveOn(DateOnly date)
@@ -53,15 +59,19 @@ public sealed class EmploymentContract : AuditableEntity
         DateOnly? validTo,
         decimal hourlyRateChf,
         decimal monthlyBvgDeductionChf,
-        decimal specialSupplementRateChf)
+        decimal specialSupplementRateChf,
+        EmployeeWageType wageType = EmployeeWageType.Hourly,
+        decimal monthlySalaryAmountChf = 0m)
     {
         Guard.AgainstInvalidPeriod(validFrom, validTo, nameof(validTo));
 
         ValidFrom = validFrom;
         ValidTo = validTo;
         HourlyRateChf = Guard.AgainstZeroOrNegative(hourlyRateChf, nameof(hourlyRateChf));
+        MonthlySalaryAmountChf = Guard.AgainstNegative(monthlySalaryAmountChf, nameof(monthlySalaryAmountChf));
         MonthlyBvgDeductionChf = Guard.AgainstNegative(monthlyBvgDeductionChf, nameof(monthlyBvgDeductionChf));
         SpecialSupplementRateChf = Guard.AgainstNegative(specialSupplementRateChf, nameof(specialSupplementRateChf));
+        WageType = wageType;
         Touch();
     }
 }

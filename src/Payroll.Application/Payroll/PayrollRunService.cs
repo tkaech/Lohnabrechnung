@@ -37,8 +37,7 @@ public sealed class PayrollRunService
             throw new InvalidOperationException("No monthly record found for payroll finalization.");
         }
 
-        var paymentDate = new DateOnly(command.Year, command.Month, DateTime.DaysInMonth(command.Year, command.Month));
-        var payrollRun = new PayrollRun(periodKey, paymentDate);
+        var payrollRun = new PayrollRun(periodKey, command.PaymentDate);
         if (input.Contract is null)
         {
             throw new InvalidOperationException("No valid contract found for payroll finalization.");
@@ -58,7 +57,8 @@ public sealed class PayrollRunService
             payrollSettingsForPeriod,
             PayrollWorkSummary.FromTimeEntries(monthlyRecord.EmployeeId, monthlyRecord.TimeEntries),
             expenses,
-            monthlyRecord.TimeEntries.ToArray());
+            monthlyRecord.TimeEntries.ToArray(),
+            new PayrollDerivationContext(contract.WageType, input.DepartmentName, input.IsDepartmentGavMandatory));
 
         if (result.Issues.Count > 0)
         {
@@ -95,15 +95,45 @@ public sealed class PayrollRunService
 
         var periodKey = CreatePeriodKey(query.Year, query.Month);
         var finalizedRun = await _repository.GetFinalizedRunForEmployeePeriodAsync(query.EmployeeId, periodKey, cancellationToken);
+        var latestRun = finalizedRun
+            ?? await _repository.GetLatestRunForEmployeePeriodAsync(query.EmployeeId, periodKey, cancellationToken);
         var hasCancelledRun = finalizedRun is null
-            && await _repository.HasCancelledRunForEmployeePeriodAsync(query.EmployeeId, periodKey, cancellationToken);
+            && latestRun?.Status == PayrollRunStatus.Cancelled;
 
         return new PayrollRunMonthlyStatusDto(
             query.EmployeeId,
             query.Year,
             query.Month,
             finalizedRun is not null,
+            latestRun?.PaymentDate,
             hasCancelledRun);
+    }
+
+    public async Task<bool> UpdatePaymentDateAsync(
+        UpdatePayrollRunPaymentDateCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        if (command.EmployeeId == Guid.Empty)
+        {
+            throw new ArgumentException("Employee is required.", nameof(command));
+        }
+
+        _ = new DateOnly(command.Year, command.Month, 1);
+
+        var periodKey = CreatePeriodKey(command.Year, command.Month);
+        var payrollRun = await _repository.GetFinalizedRunForEmployeePeriodForUpdateAsync(
+            command.EmployeeId,
+            periodKey,
+            cancellationToken);
+        if (payrollRun is null)
+        {
+            return false;
+        }
+
+        payrollRun.UpdatePaymentDate(command.PaymentDate);
+        await _repository.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task CancelMonthAsync(

@@ -14,6 +14,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private Guid? _currentMonthlyRecordId;
     private bool _isBusy;
     private bool _isLocked;
+    private bool _loadCurrentRecordAfterBusy;
     private DateTimeOffset? _selectedMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero);
     private string _selectedMonthText = DateTime.Today.ToString("MM/yyyy");
     private string _contextTitle = "Keine Monatserfassung geladen.";
@@ -410,13 +411,16 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedTimeEntry, value))
             {
-                RaisePropertyChanged(nameof(CanDeleteTimeEntry));
-                DeleteTimeEntryCommand.RaiseCanExecuteChanged();
-
                 if (value is not null)
                 {
                     PopulateTimeEntryForm(value);
                 }
+
+                RaisePropertyChanged(nameof(CanManageRecord));
+                RaisePropertyChanged(nameof(CanSaveTimeEntry));
+                RaisePropertyChanged(nameof(CanDeleteTimeEntry));
+                RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaiseActionStateChanged();
             }
         }
     }
@@ -426,9 +430,18 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         get => _selectedExpenseEntry;
         set
         {
-            if (SetProperty(ref _selectedExpenseEntry, value) && value is not null)
+            if (SetProperty(ref _selectedExpenseEntry, value))
             {
-                ExpensesTotal = NumericFormatManager.FormatDecimal(value.ExpensesTotalChf, "0.00");
+                if (value is not null)
+                {
+                    ExpensesTotal = NumericFormatManager.FormatDecimal(value.ExpensesTotalChf, "0.00");
+                }
+
+                RaisePropertyChanged(nameof(CanManageRecord));
+                RaisePropertyChanged(nameof(CanSaveTimeEntry));
+                RaisePropertyChanged(nameof(CanDeleteTimeEntry));
+                RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaiseActionStateChanged();
             }
         }
     }
@@ -581,6 +594,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
         if ((changed || forceReload) && _currentEmployeeId.HasValue)
         {
+            if (IsBusy)
+            {
+                _loadCurrentRecordAfterBusy = true;
+                return;
+            }
+
             await LoadAsync();
         }
     }
@@ -872,6 +891,12 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+        }
+
+        if (_loadCurrentRecordAfterBusy && _currentEmployeeId.HasValue && SelectedMonth.HasValue)
+        {
+            _loadCurrentRecordAfterBusy = false;
+            await ExecuteBusyAsync(LoadCurrentRecordAsync);
         }
     }
 

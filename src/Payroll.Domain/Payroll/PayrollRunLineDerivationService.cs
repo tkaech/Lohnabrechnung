@@ -15,7 +15,8 @@ public sealed class PayrollRunLineDerivationService
         PayrollSettings payrollSettings,
         PayrollWorkSummary workSummary,
         IReadOnlyCollection<ExpenseEntry> expenses,
-        IReadOnlyCollection<TimeEntry> timeEntries)
+        IReadOnlyCollection<TimeEntry> timeEntries,
+        PayrollDerivationContext? derivationContext = null)
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(payrollSettings);
@@ -34,8 +35,28 @@ public sealed class PayrollRunLineDerivationService
         var lines = new List<PayrollRunLine>();
         var issues = new List<PayrollDerivationIssue>();
         var supplementSettings = payrollSettings.WorkTimeSupplementSettings;
+        var context = derivationContext ?? new PayrollDerivationContext(contract.WageType, null, false);
 
-        if (workSummary.WorkHours > 0m)
+        if (context.WageType == EmployeeWageType.Monthly)
+        {
+            if (contract.MonthlySalaryAmountChf > 0m)
+            {
+                lines.Add(PayrollRunLine.CreateDirectChfLine(
+                    contract.EmployeeId,
+                    PayrollLineType.MonthlySalary,
+                    "MONTHLY_SALARY",
+                    "Monatslohn",
+                    contract.MonthlySalaryAmountChf));
+            }
+            else
+            {
+                issues.Add(new PayrollDerivationIssue(
+                    "MONTHLY_SALARY_AMOUNT_MISSING",
+                    "Monthly salary payroll path was selected, but no monthly salary amount is configured."));
+            }
+        }
+
+        if (context.WageType == EmployeeWageType.Hourly && workSummary.WorkHours > 0m)
         {
             lines.Add(PayrollRunLine.CreateCalculatedHourlyLine(
                 contract.EmployeeId,
@@ -46,7 +67,7 @@ public sealed class PayrollRunLineDerivationService
                 contract.HourlyRateChf));
         }
 
-        if (workSummary.WorkHours > 0m && contract.SpecialSupplementRateChf > 0m)
+        if (context.WageType == EmployeeWageType.Hourly && workSummary.WorkHours > 0m && contract.SpecialSupplementRateChf > 0m)
         {
             lines.Add(PayrollRunLine.CreateCalculatedHourlyLine(
                 contract.EmployeeId,
@@ -57,13 +78,13 @@ public sealed class PayrollRunLineDerivationService
                 contract.SpecialSupplementRateChf));
         }
 
-        if (workSummary.HasAmbiguousSpecialHourOverlap)
+        if (context.WageType == EmployeeWageType.Hourly && workSummary.HasAmbiguousSpecialHourOverlap)
         {
             issues.Add(new PayrollDerivationIssue(
                 "AMBIGUOUS_SPECIAL_HOUR_OVERLAP",
                 "Special hours exceed total work hours; overlap rules for night, sunday and holiday hours are unresolved."));
         }
-        else
+        else if (context.WageType == EmployeeWageType.Hourly)
         {
             AddConfiguredSupplementLine(
                 lines,
@@ -159,6 +180,7 @@ public sealed class PayrollRunLineDerivationService
 
         var contributableGrossChf = lines
             .Where(line => line.LineType is PayrollLineType.BaseHours
+                or PayrollLineType.MonthlySalary
                 or PayrollLineType.NightSupplement
                 or PayrollLineType.SundaySupplement
                 or PayrollLineType.HolidaySupplement
@@ -170,7 +192,10 @@ public sealed class PayrollRunLineDerivationService
         AddPercentageDeductionLine(lines, contract.EmployeeId, "AHV_IV_EO", "AHV/IV/EO", contributableGrossChf, payrollSettings.AhvIvEoRate);
         AddPercentageDeductionLine(lines, contract.EmployeeId, "ALV", "ALV", contributableGrossChf, payrollSettings.AlvRate);
         AddPercentageDeductionLine(lines, contract.EmployeeId, "KTG_UVG", "Krankentaggeld/UVG", contributableGrossChf, payrollSettings.SicknessAccidentInsuranceRate);
-        AddPercentageDeductionLine(lines, contract.EmployeeId, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", contributableGrossChf, payrollSettings.TrainingAndHolidayRate);
+        if (!context.IsDepartmentGavMandatory)
+        {
+            AddPercentageDeductionLine(lines, contract.EmployeeId, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", contributableGrossChf, payrollSettings.TrainingAndHolidayRate);
+        }
 
         if (contract.IsActiveOn(payrollReferenceDate) && contract.MonthlyBvgDeductionChf > 0m)
         {

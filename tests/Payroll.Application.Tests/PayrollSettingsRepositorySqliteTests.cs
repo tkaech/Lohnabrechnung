@@ -103,6 +103,31 @@ public sealed class PayrollSettingsRepositorySqliteTests
     }
 
     [Fact]
+    public async Task SaveAndLoadAsync_PersistsDepartmentGavMandatoryFlag()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new PayrollSettingsRepository(dbContext);
+
+        var gavDepartmentId = Guid.NewGuid();
+        await repository.SaveAsync(CreateCommand(
+            departments: [new SettingOptionDto(gavDepartmentId, "Sicherheit", true), new SettingOptionDto(Guid.NewGuid(), "Buero", false)]),
+            CancellationToken.None);
+        var loaded = await repository.GetAsync(CancellationToken.None);
+
+        Assert.Contains(loaded.Departments, item => item.OptionId == gavDepartmentId && item.IsGavMandatory);
+        Assert.Contains(loaded.Departments, item => item.Name == "Buero" && !item.IsGavMandatory);
+    }
+
+    [Fact]
     public async Task SaveAsync_WithExistingGeneralVersion_UpdatesCurrentStand()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -252,7 +277,8 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Guid? currentHourlySettingsVersionId = null,
         Guid? editingMonthlySalarySettingsVersionId = null,
         DateOnly? monthlySalarySettingsValidFrom = null,
-        Guid? currentMonthlySalarySettingsVersionId = null)
+        Guid? currentMonthlySalarySettingsVersionId = null,
+        IReadOnlyCollection<SettingOptionDto>? departments = null)
     {
         return new SavePayrollSettingsCommand(
             "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri",
@@ -288,7 +314,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
             2.20m,
             3.30m,
             PayrollPreviewHelpCatalog.GetDefaultOptions(),
-            [new SettingOptionDto(Guid.NewGuid(), "Sicherheit"), new SettingOptionDto(Guid.NewGuid(), "Buero")],
+            departments ?? [new SettingOptionDto(Guid.NewGuid(), "Sicherheit"), new SettingOptionDto(Guid.NewGuid(), "Buero")],
             [new SettingOptionDto(Guid.NewGuid(), "A"), new SettingOptionDto(Guid.NewGuid(), "B")],
             [new SettingOptionDto(Guid.NewGuid(), "Schachenstr. 7, Emmenbruecke")],
             editingGeneralSettingsVersionId ?? currentGeneralSettingsVersionId,

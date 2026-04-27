@@ -96,6 +96,56 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
+    public async Task GetDetailsAsync_MonthlySalaryPreviewUsesContractAmountWithoutTimeEntries()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(
+            employee.Id,
+            new DateOnly(2026, 1, 1),
+            null,
+            32.5m,
+            280m,
+            3.00m,
+            EmployeeWageType.Monthly,
+            5000m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.00015m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.DoesNotContain(details!.PayrollPreview.Notes, note => note == "Monat noch nicht erfasst");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Basislohn" && line.AmountDisplay == "5'000.00 CHF");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Monatslohn-Betrag" && item.ValueDisplay == "5'000.00 CHF");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Grundlohn" && item.Detail!.Contains("Arbeitsstunden werden nicht multipliziert", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task GetDetailsAsync_UsesStoredMonthlyPayrollParameterSnapshot_AfterGlobalSettingsChange()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

@@ -2,7 +2,8 @@ namespace Payroll.Application.Settings;
 
 public sealed record SettingOptionDto(
     Guid OptionId,
-    string Name);
+    string Name,
+    bool IsGavMandatory = false);
 
 public sealed record PayrollPreviewHelpOptionDto(
     string Code,

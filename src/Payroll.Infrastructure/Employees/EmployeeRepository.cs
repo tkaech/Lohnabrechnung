@@ -139,7 +139,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
             contract?.HourlyRateChf ?? 0m,
             contract?.MonthlyBvgDeductionChf ?? 0m,
             contract?.SpecialSupplementRateChf ?? 0m,
-            BuildContractHistory(contractHistory, contract?.Id));
+            BuildContractHistory(contractHistory, contract?.Id),
+            contract?.MonthlySalaryAmountChf ?? 0m);
     }
 
     public async Task<EmployeeDetailsDto?> GetByPersonnelNumberAsync(string personnelNumber, CancellationToken cancellationToken)
@@ -224,7 +225,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     normalizedValidTo,
                     command.HourlyRateChf,
                     command.MonthlyBvgDeductionChf,
-                    command.SpecialSupplementRateChf);
+                    command.SpecialSupplementRateChf,
+                    command.WageType,
+                    command.MonthlySalaryAmountChf);
             }
             else
             {
@@ -234,7 +237,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     normalizedValidTo,
                     command.HourlyRateChf,
                     command.MonthlyBvgDeductionChf,
-                    command.SpecialSupplementRateChf);
+                    command.SpecialSupplementRateChf,
+                    command.WageType,
+                    command.MonthlySalaryAmountChf);
                 _dbContext.EmploymentContracts.Add(contract);
                 contracts.Add(contract);
             }
@@ -271,7 +276,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 normalizedValidTo,
                 command.HourlyRateChf,
                 command.MonthlyBvgDeductionChf,
-                command.SpecialSupplementRateChf);
+                command.SpecialSupplementRateChf,
+                command.WageType,
+                command.MonthlySalaryAmountChf);
 
             _dbContext.Employees.Add(employee);
             _dbContext.EmploymentContracts.Add(contract);
@@ -308,7 +315,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
                 item.HourlyRateChf,
                 item.MonthlyBvgDeductionChf,
                 item.SpecialSupplementRateChf,
-                item.Id == currentContractId))
+                item.Id == currentContractId,
+                item.WageType,
+                item.MonthlySalaryAmountChf))
             .ToArray();
     }
 
@@ -345,7 +354,7 @@ public sealed class EmployeeRepository : IEmployeeRepository
         if (isNewVersion && !effectiveValidTo.HasValue && nextContract is not null)
         {
             effectiveValidTo = nextContract.ValidFrom.AddDays(-1);
-            targetContract.UpdateTerms(validFrom, effectiveValidTo, targetContract.HourlyRateChf, targetContract.MonthlyBvgDeductionChf, targetContract.SpecialSupplementRateChf);
+            targetContract.UpdateTerms(validFrom, effectiveValidTo, targetContract.HourlyRateChf, targetContract.MonthlyBvgDeductionChf, targetContract.SpecialSupplementRateChf, targetContract.WageType, targetContract.MonthlySalaryAmountChf);
         }
 
         if (previousContract is not null)
@@ -363,7 +372,9 @@ public sealed class EmployeeRepository : IEmployeeRepository
                     previousValidTo,
                     previousContract.HourlyRateChf,
                     previousContract.MonthlyBvgDeductionChf,
-                    previousContract.SpecialSupplementRateChf);
+                    previousContract.SpecialSupplementRateChf,
+                    previousContract.WageType,
+                    previousContract.MonthlySalaryAmountChf);
             }
         }
 

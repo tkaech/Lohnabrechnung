@@ -97,6 +97,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DateTimeOffset? _contractValidFrom;
     private DateTimeOffset? _contractValidTo;
     private string _hourlyRateChf = string.Empty;
+    private string _monthlySalaryAmountChf = string.Empty;
     private string _monthlyBvgDeductionChf = string.Empty;
     private string _specialSupplementRateChf = string.Empty;
     private string? _settingsNightSupplementRate;
@@ -162,6 +163,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private ImportConfigurationItemViewModel? _selectedTimeImportConfiguration;
     private DateTimeOffset? _timeImportMonth = new(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1));
     private ImportedMonthStatusItemViewModel? _selectedImportedTimeMonth;
+    private DateTimeOffset? _payrollPaymentDate = new(DateTime.Today);
     private string _timeImportStatusMessage = "CSV-Datei laden, Mapping zuordnen, Importmonat waehlen und danach importieren.";
     private string _appLogoText = ThemeTokens.BrandLogoText;
     private Bitmap? _appLogoImage;
@@ -194,6 +196,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _annualSalarySummary = "Mitarbeitenden und Jahr waehlen.";
     private AnnualSalaryTotalsDto? _annualSalaryTotals;
     private string _payrollRunStatusDisplay = "offen";
+    private int _payrollRunStatusLoadVersion;
     private IReadOnlyCollection<PayrollGeneralSettingsVersionDto> _generalSettingsHistory = [];
     private IReadOnlyCollection<PayrollHourlySettingsVersionDto> _hourlySettingsHistory = [];
     private IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto> _monthlySalarySettingsHistory = [];
@@ -627,12 +630,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool CanDeleteImportedTimeMonth => !IsBusy && IsSettingsWorkspace && SelectedImportedTimeMonth is not null;
     public bool CanCreateBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(BackupDirectoryPath) && !string.IsNullOrWhiteSpace(BackupFileName);
     public bool CanRestoreBackup => !IsBusy && IsSettingsWorkspace && !string.IsNullOrWhiteSpace(RestoreFilePath);
-    public bool CanCreatePayrollPdf => !IsBusy && IsPayrollRunsWorkspace && _currentEmployeeId.HasValue && MonthlyRecord.SelectedMonth.HasValue;
+    public bool CanCreatePayrollPdf => !IsBusy && IsPayrollRunsWorkspace && _currentEmployeeId.HasValue && MonthlyRecord.SelectedMonth.HasValue && PayrollPaymentDate.HasValue;
     public bool CanFinalizePayrollMonth => !IsBusy
         && IsPayrollRunsWorkspace
         && _payrollRunService is not null
         && _currentEmployeeId.HasValue
         && MonthlyRecord.SelectedMonth.HasValue
+        && PayrollPaymentDate.HasValue
         && !PayrollRunIsFinalized;
     public bool CanCancelPayrollMonth => !IsBusy
         && IsPayrollRunsWorkspace
@@ -645,6 +649,21 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool PayrollRunIsOpen => string.Equals(PayrollRunStatusDisplay, "offen", StringComparison.OrdinalIgnoreCase);
     public bool PayrollRunIsCancelled => string.Equals(PayrollRunStatusDisplay, "storniert", StringComparison.OrdinalIgnoreCase);
     public string PayrollMonthActionLabel => PayrollRunIsFinalized ? "Monat stornieren" : "Monat abschliessen";
+    public DateTimeOffset? PayrollPaymentDate
+    {
+        get => _payrollPaymentDate;
+        set
+        {
+            if (SetProperty(ref _payrollPaymentDate, value))
+            {
+                RaisePropertyChanged(nameof(CanCreatePayrollPdf));
+                RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
+                CreatePayrollPdfCommand.RaiseCanExecuteChanged();
+                FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public string PayrollRunStatusDisplay
     {
         get => _payrollRunStatusDisplay;
@@ -656,6 +675,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(PayrollRunIsOpen));
                 RaisePropertyChanged(nameof(PayrollRunIsCancelled));
                 RaisePropertyChanged(nameof(PayrollMonthActionLabel));
+                ApplyMonthlyRecordLock();
                 RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
                 RaisePropertyChanged(nameof(CanCancelPayrollMonth));
                 RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
@@ -1006,6 +1026,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _hourlyRateChf;
         set => SetProperty(ref _hourlyRateChf, value);
+    }
+
+    public string MonthlySalaryAmountChf
+    {
+        get => _monthlySalaryAmountChf;
+        set => SetProperty(ref _monthlySalaryAmountChf, value);
     }
 
     public string MonthlyBvgDeductionChf
@@ -1781,7 +1807,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ContractValidTo.HasValue ? DateOnly.FromDateTime(ContractValidTo.Value.Date) : null,
                 ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
                 ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)),
-                ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf)));
+                ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf)),
+                ParseRequiredDecimal(MonthlySalaryAmountChf, nameof(MonthlySalaryAmountChf)));
 
             var saved = await _employeeService.SaveAsync(command);
             _currentEmployeeId = saved.EmployeeId;
@@ -1949,7 +1976,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 NewContractVersionValidTo.HasValue ? DateOnly.FromDateTime(NewContractVersionValidTo.Value.Date) : null,
                 ParseRequiredDecimal(HourlyRateChf, nameof(HourlyRateChf)),
                 ParseRequiredDecimal(MonthlyBvgDeductionChf, nameof(MonthlyBvgDeductionChf)),
-                ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf)));
+                ParseRequiredDecimal(SpecialSupplementRateChf, nameof(SpecialSupplementRateChf)),
+                ParseRequiredDecimal(MonthlySalaryAmountChf, nameof(MonthlySalaryAmountChf)));
 
             var saved = await _employeeService.SaveAsync(command);
             _currentEmployeeId = saved.EmployeeId;
@@ -2429,10 +2457,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         await ExecuteBusyAsync(async () =>
         {
             var selectedMonth = MonthlyRecord.SelectedMonth.Value;
+            var paymentDate = ToDateOnly(PayrollPaymentDate!.Value);
+            if (_payrollRunService is not null)
+            {
+                await _payrollRunService.UpdatePaymentDateAsync(
+                    new UpdatePayrollRunPaymentDateCommand(
+                        _currentEmployeeId.Value,
+                        selectedMonth.Year,
+                        selectedMonth.Month,
+                        paymentDate));
+            }
+
             var exportPath = await _reportingService.CreatePayrollStatementPdfAsync(
                 _currentEmployeeId.Value,
                 selectedMonth.Year,
-                selectedMonth.Month);
+                selectedMonth.Month,
+                paymentDate);
 
             StatusMessage = $"PDF erstellt: {exportPath}";
         });
@@ -2454,7 +2494,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 new FinalizePayrollMonthCommand(
                     _currentEmployeeId.Value,
                     selectedMonth.Year,
-                    selectedMonth.Month));
+                    selectedMonth.Month,
+                    ToDateOnly(PayrollPaymentDate!.Value)));
 
             PayrollRunStatusDisplay = "abgeschlossen";
             StatusMessage = $"Monat {selectedMonth:MM/yyyy} abgeschlossen ({result.LineCount} Positionen).";
@@ -2495,30 +2536,67 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task LoadPayrollRunStatusAsync()
     {
-        if (_payrollRunService is null || !_currentEmployeeId.HasValue || !MonthlyRecord.SelectedMonth.HasValue)
+        var loadVersion = ++_payrollRunStatusLoadVersion;
+        var employeeId = _currentEmployeeId;
+        var selectedMonth = MonthlyRecord.SelectedMonth;
+
+        if (_payrollRunService is null || !employeeId.HasValue || !selectedMonth.HasValue)
         {
             PayrollRunStatusDisplay = "offen";
+            PayrollPaymentDate = new DateTimeOffset(DateTime.Today);
+            ApplyMonthlyRecordLock();
             RaisePayrollRunActionStateChanged();
             return;
         }
 
         try
         {
-            var selectedMonth = MonthlyRecord.SelectedMonth.Value;
             var status = await _payrollRunService.GetMonthlyStatusAsync(
                 new PayrollRunMonthlyStatusQuery(
-                    _currentEmployeeId.Value,
-                    selectedMonth.Year,
-                    selectedMonth.Month));
+                    employeeId.Value,
+                    selectedMonth.Value.Year,
+                    selectedMonth.Value.Month));
+
+            if (!IsCurrentPayrollRunStatusRequest(loadVersion, employeeId.Value, selectedMonth.Value))
+            {
+                return;
+            }
 
             PayrollRunStatusDisplay = status.StatusDisplay;
+            PayrollPaymentDate = ToDateTimeOffset(status.PaymentDate ?? DateOnly.FromDateTime(DateTime.Today));
         }
         catch
         {
+            if (!IsCurrentPayrollRunStatusRequest(loadVersion, employeeId.Value, selectedMonth.Value))
+            {
+                return;
+            }
+
             PayrollRunStatusDisplay = "offen";
+            PayrollPaymentDate = new DateTimeOffset(DateTime.Today);
         }
 
+        ApplyMonthlyRecordLock();
         RaisePayrollRunActionStateChanged();
+    }
+
+    private static DateOnly ToDateOnly(DateTimeOffset value)
+    {
+        return DateOnly.FromDateTime(value.Date);
+    }
+
+    private static DateTimeOffset ToDateTimeOffset(DateOnly value)
+    {
+        return new DateTimeOffset(value.ToDateTime(TimeOnly.MinValue));
+    }
+
+    private bool IsCurrentPayrollRunStatusRequest(int loadVersion, Guid employeeId, DateTimeOffset selectedMonth)
+    {
+        return loadVersion == _payrollRunStatusLoadVersion
+            && _currentEmployeeId == employeeId
+            && MonthlyRecord.SelectedMonth.HasValue
+            && MonthlyRecord.SelectedMonth.Value.Year == selectedMonth.Year
+            && MonthlyRecord.SelectedMonth.Value.Month == selectedMonth.Month;
     }
 
     private void RaisePayrollRunActionStateChanged()
@@ -2529,6 +2607,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanExecutePayrollMonthAction));
         FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
         CancelPayrollMonthCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ApplyMonthlyRecordLock()
+    {
+        MonthlyRecord.IsLocked = PayrollRunIsFinalized;
     }
 
     private async Task CreateBackupAsync()
@@ -2702,6 +2785,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             ? new DateTimeOffset(employee.ContractValidTo.Value.ToDateTime(TimeOnly.MinValue))
             : null;
         HourlyRateChf = NumericFormatManager.FormatDecimal(employee.HourlyRateChf, "0.00");
+        MonthlySalaryAmountChf = NumericFormatManager.FormatDecimal(employee.MonthlySalaryAmountChf, "0.00");
         MonthlyBvgDeductionChf = NumericFormatManager.FormatDecimal(employee.MonthlyBvgDeductionChf, "0.00");
         SpecialSupplementRateChf = NumericFormatManager.FormatDecimal(employee.SpecialSupplementRateChf, "0.00");
         ApplyContractHistory(employee.ContractHistory);
@@ -2739,6 +2823,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidFrom = new DateTimeOffset(DateTime.Today);
         ContractValidTo = null;
         HourlyRateChf = NumericFormatManager.FormatDecimal(0m, "0");
+        MonthlySalaryAmountChf = NumericFormatManager.FormatDecimal(0m, "0");
         MonthlyBvgDeductionChf = NumericFormatManager.FormatDecimal(0m, "0");
         SpecialSupplementRateChf = NumericFormatManager.FormatDecimal(3m, "0.00");
         ContractHistory.Clear();
@@ -2777,6 +2862,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ContractValidFrom = null;
         ContractValidTo = null;
         HourlyRateChf = string.Empty;
+        MonthlySalaryAmountChf = string.Empty;
         MonthlyBvgDeductionChf = string.Empty;
         SpecialSupplementRateChf = string.Empty;
         ContractHistory.Clear();
@@ -2797,8 +2883,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ValidFrom = new DateTimeOffset(entry.ValidFrom.ToDateTime(TimeOnly.MinValue)),
                 ValidTo = entry.ValidTo.HasValue ? new DateTimeOffset(entry.ValidTo.Value.ToDateTime(TimeOnly.MinValue)) : null,
                 HourlyRateDisplay = $"{NumericFormatManager.FormatDecimal(entry.HourlyRateChf, "0.00")} CHF/h",
+                MonthlySalaryDisplay = $"Monat {NumericFormatManager.FormatDecimal(entry.MonthlySalaryAmountChf, "0.00")} CHF",
                 MonthlyBvgDisplay = $"BVG {NumericFormatManager.FormatDecimal(entry.MonthlyBvgDeductionChf, "0.00")} CHF",
                 SpecialSupplementDisplay = $"Spezial {NumericFormatManager.FormatDecimal(entry.SpecialSupplementRateChf, "0.00")} CHF",
+                WageTypeDisplay = MapWageTypeToLabel(entry.WageType),
                 IsCurrent = entry.IsCurrent
             });
         }
@@ -2940,7 +3028,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         _isEditing = isEditing;
         _isCreatingNew = isCreatingNew;
-        MonthlyRecord.IsLocked = isEditing;
+        ApplyMonthlyRecordLock();
         if (!_isEditing)
         {
             DismissDeleteConfirmation();
@@ -3234,7 +3322,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         return options
             .Where(item => !string.IsNullOrWhiteSpace(item.Name))
-            .Select(item => new SettingOptionDto(item.OptionId, item.Name.Trim()))
+            .Select(item => new SettingOptionDto(item.OptionId, item.Name.Trim(), item.IsGavMandatory))
             .ToArray();
     }
 
@@ -3254,7 +3342,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             target.Add(new EditableSettingOptionViewModel
             {
                 OptionId = item.OptionId,
-                Name = item.Name
+                Name = item.Name,
+                IsGavMandatory = item.IsGavMandatory
             });
         }
 

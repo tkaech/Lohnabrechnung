@@ -6,12 +6,19 @@ namespace Payroll.Application.Payroll;
 public sealed record FinalizePayrollMonthCommand(
     Guid EmployeeId,
     int Year,
-    int Month);
+    int Month,
+    DateOnly PaymentDate);
 
 public sealed record CancelPayrollRunCommand(
     Guid EmployeeId,
     int Year,
     int Month);
+
+public sealed record UpdatePayrollRunPaymentDateCommand(
+    Guid EmployeeId,
+    int Year,
+    int Month,
+    DateOnly PaymentDate);
 
 public sealed record PayrollRunMonthlyStatusQuery(
     Guid EmployeeId,
@@ -30,6 +37,7 @@ public sealed record PayrollRunMonthlyStatusDto(
     int Year,
     int Month,
     bool IsFinalized,
+    DateOnly? PaymentDate,
     bool HasCancelledRun = false)
 {
     public string StatusDisplay => IsFinalized ? "abgeschlossen" : HasCancelledRun ? "storniert" : "offen";
@@ -38,5 +46,7 @@ public sealed record PayrollRunMonthlyStatusDto(
 public sealed record PayrollRunMonthlyInputDto(
     Guid EmployeeId,
     DateOnly? EmployeeBirthDate,
+    string? DepartmentName,
+    bool IsDepartmentGavMandatory,
     EmployeeMonthlyRecord MonthlyRecord,
     EmploymentContract? Contract);

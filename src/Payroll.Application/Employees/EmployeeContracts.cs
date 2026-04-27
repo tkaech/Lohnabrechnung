@@ -59,7 +59,8 @@ public sealed record EmployeeDetailsDto(
     decimal HourlyRateChf,
     decimal MonthlyBvgDeductionChf,
     decimal SpecialSupplementRateChf,
-    IReadOnlyCollection<EmploymentContractVersionDto> ContractHistory);
+    IReadOnlyCollection<EmploymentContractVersionDto> ContractHistory,
+    decimal MonthlySalaryAmountChf = 0m);
 
 public sealed record EmploymentContractVersionDto(
     Guid ContractId,
@@ -68,7 +69,9 @@ public sealed record EmploymentContractVersionDto(
     decimal HourlyRateChf,
     decimal MonthlyBvgDeductionChf,
     decimal SpecialSupplementRateChf,
-    bool IsCurrent);
+    bool IsCurrent,
+    EmployeeWageType WageType = EmployeeWageType.Hourly,
+    decimal MonthlySalaryAmountChf = 0m);
 
 public sealed record SaveEmployeeCommand(
     Guid? EmployeeId,
@@ -103,4 +106,5 @@ public sealed record SaveEmployeeCommand(
     DateOnly? ContractValidTo,
     decimal HourlyRateChf,
     decimal MonthlyBvgDeductionChf,
-    decimal SpecialSupplementRateChf);
+    decimal SpecialSupplementRateChf,
+    decimal MonthlySalaryAmountChf = 0m);

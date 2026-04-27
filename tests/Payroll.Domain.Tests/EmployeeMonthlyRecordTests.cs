@@ -104,7 +104,7 @@ public sealed class EmployeeMonthlyRecordTests
     public void InitializeEmploymentContractSnapshot_CapturesContractOnlyOnce()
     {
         var record = new EmployeeMonthlyRecord(Guid.NewGuid(), 2026, 4);
-        var originalContract = new EmploymentContract(record.EmployeeId, new DateOnly(2026, 1, 1), null, 33.5m, 310m, 3m);
+        var originalContract = new EmploymentContract(record.EmployeeId, new DateOnly(2026, 1, 1), null, 33.5m, 310m, 3m, monthlySalaryAmountChf: 4800m);
         var laterContract = new EmploymentContract(record.EmployeeId, new DateOnly(2026, 6, 1), null, 39m, 450m, 5m);
 
         record.InitializeEmploymentContractSnapshot(originalContract);
@@ -116,6 +116,7 @@ public sealed class EmployeeMonthlyRecordTests
         Assert.Equal(firstCapturedAt, record.EmploymentContractSnapshot.CapturedAtUtc);
         Assert.Equal(new DateOnly(2026, 1, 1), record.EmploymentContractSnapshot.ValidFrom);
         Assert.Equal(33.5m, record.EmploymentContractSnapshot.HourlyRateChf);
+        Assert.Equal(4800m, record.EmploymentContractSnapshot.MonthlySalaryAmountChf);
         Assert.Equal(310m, record.EmploymentContractSnapshot.MonthlyBvgDeductionChf);
         Assert.Equal(3m, record.EmploymentContractSnapshot.SpecialSupplementRateChf);
     }

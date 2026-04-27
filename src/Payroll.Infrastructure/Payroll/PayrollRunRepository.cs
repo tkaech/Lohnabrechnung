@@ -44,6 +44,23 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
                 cancellationToken);
     }
 
+    public async Task<PayrollRun?> GetLatestRunForEmployeePeriodAsync(
+        Guid employeeId,
+        string periodKey,
+        CancellationToken cancellationToken)
+    {
+        var runs = await _dbContext.PayrollRuns
+            .AsNoTracking()
+            .Where(run => run.PeriodKey == periodKey
+                && run.Lines.Any(line => line.EmployeeId == employeeId))
+            .ToListAsync(cancellationToken);
+
+        return runs
+            .OrderByDescending(run => run.Status == PayrollRunStatus.Finalized)
+            .ThenByDescending(run => run.CreatedAtUtc)
+            .FirstOrDefault();
+    }
+
     public Task<bool> HasCancelledRunForEmployeePeriodAsync(
         Guid employeeId,
         string periodKey,
@@ -79,6 +96,13 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
         var employee = await _dbContext.Employees
             .AsNoTracking()
             .SingleOrDefaultAsync(employee => employee.Id == employeeId, cancellationToken);
+        DepartmentOption? department = null;
+        if (employee?.DepartmentOptionId is { } departmentId)
+        {
+            department = await _dbContext.DepartmentOptions
+                .AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == departmentId, cancellationToken);
+        }
 
         var periodStart = new DateOnly(year, month, 1);
         var periodEnd = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
@@ -93,6 +117,8 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
         return new PayrollRunMonthlyInputDto(
             record.EmployeeId,
             employee?.BirthDate,
+            department?.Name,
+            department?.IsGavMandatory ?? false,
             record,
             contracts.OrderByDescending(contract => contract.ValidFrom).FirstOrDefault());
     }

@@ -202,8 +202,11 @@ public sealed class BackupRestoreService : IBackupRestoreService
                             item.HourlyRateChf,
                             item.MonthlyBvgDeductionChf,
                             item.SpecialSupplementRateChf,
-                            contract is not null && item.Id == contract.Id))
-                        .ToArray());
+                            contract is not null && item.Id == contract.Id,
+                            item.WageType,
+                            item.MonthlySalaryAmountChf))
+                        .ToArray(),
+                    contract?.MonthlySalaryAmountChf ?? 0m);
             })
             .OrderBy(employee => employee.LastName)
             .ThenBy(employee => employee.FirstName)
@@ -347,7 +350,9 @@ public sealed class BackupRestoreService : IBackupRestoreService
                 employee.ContractValidTo,
                 employee.HourlyRateChf,
                 employee.MonthlyBvgDeductionChf,
-                employee.SpecialSupplementRateChf);
+                employee.SpecialSupplementRateChf,
+                employee.WageType,
+                employee.MonthlySalaryAmountChf);
             dbContext.EmploymentContracts.Add(restoredContract);
         }
 

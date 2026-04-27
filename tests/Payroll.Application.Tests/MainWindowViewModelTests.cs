@@ -390,10 +390,70 @@ public sealed class MainWindowViewModelTests
         await WaitUntilAsync(() => viewModel.PersonnelNumber == "1001");
 
         Assert.Equal("offen", viewModel.PayrollRunStatusDisplay);
+        Assert.Equal(DateTime.Today, viewModel.PayrollPaymentDate?.Date);
         Assert.True(viewModel.CanFinalizePayrollMonth);
         Assert.True(viewModel.CanExecutePayrollMonthAction);
         Assert.Equal("Monat abschliessen", viewModel.PayrollMonthActionLabel);
         Assert.Contains(nameof(MainWindowViewModel.CanExecutePayrollMonthAction), changedProperties);
+    }
+
+    [Fact]
+    public async Task TimeAndExpenses_LockFollowsActivePayrollRunStatus()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+
+        var openViewModel = CreateViewModel(
+            new TestEmployeeRepository(employee),
+            payrollRunService: new PayrollRunService(new OpenPayrollRunRepository()));
+        openViewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await openViewModel.InitializeAsync();
+        await WaitUntilAsync(() => openViewModel.PersonnelNumber == "1000"
+            && openViewModel.PayrollRunStatusDisplay == "offen");
+
+        Assert.False(openViewModel.MonthlyRecord.IsLocked);
+        Assert.True(openViewModel.MonthlyRecord.CanManageRecord);
+        Assert.True(openViewModel.MonthlyRecord.NewTimeEntryCommand.CanExecute(null));
+
+        var finalizedViewModel = CreateViewModel(
+            new TestEmployeeRepository(employee),
+            payrollRunService: new PayrollRunService(new OpenPayrollRunRepository(finalized: true)));
+        finalizedViewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await finalizedViewModel.InitializeAsync();
+        await WaitUntilAsync(() => finalizedViewModel.PayrollRunStatusDisplay == "abgeschlossen");
+
+        Assert.True(finalizedViewModel.MonthlyRecord.IsLocked);
+        Assert.False(finalizedViewModel.MonthlyRecord.CanSaveTimeEntry);
+        Assert.False(finalizedViewModel.MonthlyRecord.CanSaveExpenseEntry);
+
+        var cancelledViewModel = CreateViewModel(
+            new TestEmployeeRepository(employee),
+            payrollRunService: new PayrollRunService(new OpenPayrollRunRepository(cancelled: true)));
+        cancelledViewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await cancelledViewModel.InitializeAsync();
+        await WaitUntilAsync(() => cancelledViewModel.PayrollRunStatusDisplay == "storniert");
+
+        Assert.False(cancelledViewModel.MonthlyRecord.IsLocked);
+        Assert.True(cancelledViewModel.MonthlyRecord.CanManageRecord);
+    }
+
+    [Fact]
+    public async Task TimeAndExpenses_MonthChangeRefreshesPayrollRunLock()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new OpenPayrollRunRepository(finalized: true, finalizedPeriodKey: "2026-03");
+        var viewModel = CreateViewModel(
+            new TestEmployeeRepository(employee),
+            payrollRunService: new PayrollRunService(repository));
+
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PayrollRunStatusDisplay == "abgeschlossen");
+
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+        await WaitUntilAsync(() => viewModel.PayrollRunStatusDisplay == "offen");
+
+        Assert.False(viewModel.MonthlyRecord.IsLocked);
+        Assert.True(viewModel.MonthlyRecord.CanManageRecord);
     }
 
     [Fact]
@@ -836,19 +896,39 @@ public sealed class MainWindowViewModelTests
 
     private sealed class OpenPayrollRunRepository : IPayrollRunRepository
     {
+        private readonly bool _finalized;
+        private readonly bool _cancelled;
+        private readonly string _finalizedPeriodKey;
+
+        public OpenPayrollRunRepository(bool finalized = false, bool cancelled = false, string finalizedPeriodKey = "2026-03")
+        {
+            _finalized = finalized;
+            _cancelled = cancelled;
+            _finalizedPeriodKey = finalizedPeriodKey;
+        }
+
         public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
         {
-            return Task.FromResult<PayrollRun?>(null);
+            return Task.FromResult(_finalized && periodKey == _finalizedPeriodKey
+                ? CreateRun(periodKey, PayrollRunStatus.Finalized)
+                : null);
         }
 
         public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodForUpdateAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
         {
-            return Task.FromResult<PayrollRun?>(null);
+            return GetFinalizedRunForEmployeePeriodAsync(employeeId, periodKey, cancellationToken);
+        }
+
+        public Task<PayrollRun?> GetLatestRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_cancelled && periodKey == _finalizedPeriodKey
+                ? CreateRun(periodKey, PayrollRunStatus.Cancelled)
+                : null);
         }
 
         public Task<bool> HasCancelledRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
         {
-            return Task.FromResult(false);
+            return Task.FromResult(_cancelled && periodKey == _finalizedPeriodKey);
         }
 
         public Task<PayrollRunMonthlyInputDto?> LoadMonthlyInputAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
@@ -873,6 +953,18 @@ public sealed class MainWindowViewModelTests
         public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+
+        private static PayrollRun CreateRun(string periodKey, PayrollRunStatus status)
+        {
+            var run = new PayrollRun(periodKey, new DateOnly(2026, 4, 5));
+            run.FinalizeRun();
+            if (status == PayrollRunStatus.Cancelled)
+            {
+                run.Cancel(DateTimeOffset.UtcNow);
+            }
+
+            return run;
         }
     }
 

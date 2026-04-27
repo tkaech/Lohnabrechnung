@@ -88,8 +88,10 @@ public sealed class PayrollDbContext : DbContext
             builder.HasKey(contract => contract.Id);
             builder.Property(contract => contract.EmployeeId).IsRequired();
             builder.Property(contract => contract.HourlyRateChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(contract => contract.MonthlySalaryAmountChf).HasColumnType("TEXT").IsRequired();
             builder.Property(contract => contract.MonthlyBvgDeductionChf).HasColumnType("TEXT").IsRequired();
             builder.Property(contract => contract.SpecialSupplementRateChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(contract => contract.WageType).HasConversion<string>().HasMaxLength(50).IsRequired();
 
             builder.HasOne<Employee>()
                 .WithMany()
@@ -185,6 +187,7 @@ public sealed class PayrollDbContext : DbContext
             builder.ToTable("DepartmentOptions");
             builder.HasKey(option => option.Id);
             builder.Property(option => option.Name).HasMaxLength(200).IsRequired();
+            builder.Property(option => option.IsGavMandatory).IsRequired();
             builder.HasIndex(option => option.Name).IsUnique();
         });
 
@@ -351,12 +354,20 @@ public sealed class PayrollDbContext : DbContext
                 snapshotBuilder.Property(item => item.HourlyRateChf)
                     .HasColumnName("EmploymentContractSnapshot_HourlyRateChf")
                     .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.MonthlySalaryAmountChf)
+                    .HasColumnName("EmploymentContractSnapshot_MonthlySalaryAmountChf")
+                    .HasColumnType("TEXT");
                 snapshotBuilder.Property(item => item.MonthlyBvgDeductionChf)
                     .HasColumnName("EmploymentContractSnapshot_MonthlyBvgDeductionChf")
                     .HasColumnType("TEXT");
                 snapshotBuilder.Property(item => item.SpecialSupplementRateChf)
                     .HasColumnName("EmploymentContractSnapshot_SpecialSupplementRateChf")
                     .HasColumnType("TEXT");
+                snapshotBuilder.Property(item => item.WageType)
+                    .HasColumnName("EmploymentContractSnapshot_WageType")
+                    .HasConversion<string>()
+                    .HasMaxLength(50)
+                    .IsRequired();
             });
         });
 

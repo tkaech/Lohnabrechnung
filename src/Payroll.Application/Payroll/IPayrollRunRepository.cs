@@ -7,6 +7,7 @@ public interface IPayrollRunRepository
 {
     Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
     Task<PayrollRun?> GetFinalizedRunForEmployeePeriodForUpdateAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
+    Task<PayrollRun?> GetLatestRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
     Task<bool> HasCancelledRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
     Task<PayrollRunMonthlyInputDto?> LoadMonthlyInputAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken);
     Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken);
