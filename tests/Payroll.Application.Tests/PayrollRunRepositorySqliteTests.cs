@@ -198,6 +198,52 @@ public sealed class PayrollRunRepositorySqliteTests
     }
 
     [Fact]
+    public async Task FinalizeMonthAsync_StoresWithholdingTaxValuesAsPayrollRunLines()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee(isSubjectToWithholdingTax: true);
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 3, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 3, 31), 100m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        record.SaveWithholdingTaxInputs(7m, 25m, "Rueckzahlung");
+        await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
+
+        var service = new PayrollRunService(new PayrollRunRepository(dbContext));
+        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
+
+        var storedRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == result.PayrollRunId);
+
+        Assert.Contains(storedRun.Lines, line => line.Code == "WITHHOLDING_TAX" && line.RateChf == 7m && line.Quantity == 1000m && line.AmountChf == -70m);
+        Assert.Contains(storedRun.Lines, line => line.Code == "WITHHOLDING_TAX_CORRECTION" && line.AmountChf == 25m && line.Description.Contains("Rueckzahlung", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AnnualSalary_ReadsOnlyFinalizedPayrollRunLines()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -381,6 +427,7 @@ public sealed class PayrollRunRepositorySqliteTests
         marchRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.SocialContribution, "ALV", "ALV", 10m));
         marchRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.SocialContribution, "KTG_UVG", "Krankentaggeld/UVG", 20m));
         marchRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.SocialContribution, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", 30m));
+        marchRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.Tax, "WITHHOLDING_TAX", "Quellensteuer", 80m));
         marchRun.FinalizeRun();
 
         var aprilRun = new PayrollRun("2026-04", new DateOnly(2026, 4, 30));
@@ -389,6 +436,7 @@ public sealed class PayrollRunRepositorySqliteTests
         aprilRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.SocialContribution, "ALV", "ALV", 5m));
         aprilRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.SocialContribution, "KTG_UVG", "Krankentaggeld/UVG", 10m));
         aprilRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employee.Id, PayrollLineType.SocialContribution, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", 15m));
+        aprilRun.AddLine(PayrollRunLine.CreateManualChfLine(employee.Id, PayrollLineType.Tax, "WITHHOLDING_TAX_CORRECTION", "Rueckzahlung", 20m));
         aprilRun.FinalizeRun();
 
         var cancelledRun = new PayrollRun("2026-05", new DateOnly(2026, 5, 31));
@@ -412,13 +460,16 @@ public sealed class PayrollRunRepositorySqliteTests
         Assert.Equal(20m, march.SicknessDailyAllowanceDeductionChf);
         Assert.Equal(30m, march.TrainingAndEducationDeductionChf);
         Assert.Equal(110m, march.TotalSocialDeductionChf);
+        Assert.Equal(80m, march.WithholdingTaxChf);
         Assert.Equal(55m, april.TotalSocialDeductionChf);
+        Assert.Equal(20m, april.WithholdingTaxChf);
         Assert.Equal(0m, may.TotalSocialDeductionChf);
         Assert.Equal(75m, overview.Totals.AhvIvEoDeductionChf);
         Assert.Equal(15m, overview.Totals.AlvDeductionChf);
         Assert.Equal(30m, overview.Totals.SicknessDailyAllowanceDeductionChf);
         Assert.Equal(45m, overview.Totals.TrainingAndEducationDeductionChf);
         Assert.Equal(165m, overview.Totals.SocialInsuranceDeductionChf);
+        Assert.Equal(100m, overview.Totals.WithholdingTaxChf);
     }
 
     [Fact]
@@ -530,7 +581,7 @@ public sealed class PayrollRunRepositorySqliteTests
         Assert.Contains(details.PayrollPreview.Lines, line => line.Code == PayrollPreviewHelpCatalog.TimeSupplementCode && line.AmountDisplay.Contains("20.00", StringComparison.Ordinal));
     }
 
-    private static Employee CreateEmployee()
+    private static Employee CreateEmployee(bool isSubjectToWithholdingTax = false)
     {
         return new Employee(
             "9001",
@@ -544,8 +595,8 @@ public sealed class PayrollRunRepositorySqliteTests
             "Schweiz",
             "CH",
             "B",
-            "Ordentlich",
-            false,
+            isSubjectToWithholdingTax ? "B" : "Ordentlich",
+            isSubjectToWithholdingTax,
             null,
             null,
             null,

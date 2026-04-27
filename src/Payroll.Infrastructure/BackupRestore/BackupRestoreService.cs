@@ -241,7 +241,10 @@ public sealed class BackupRestoreService : IBackupRestoreService
                 expenseEntries
                     .Where(entry => entry.EmployeeMonthlyRecordId == record.Id)
                     .Select(entry => (decimal?)entry.ExpensesTotalChf)
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+                record.WithholdingTaxRatePercent,
+                record.WithholdingTaxCorrectionAmountChf,
+                record.WithholdingTaxCorrectionText))
             .ToArray();
 
         return new UserDataBackupDto(employeeSnapshots, monthlyRecords);
@@ -390,6 +393,19 @@ public sealed class BackupRestoreService : IBackupRestoreService
                         monthlyRecord.ExpensesTotalChf.Value),
                     cancellationToken);
             }
+
+            if (monthlyRecord.WithholdingTaxRatePercent != 0m
+                || monthlyRecord.WithholdingTaxCorrectionAmountChf != 0m
+                || !string.IsNullOrWhiteSpace(monthlyRecord.WithholdingTaxCorrectionText))
+            {
+                await _monthlyRecordService.SaveWithholdingTaxAsync(
+                    new SaveMonthlyWithholdingTaxCommand(
+                        details.Header.MonthlyRecordId,
+                        monthlyRecord.WithholdingTaxRatePercent,
+                        monthlyRecord.WithholdingTaxCorrectionAmountChf,
+                        monthlyRecord.WithholdingTaxCorrectionText),
+                    cancellationToken);
+            }
         }
     }
 
@@ -508,7 +524,10 @@ public sealed class BackupRestoreService : IBackupRestoreService
         int Year,
         int Month,
         IReadOnlyCollection<TimeEntryBackupDto> TimeEntries,
-        decimal? ExpensesTotalChf);
+        decimal? ExpensesTotalChf,
+        decimal WithholdingTaxRatePercent = 0m,
+        decimal WithholdingTaxCorrectionAmountChf = 0m,
+        string? WithholdingTaxCorrectionText = null);
 
     private sealed record TimeEntryBackupDto(
         DateOnly WorkDate,
