@@ -82,6 +82,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         ResetExpenseValuesCommand = new DelegateCommand(PrepareNewExpenseEntry, () => CanManageRecord);
         SaveExpenseEntryCommand = new DelegateCommand(SaveExpenseEntryAsync, () => CanSaveExpenseEntry);
         SaveWithholdingTaxCommand = new DelegateCommand(SaveWithholdingTaxAsync, () => CanSaveWithholdingTax);
+        ResetWithholdingTaxCommand = new DelegateCommand(ResetWithholdingTaxAsync, () => CanResetWithholdingTax);
     }
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
@@ -100,6 +101,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public DelegateCommand ResetExpenseValuesCommand { get; }
     public DelegateCommand SaveExpenseEntryCommand { get; }
     public DelegateCommand SaveWithholdingTaxCommand { get; }
+    public DelegateCommand ResetWithholdingTaxCommand { get; }
 
     public bool IsBusy
     {
@@ -113,6 +115,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+                RaisePropertyChanged(nameof(CanResetWithholdingTax));
                 RaiseActionStateChanged();
             }
         }
@@ -130,6 +133,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+                RaisePropertyChanged(nameof(CanResetWithholdingTax));
                 RaiseActionStateChanged();
             }
         }
@@ -140,6 +144,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public bool CanDeleteTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedTimeEntry is { IsCurrentMonth: true };
     public bool CanSaveExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
     public bool CanSaveWithholdingTax => CanManageRecord && _currentMonthlyRecordId.HasValue && IsSubjectToWithholdingTax;
+    public bool CanResetWithholdingTax => CanSaveWithholdingTax;
 
     public DateTimeOffset? SelectedMonth
     {
@@ -361,7 +366,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             if (SetProperty(ref _isSubjectToWithholdingTax, value))
             {
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+                RaisePropertyChanged(nameof(CanResetWithholdingTax));
                 SaveWithholdingTaxCommand.RaiseCanExecuteChanged();
+                ResetWithholdingTaxCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -461,6 +468,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+                RaisePropertyChanged(nameof(CanResetWithholdingTax));
                 RaiseActionStateChanged();
             }
         }
@@ -752,6 +760,19 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
     private async Task SaveWithholdingTaxAsync()
     {
+        await SaveWithholdingTaxAsync("Quellensteuer gespeichert.");
+    }
+
+    private async Task ResetWithholdingTaxAsync()
+    {
+        WithholdingTaxRatePercent = "0";
+        WithholdingTaxCorrectionAmountChf = "0.00";
+        WithholdingTaxCorrectionText = null;
+        await SaveWithholdingTaxAsync("Quellensteuer zurueckgesetzt.");
+    }
+
+    private async Task SaveWithholdingTaxAsync(string successMessage)
+    {
         await EnsureCurrentRecordLoadedAsync();
 
         if (!_currentMonthlyRecordId.HasValue)
@@ -769,7 +790,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                     WithholdingTaxCorrectionText));
 
             ApplyDetails(details);
-            ActionMessage = "Quellensteuer gespeichert.";
+            ActionMessage = successMessage;
         });
     }
 
@@ -921,6 +942,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+        RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+        RaisePropertyChanged(nameof(CanResetWithholdingTax));
         RaiseActionStateChanged();
     }
 
@@ -1021,6 +1044,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanSaveTimeEntry));
         RaisePropertyChanged(nameof(CanDeleteTimeEntry));
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+        RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+        RaisePropertyChanged(nameof(CanResetWithholdingTax));
         RaiseActionStateChanged();
     }
 
@@ -1033,6 +1058,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         ResetExpenseValuesCommand.RaiseCanExecuteChanged();
         SaveExpenseEntryCommand.RaiseCanExecuteChanged();
         SaveWithholdingTaxCommand.RaiseCanExecuteChanged();
+        ResetWithholdingTaxCommand.RaiseCanExecuteChanged();
     }
 
     private void RefreshVisiblePayrollPreviewLines()

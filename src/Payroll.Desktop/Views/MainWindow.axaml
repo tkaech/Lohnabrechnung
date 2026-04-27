@@ -1278,18 +1278,19 @@
         <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
-              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto">
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
-                <controls:MonthPicker Grid.Row="1" SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
+              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="220,220,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
+                  <controls:MonthPicker SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
+                </StackPanel>
                 <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="4">
                   <TextBlock Classes="section-caption" Text="Auszahlungsdatum" />
                   <controls:AppDatePicker SelectedDate="{Binding PayrollPaymentDate, Mode=TwoWay}" Watermark="TT.MM.JJJJ" />
                 </StackPanel>
                 <StackPanel Grid.Column="3"
-                            Grid.RowSpan="2"
                             MinWidth="120"
                             Margin="0,0,8,0"
-                            VerticalAlignment="Center"
+                            VerticalAlignment="Bottom"
                             Spacing="2">
                   <TextBlock Classes="section-caption" Text="Status" />
                   <TextBlock Classes="payroll-status"
@@ -1299,29 +1300,26 @@
                              Text="{Binding PayrollRunStatusDisplay}" />
                 </StackPanel>
                 <ToggleButton Grid.Column="4"
-                              Grid.RowSpan="2"
                               MinWidth="132"
                               Margin="0,0,8,0"
-                              VerticalAlignment="Center"
+                              VerticalAlignment="Bottom"
                               IsChecked="{Binding MonthlyRecord.IsPayrollPreviewDerivationVisible, Mode=TwoWay}"
                               IsEnabled="{Binding MonthlyRecord.HasPayrollPreviewDerivationGroups}"
                               Content="Herleitung anzeigen" />
                 <Button Grid.Column="5"
-                        Grid.RowSpan="2"
                         MinWidth="148"
                         Margin="0,0,8,0"
-                        VerticalAlignment="Center"
+                        VerticalAlignment="Bottom"
                         Classes="primary-action"
                         IsEnabled="{Binding CanExecutePayrollMonthAction}"
                         Click="OnFinalizePayrollMonthClick"
                         Content="{Binding PayrollMonthActionLabel}" />
                 <Button Grid.Column="6"
-                        Grid.RowSpan="2"
-                        VerticalAlignment="Center"
+                        VerticalAlignment="Bottom"
                         Classes="primary-action"
                         Command="{Binding CreatePayrollPdfCommand}"
                         Content="PDF erstellen" />
-                <StackPanel Grid.Row="2"
+                <StackPanel Grid.Row="1"
                             Grid.ColumnSpan="7"
                             Margin="0,12,0,0"
                             Orientation="Horizontal"
@@ -1339,6 +1337,9 @@
                     <TextBlock Classes="section-caption" Text="Korrekturtext" />
                     <TextBox Text="{Binding MonthlyRecord.WithholdingTaxCorrectionText, Mode=TwoWay}" />
                   </StackPanel>
+                  <Button VerticalAlignment="Bottom"
+                          Command="{Binding MonthlyRecord.ResetWithholdingTaxCommand}"
+                          Content="Zuruecksetzen" />
                   <Button VerticalAlignment="Bottom"
                           Command="{Binding MonthlyRecord.SaveWithholdingTaxCommand}"
                           Content="Quellensteuer speichern" />

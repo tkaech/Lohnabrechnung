@@ -63,6 +63,8 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
             employee.PersonnelNumber,
             employee.FirstName,
             employee.LastName,
+            employee.AhvNumber,
+            employee.BirthDate,
             query.Year,
             rows,
             totals);

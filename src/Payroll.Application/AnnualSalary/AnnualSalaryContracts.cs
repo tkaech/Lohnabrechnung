@@ -9,6 +9,8 @@ public sealed record AnnualSalaryOverviewDto(
     string PersonnelNumber,
     string FirstName,
     string LastName,
+    string? AhvNumber,
+    DateOnly? BirthDate,
     int Year,
     IReadOnlyCollection<AnnualSalaryMonthDto> Months,
     AnnualSalaryTotalsDto Totals);
