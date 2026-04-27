@@ -117,6 +117,70 @@ public sealed class PayrollRunLineDerivationServiceTests
     }
 
     [Fact]
+    public void DeriveForEmployee_WithholdingTaxSubjectEmployeeCreatesTaxLineFromAhvGross()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false, true, "B", 5m));
+
+        var taxLine = Assert.Single(result.Lines, line => line.Code == "WITHHOLDING_TAX");
+        Assert.Equal(PayrollLineType.Tax, taxLine.LineType);
+        Assert.Equal(331.92m, taxLine.Quantity);
+        Assert.Equal(5m, taxLine.RateChf);
+        Assert.Equal(-16.596m, taxLine.AmountChf);
+    }
+
+    [Fact]
+    public void DeriveForEmployee_NonWithholdingTaxSubjectEmployeeCreatesNoTaxLine()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false, false, "B", 5m, -20m, "Rueckzahlung"));
+
+        Assert.DoesNotContain(result.Lines, line => line.LineType == PayrollLineType.Tax);
+    }
+
+    [Fact]
+    public void DeriveForEmployee_WithholdingTaxCorrectionCreatesSeparateSignedTaxLine()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 30m, 0m, 0m);
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 3, 31),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false, true, "B", 0m, 25m, "Rueckzahlung"));
+
+        Assert.Contains(result.Lines, line => line.Code == "WITHHOLDING_TAX_CORRECTION" && line.AmountChf == 25m);
+    }
+
+    [Fact]
     public void DeriveForEmployee_MonthlyWageTypeUsesSeparatePath()
     {
         var employeeId = Guid.NewGuid();

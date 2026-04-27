@@ -3,5 +3,6 @@ namespace Payroll.Domain.Payroll;
 public enum PayrollLineUnit
 {
     Chf,
-    Hours
+    Hours,
+    Percent
 }

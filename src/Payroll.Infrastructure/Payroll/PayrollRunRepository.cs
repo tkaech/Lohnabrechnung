@@ -119,6 +119,8 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
             employee?.BirthDate,
             department?.Name,
             department?.IsGavMandatory ?? false,
+            employee?.TaxStatus,
+            employee?.IsSubjectToWithholdingTax == true,
             record,
             contracts.OrderByDescending(contract => contract.ValidFrom).FirstOrDefault());
     }

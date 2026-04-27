@@ -197,6 +197,30 @@ public sealed class PayrollRunLineDerivationService
             AddPercentageDeductionLine(lines, contract.EmployeeId, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", contributableGrossChf, payrollSettings.TrainingAndHolidayRate);
         }
 
+        if (context.IsSubjectToWithholdingTax)
+        {
+            if (context.WithholdingTaxRatePercent > 0m && contributableGrossChf > 0m)
+            {
+                lines.Add(PayrollRunLine.CreateCalculatedPercentageDeduction(
+                    contract.EmployeeId,
+                    PayrollLineType.Tax,
+                    "WITHHOLDING_TAX",
+                    BuildWithholdingTaxDescription(context.WithholdingTaxStatus),
+                    contributableGrossChf,
+                    context.WithholdingTaxRatePercent));
+            }
+
+            if (context.WithholdingTaxCorrectionAmountChf != 0m)
+            {
+                lines.Add(PayrollRunLine.CreateManualChfLine(
+                    contract.EmployeeId,
+                    PayrollLineType.Tax,
+                    "WITHHOLDING_TAX_CORRECTION",
+                    BuildWithholdingTaxCorrectionDescription(context.WithholdingTaxCorrectionText),
+                    context.WithholdingTaxCorrectionAmountChf));
+            }
+        }
+
         if (contract.IsActiveOn(payrollReferenceDate) && contract.MonthlyBvgDeductionChf > 0m)
         {
             lines.Add(PayrollRunLine.CreateCalculatedFixedDeduction(
@@ -282,6 +306,20 @@ public sealed class PayrollRunLineDerivationService
             code,
             description,
             contributableGrossChf * rate));
+    }
+
+    private static string BuildWithholdingTaxDescription(string? taxStatus)
+    {
+        return string.IsNullOrWhiteSpace(taxStatus)
+            ? "Quellensteuer vom AHV-pflichtigen Bruttolohn"
+            : $"Quellensteuer Tarif {taxStatus.Trim()} vom AHV-pflichtigen Bruttolohn";
+    }
+
+    private static string BuildWithholdingTaxCorrectionDescription(string? correctionText)
+    {
+        return string.IsNullOrWhiteSpace(correctionText)
+            ? "Quellensteuer Korrektur / Rueckzahlung"
+            : $"Quellensteuer Korrektur / Rueckzahlung: {correctionText.Trim()}";
     }
 
     private static void ValidateEmployeeIds<TEntry>(IEnumerable<TEntry> entries, Guid employeeId, string paramName)

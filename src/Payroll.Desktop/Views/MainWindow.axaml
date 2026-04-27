@@ -1278,7 +1278,7 @@
         <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
-              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto">
                 <TextBlock FontSize="16" FontWeight="SemiBold" Text="Abrechnungsmonat" />
                 <controls:MonthPicker Grid.Row="1" SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
                 <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="4">
@@ -1321,6 +1321,28 @@
                         Classes="primary-action"
                         Command="{Binding CreatePayrollPdfCommand}"
                         Content="PDF erstellen" />
+                <StackPanel Grid.Row="2"
+                            Grid.ColumnSpan="7"
+                            Margin="0,12,0,0"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            IsVisible="{Binding MonthlyRecord.IsSubjectToWithholdingTax}">
+                  <StackPanel Spacing="4" Width="120">
+                    <TextBlock Classes="section-caption" Text="Quellensteuer %" />
+                    <TextBox Text="{Binding MonthlyRecord.WithholdingTaxRatePercent, Mode=TwoWay}" />
+                  </StackPanel>
+                  <StackPanel Spacing="4" Width="150">
+                    <TextBlock Classes="section-caption" Text="Korrektur" />
+                    <TextBox Text="{Binding MonthlyRecord.WithholdingTaxCorrectionAmountChf, Mode=TwoWay}" />
+                  </StackPanel>
+                  <StackPanel Spacing="4" Width="260">
+                    <TextBlock Classes="section-caption" Text="Korrekturtext" />
+                    <TextBox Text="{Binding MonthlyRecord.WithholdingTaxCorrectionText, Mode=TwoWay}" />
+                  </StackPanel>
+                  <Button VerticalAlignment="Bottom"
+                          Command="{Binding MonthlyRecord.SaveWithholdingTaxCommand}"
+                          Content="Quellensteuer speichern" />
+                </StackPanel>
               </Grid>
               <StackPanel Spacing="4" IsVisible="{Binding ShowReportingWorkspace}">
                 <TextBlock FontSize="18" FontWeight="SemiBold" Text="Reporting" />

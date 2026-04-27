@@ -591,6 +591,21 @@ public sealed class AppBootstrapper
                 "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"EmploymentContractSnapshot_WageType\" TEXT NOT NULL DEFAULT 'Hourly';");
             EnsureTableColumn(
                 connection,
+                "EmployeeMonthlyRecords",
+                "WithholdingTaxRatePercent",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"WithholdingTaxRatePercent\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "WithholdingTaxCorrectionAmountChf",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"WithholdingTaxCorrectionAmountChf\" TEXT NOT NULL DEFAULT 0;");
+            EnsureTableColumn(
+                connection,
+                "EmployeeMonthlyRecords",
+                "WithholdingTaxCorrectionText",
+                "ALTER TABLE \"EmployeeMonthlyRecords\" ADD COLUMN \"WithholdingTaxCorrectionText\" TEXT NULL;");
+            EnsureTableColumn(
+                connection,
                 "EmploymentContracts",
                 "MonthlySalaryAmountChf",
                 "ALTER TABLE \"EmploymentContracts\" ADD COLUMN \"MonthlySalaryAmountChf\" TEXT NOT NULL DEFAULT 0;");

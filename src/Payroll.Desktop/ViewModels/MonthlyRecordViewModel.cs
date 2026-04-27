@@ -44,6 +44,10 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _payrollPreviewSummary = "Lohn-Voransicht wird nach dem Laden des Monats angezeigt.";
     private bool _isPayrollPreviewDerivationVisible;
     private bool _isTimeDatePickerOpen;
+    private bool _isSubjectToWithholdingTax;
+    private string _withholdingTaxRatePercent = "0";
+    private string _withholdingTaxCorrectionAmountChf = "0";
+    private string? _withholdingTaxCorrectionText;
     private IReadOnlyCollection<MonthlyPayrollPreviewLineDto> _rawPayrollPreviewLines = [];
     private IReadOnlyDictionary<string, PayrollPreviewHelpOptionDto> _payrollPreviewHelpOptions = new Dictionary<string, PayrollPreviewHelpOptionDto>(StringComparer.Ordinal);
     public event EventHandler? TimeCaptureChanged;
@@ -77,6 +81,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         DeleteTimeEntryCommand = new DelegateCommand(DeleteTimeEntryAsync, () => CanDeleteTimeEntry);
         ResetExpenseValuesCommand = new DelegateCommand(PrepareNewExpenseEntry, () => CanManageRecord);
         SaveExpenseEntryCommand = new DelegateCommand(SaveExpenseEntryAsync, () => CanSaveExpenseEntry);
+        SaveWithholdingTaxCommand = new DelegateCommand(SaveWithholdingTaxAsync, () => CanSaveWithholdingTax);
     }
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
@@ -94,6 +99,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public DelegateCommand DeleteTimeEntryCommand { get; }
     public DelegateCommand ResetExpenseValuesCommand { get; }
     public DelegateCommand SaveExpenseEntryCommand { get; }
+    public DelegateCommand SaveWithholdingTaxCommand { get; }
 
     public bool IsBusy
     {
@@ -106,6 +112,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaisePropertyChanged(nameof(CanSaveWithholdingTax));
                 RaiseActionStateChanged();
             }
         }
@@ -122,6 +129,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaisePropertyChanged(nameof(CanSaveWithholdingTax));
                 RaiseActionStateChanged();
             }
         }
@@ -131,6 +139,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public bool CanSaveTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
     public bool CanDeleteTimeEntry => CanManageRecord && _currentMonthlyRecordId.HasValue && SelectedTimeEntry is { IsCurrentMonth: true };
     public bool CanSaveExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
+    public bool CanSaveWithholdingTax => CanManageRecord && _currentMonthlyRecordId.HasValue && IsSubjectToWithholdingTax;
 
     public DateTimeOffset? SelectedMonth
     {
@@ -344,6 +353,37 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public bool ShowPayrollPreviewResultOnly => HasPayrollPreviewLines && !ShowPayrollPreviewDerivation;
     public bool ShowPayrollPreviewSplitView => HasPayrollPreviewLines && ShowPayrollPreviewDerivation;
 
+    public bool IsSubjectToWithholdingTax
+    {
+        get => _isSubjectToWithholdingTax;
+        private set
+        {
+            if (SetProperty(ref _isSubjectToWithholdingTax, value))
+            {
+                RaisePropertyChanged(nameof(CanSaveWithholdingTax));
+                SaveWithholdingTaxCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string WithholdingTaxRatePercent
+    {
+        get => _withholdingTaxRatePercent;
+        set => SetProperty(ref _withholdingTaxRatePercent, value);
+    }
+
+    public string WithholdingTaxCorrectionAmountChf
+    {
+        get => _withholdingTaxCorrectionAmountChf;
+        set => SetProperty(ref _withholdingTaxCorrectionAmountChf, value);
+    }
+
+    public string? WithholdingTaxCorrectionText
+    {
+        get => _withholdingTaxCorrectionText;
+        set => SetProperty(ref _withholdingTaxCorrectionText, value);
+    }
+
     public string TimeDate
     {
         get => _timeDate;
@@ -420,6 +460,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaisePropertyChanged(nameof(CanSaveWithholdingTax));
                 RaiseActionStateChanged();
             }
         }
@@ -709,12 +750,39 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         });
     }
 
+    private async Task SaveWithholdingTaxAsync()
+    {
+        await EnsureCurrentRecordLoadedAsync();
+
+        if (!_currentMonthlyRecordId.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var details = await _monthlyRecordService.SaveWithholdingTaxAsync(
+                new SaveMonthlyWithholdingTaxCommand(
+                    _currentMonthlyRecordId.Value,
+                    ParseRequiredDecimal(WithholdingTaxRatePercent, nameof(WithholdingTaxRatePercent)),
+                    ParseRequiredDecimal(WithholdingTaxCorrectionAmountChf, nameof(WithholdingTaxCorrectionAmountChf)),
+                    WithholdingTaxCorrectionText));
+
+            ApplyDetails(details);
+            ActionMessage = "Quellensteuer gespeichert.";
+        });
+    }
+
     private void ApplyDetails(MonthlyRecordDetailsDto details)
     {
         _currentMonthlyRecordId = details.Header.MonthlyRecordId;
         ContextTitle = $"Monatserfassung fuer {details.Header.EmployeeFullName}";
         ContextDescription = $"{details.Header.Month:00}/{details.Header.Year} | Monatserfassung fuer Zeiten und Spesen.";
         StatusSummary = $"Status: {FormatStatus(details.Header.Status)}";
+        IsSubjectToWithholdingTax = details.Header.IsSubjectToWithholdingTax;
+        WithholdingTaxRatePercent = NumericFormatManager.FormatDecimal(details.Header.WithholdingTaxRatePercent, "0.###");
+        WithholdingTaxCorrectionAmountChf = NumericFormatManager.FormatDecimal(details.Header.WithholdingTaxCorrectionAmountChf, "0.00");
+        WithholdingTaxCorrectionText = details.Header.WithholdingTaxCorrectionText;
         ContractSummary = details.Header.ContractValidFrom.HasValue
             ? $"Vertragsstand: {details.Header.ContractValidFrom:dd.MM.yyyy} bis {FormatDate(details.Header.ContractValidTo)} | {PayrollAmountFormatter.FormatChf(details.Header.HourlyRateChf ?? 0m)}/h | BVG {PayrollAmountFormatter.FormatChf(details.Header.MonthlyBvgDeductionChf ?? 0m)}"
             : "Vertragsstand: kein passender Vertrag fuer den Monat gefunden.";
@@ -964,6 +1032,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         DeleteTimeEntryCommand.RaiseCanExecuteChanged();
         ResetExpenseValuesCommand.RaiseCanExecuteChanged();
         SaveExpenseEntryCommand.RaiseCanExecuteChanged();
+        SaveWithholdingTaxCommand.RaiseCanExecuteChanged();
     }
 
     private void RefreshVisiblePayrollPreviewLines()

@@ -58,7 +58,15 @@ public sealed class PayrollRunService
             PayrollWorkSummary.FromTimeEntries(monthlyRecord.EmployeeId, monthlyRecord.TimeEntries),
             expenses,
             monthlyRecord.TimeEntries.ToArray(),
-            new PayrollDerivationContext(contract.WageType, input.DepartmentName, input.IsDepartmentGavMandatory));
+            new PayrollDerivationContext(
+                contract.WageType,
+                input.DepartmentName,
+                input.IsDepartmentGavMandatory,
+                input.IsSubjectToWithholdingTax,
+                input.TaxStatus,
+                monthlyRecord.WithholdingTaxRatePercent,
+                monthlyRecord.WithholdingTaxCorrectionAmountChf,
+                monthlyRecord.WithholdingTaxCorrectionText));
 
         if (result.Issues.Count > 0)
         {

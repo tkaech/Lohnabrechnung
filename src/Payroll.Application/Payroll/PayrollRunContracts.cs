@@ -48,5 +48,7 @@ public sealed record PayrollRunMonthlyInputDto(
     DateOnly? EmployeeBirthDate,
     string? DepartmentName,
     bool IsDepartmentGavMandatory,
+    string? TaxStatus,
+    bool IsSubjectToWithholdingTax,
     EmployeeMonthlyRecord MonthlyRecord,
     EmploymentContract? Contract);

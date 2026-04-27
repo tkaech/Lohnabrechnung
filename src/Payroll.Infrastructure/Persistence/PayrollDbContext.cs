@@ -278,6 +278,9 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(record => record.Year).IsRequired();
             builder.Property(record => record.Month).IsRequired();
             builder.Property(record => record.Status).HasConversion<string>().HasMaxLength(50).IsRequired();
+            builder.Property(record => record.WithholdingTaxRatePercent).HasColumnType("TEXT").IsRequired();
+            builder.Property(record => record.WithholdingTaxCorrectionAmountChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(record => record.WithholdingTaxCorrectionText).HasMaxLength(500);
             builder.HasIndex(record => new { record.EmployeeId, record.Year, record.Month }).IsUnique();
 
             builder.HasOne<Employee>()

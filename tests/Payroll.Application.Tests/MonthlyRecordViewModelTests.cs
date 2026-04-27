@@ -1,4 +1,5 @@
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Formatting;
 using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Domain.MonthlyRecords;
@@ -53,7 +54,7 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Single(viewModel.TimeEntries);
         Assert.Contains("05/2026", viewModel.ContextDescription, StringComparison.Ordinal);
         Assert.Contains("8", viewModel.TotalsSummary, StringComparison.Ordinal);
-        Assert.Contains("Fahrzeug 33,00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Contains($"Fahrzeug {PayrollAmountFormatter.FormatChf(33m)}", viewModel.TotalsSummary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -135,7 +136,7 @@ public sealed class MonthlyRecordViewModelTests
         await WaitUntilAsync(() => viewModel.ActionMessage == "Spesen gespeichert.");
 
         Assert.Equal("40,00", viewModel.ExpensesTotal);
-        Assert.Contains("Spesen 40,00 CHF", viewModel.TotalsSummary, StringComparison.Ordinal);
+        Assert.Contains($"Spesen {PayrollAmountFormatter.FormatChf(40m)}", viewModel.TotalsSummary, StringComparison.Ordinal);
         Assert.False(viewModel.HasPayrollPreviewLines);
         Assert.Single(viewModel.PayrollPreviewNotes, note => note == "Monat noch nicht erfasst");
     }

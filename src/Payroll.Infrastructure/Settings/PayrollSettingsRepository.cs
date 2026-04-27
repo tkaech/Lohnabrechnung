@@ -52,7 +52,6 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
     public async Task<PayrollSettingsDto> SaveAsync(SavePayrollSettingsCommand command, CancellationToken cancellationToken)
     {
         var settings = await GetOrCreateAsync(cancellationToken);
-        await EnsureDefaultCalculationVersionsAsync(settings, cancellationToken);
 
         settings.UpdateCompanyAddress(command.CompanyAddress);
         settings.UpdateVisualSettings(
@@ -118,9 +117,10 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         List<PayrollGeneralSettingsVersion> versions,
         SavePayrollSettingsCommand command)
     {
+        var validFrom = command.GeneralSettingsValidFrom == default ? ResolveDefaultValidFrom(versions) : command.GeneralSettingsValidFrom;
         var version = ResolveVersion(
             versions,
-            command.EditingGeneralSettingsVersionId,
+            command.EditingGeneralSettingsVersionId ?? ResolveImplicitEditingVersionId(versions, validFrom),
             () =>
             {
                 var created = new PayrollGeneralSettingsVersion();
@@ -130,7 +130,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             });
 
         version.UpdateValidity(
-            command.GeneralSettingsValidFrom == default ? ResolveDefaultValidFrom(versions) : command.GeneralSettingsValidFrom,
+            validFrom,
             command.GeneralSettingsValidTo);
         version.UpdateRates(
             command.AhvIvEoRate,
@@ -146,9 +146,10 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         List<PayrollHourlySettingsVersion> versions,
         SavePayrollSettingsCommand command)
     {
+        var validFrom = command.HourlySettingsValidFrom == default ? ResolveDefaultValidFrom(versions) : command.HourlySettingsValidFrom;
         var version = ResolveVersion(
             versions,
-            command.EditingHourlySettingsVersionId,
+            command.EditingHourlySettingsVersionId ?? ResolveImplicitEditingVersionId(versions, validFrom),
             () =>
             {
                 var created = new PayrollHourlySettingsVersion();
@@ -158,7 +159,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             });
 
         version.UpdateValidity(
-            command.HourlySettingsValidFrom == default ? ResolveDefaultValidFrom(versions) : command.HourlySettingsValidFrom,
+            validFrom,
             command.HourlySettingsValidTo);
         version.UpdateRates(
             command.NightSupplementRate,
@@ -178,9 +179,10 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
         List<PayrollMonthlySalarySettingsVersion> versions,
         SavePayrollSettingsCommand command)
     {
+        var validFrom = command.MonthlySalarySettingsValidFrom == default ? ResolveDefaultValidFrom(versions) : command.MonthlySalarySettingsValidFrom;
         var version = ResolveVersion(
             versions,
-            command.EditingMonthlySalarySettingsVersionId,
+            command.EditingMonthlySalarySettingsVersionId ?? ResolveImplicitEditingVersionId(versions, validFrom),
             () =>
             {
                 var created = new PayrollMonthlySalarySettingsVersion();
@@ -190,7 +192,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             });
 
         version.UpdateValidity(
-            command.MonthlySalarySettingsValidFrom == default ? ResolveDefaultValidFrom(versions) : command.MonthlySalarySettingsValidFrom,
+            validFrom,
             command.MonthlySalarySettingsValidTo);
         version.MarkPrepared();
 
@@ -450,6 +452,15 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
     {
         var current = DetermineCurrentVersion(versions);
         return current?.ValidFrom ?? new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+    }
+
+    private static Guid? ResolveImplicitEditingVersionId<T>(IReadOnlyCollection<T> versions, DateOnly validFrom)
+        where T : PayrollCalculationSettingsVersionBase
+    {
+        var current = DetermineCurrentVersion(versions);
+        return current is not null && current.ValidFrom == validFrom
+            ? current.Id
+            : null;
     }
 
     private static T? DetermineCurrentVersion<T>(IReadOnlyCollection<T> versions)

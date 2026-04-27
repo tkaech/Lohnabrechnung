@@ -2063,7 +2063,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 hourlySettingsValidToOverride: _selectedSettingsVersionArea == SettingsVersionAreaHourly ? NewSettingsVersionValidTo : SettingsHourlyValidTo,
                 editingMonthlySalarySettingsVersionId: _selectedSettingsVersionArea == SettingsVersionAreaMonthlySalary ? null : _loadedCurrentMonthlySalarySettingsVersionId,
                 monthlySalarySettingsValidFromOverride: _selectedSettingsVersionArea == SettingsVersionAreaMonthlySalary ? NewSettingsVersionValidFrom : SettingsMonthlySalaryValidFrom,
-                monthlySalarySettingsValidToOverride: _selectedSettingsVersionArea == SettingsVersionAreaMonthlySalary ? NewSettingsVersionValidTo : SettingsMonthlySalaryValidTo));
+                monthlySalarySettingsValidToOverride: _selectedSettingsVersionArea == SettingsVersionAreaMonthlySalary ? NewSettingsVersionValidTo : SettingsMonthlySalaryValidTo,
+                createNewGeneralSettingsVersion: _selectedSettingsVersionArea == SettingsVersionAreaGeneral,
+                createNewHourlySettingsVersion: _selectedSettingsVersionArea == SettingsVersionAreaHourly,
+                createNewMonthlySalarySettingsVersion: _selectedSettingsVersionArea == SettingsVersionAreaMonthlySalary));
 
             ApplySettings(saved);
             DismissSettingsVersionDialog();
@@ -2158,7 +2161,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         DateTimeOffset? hourlySettingsValidToOverride = null,
         Guid? editingMonthlySalarySettingsVersionId = null,
         DateTimeOffset? monthlySalarySettingsValidFromOverride = null,
-        DateTimeOffset? monthlySalarySettingsValidToOverride = null)
+        DateTimeOffset? monthlySalarySettingsValidToOverride = null,
+        bool createNewGeneralSettingsVersion = false,
+        bool createNewHourlySettingsVersion = false,
+        bool createNewMonthlySalarySettingsVersion = false)
     {
         var generalValidFrom = generalSettingsValidFromOverride ?? SettingsGeneralValidFrom ?? StartOfCurrentMonth();
         var hourlyValidFrom = hourlySettingsValidFromOverride ?? SettingsHourlyValidFrom ?? StartOfCurrentMonth();
@@ -2201,13 +2207,13 @@ public sealed class MainWindowViewModel : ViewModelBase
             BuildSettingOptionDtos(DepartmentOptions),
             BuildSettingOptionDtos(EmploymentCategoryOptions),
             BuildSettingOptionDtos(EmploymentLocationOptions),
-            editingGeneralSettingsVersionId ?? _loadedCurrentGeneralSettingsVersionId,
+            createNewGeneralSettingsVersion ? null : editingGeneralSettingsVersionId ?? _loadedCurrentGeneralSettingsVersionId,
             DateOnly.FromDateTime(generalValidFrom.Date),
             generalSettingsValidToOverride.HasValue ? DateOnly.FromDateTime(generalSettingsValidToOverride.Value.Date) : SettingsGeneralValidTo.HasValue && generalSettingsValidToOverride is null ? DateOnly.FromDateTime(SettingsGeneralValidTo.Value.Date) : null,
-            editingHourlySettingsVersionId ?? _loadedCurrentHourlySettingsVersionId,
+            createNewHourlySettingsVersion ? null : editingHourlySettingsVersionId ?? _loadedCurrentHourlySettingsVersionId,
             DateOnly.FromDateTime(hourlyValidFrom.Date),
             hourlySettingsValidToOverride.HasValue ? DateOnly.FromDateTime(hourlySettingsValidToOverride.Value.Date) : SettingsHourlyValidTo.HasValue && hourlySettingsValidToOverride is null ? DateOnly.FromDateTime(SettingsHourlyValidTo.Value.Date) : null,
-            editingMonthlySalarySettingsVersionId ?? _loadedCurrentMonthlySalarySettingsVersionId,
+            createNewMonthlySalarySettingsVersion ? null : editingMonthlySalarySettingsVersionId ?? _loadedCurrentMonthlySalarySettingsVersionId,
             DateOnly.FromDateTime(monthlySalaryValidFrom.Date),
             monthlySalarySettingsValidToOverride.HasValue ? DateOnly.FromDateTime(monthlySalarySettingsValidToOverride.Value.Date) : SettingsMonthlySalaryValidTo.HasValue && monthlySalarySettingsValidToOverride is null ? DateOnly.FromDateTime(SettingsMonthlySalaryValidTo.Value.Date) : null,
             ParseClampedDecimal(SettingsAppPagePadding, nameof(SettingsAppPagePadding), 4m, 24m),

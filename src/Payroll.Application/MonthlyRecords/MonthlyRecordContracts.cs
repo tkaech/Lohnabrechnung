@@ -45,6 +45,11 @@ public sealed record MonthlyRecordHeaderDto(
     DateOnly? ContractValidTo,
     decimal? HourlyRateChf,
     decimal? MonthlyBvgDeductionChf,
+    string? TaxStatus,
+    bool IsSubjectToWithholdingTax,
+    decimal WithholdingTaxRatePercent,
+    decimal WithholdingTaxCorrectionAmountChf,
+    string? WithholdingTaxCorrectionText,
     decimal TotalWorkedHours,
     decimal TotalSpecialHours,
     decimal TotalExpensesChf,
@@ -154,3 +159,9 @@ public sealed record SaveMonthlyTimeEntryCommand(
 public sealed record SaveMonthlyExpenseEntryCommand(
     Guid MonthlyRecordId,
     decimal ExpensesTotalChf);
+
+public sealed record SaveMonthlyWithholdingTaxCommand(
+    Guid MonthlyRecordId,
+    decimal WithholdingTaxRatePercent,
+    decimal WithholdingTaxCorrectionAmountChf,
+    string? WithholdingTaxCorrectionText);

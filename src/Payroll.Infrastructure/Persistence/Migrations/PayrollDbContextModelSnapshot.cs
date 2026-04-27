@@ -118,6 +118,9 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.Property<decimal>("PayrollParameterSnapshot_VehicleRegiezone1RateChf").HasColumnType("TEXT");
             b.Property<string>("Status").IsRequired().HasMaxLength(50).HasColumnType("TEXT");
             b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");
+            b.Property<decimal>("WithholdingTaxCorrectionAmountChf").HasColumnType("TEXT");
+            b.Property<string>("WithholdingTaxCorrectionText").HasMaxLength(500).HasColumnType("TEXT");
+            b.Property<decimal>("WithholdingTaxRatePercent").HasColumnType("TEXT");
             b.Property<int>("Year").HasColumnType("INTEGER");
             b.HasKey("Id");
             b.HasIndex("EmployeeId", "Year", "Month").IsUnique();

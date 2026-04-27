@@ -249,6 +249,7 @@ public sealed class ImportService
             var isActive = GetOptionalBoolean(row, mappingByField, PersonFieldIsActive, "Aktiv / Inaktiv", rowErrors);
             var withholdingTax = GetOptionalBoolean(row, mappingByField, PersonFieldWithholdingTax, "Quellensteuerpflicht", rowErrors);
             var wageType = GetOptionalWageType(row, mappingByField, PersonFieldWageType, "Lohnart", rowErrors);
+            ValidatePersonDates(birthDate, entryDate, exitDate, rowErrors);
 
             if (rowErrors.Count > 0)
             {
@@ -393,6 +394,7 @@ public sealed class ImportService
     public async Task<TimeDataImportResultDto> ImportTimeDataAsync(ImportTimeDataCommand command, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        _ = new DateOnly(command.Year, command.Month, 1);
 
         var document = await _csvImportFileReader.ReadAsync(
             new ReadCsvImportDocumentCommand(command.FilePath, command.Delimiter, command.FieldsEnclosed, command.TextQualifier),
@@ -516,6 +518,23 @@ public sealed class ImportService
     private static bool IsEmptyRow(IReadOnlyDictionary<string, string> row)
     {
         return row.Values.All(value => string.IsNullOrWhiteSpace(value));
+    }
+
+    private static void ValidatePersonDates(
+        DateOnly? birthDate,
+        DateOnly? entryDate,
+        DateOnly? exitDate,
+        ICollection<string> errors)
+    {
+        if (birthDate.HasValue && entryDate.HasValue && birthDate.Value > entryDate.Value)
+        {
+            errors.Add("Birth date cannot be after entry date.");
+        }
+
+        if (entryDate.HasValue && exitDate.HasValue && exitDate.Value < entryDate.Value)
+        {
+            errors.Add("Gueltig bis darf nicht vor Gueltig ab liegen.");
+        }
     }
 
     private static string? GetRequiredString(

@@ -106,4 +106,49 @@ public sealed class PayrollRunLine : AuditableEntity
             null,
             -safeAmount);
     }
+
+    public static PayrollRunLine CreateCalculatedPercentageDeduction(
+        Guid employeeId,
+        PayrollLineType lineType,
+        string code,
+        string description,
+        decimal basisChf,
+        decimal ratePercent)
+    {
+        var safeBasis = Guard.AgainstNegative(basisChf, nameof(basisChf));
+        if (ratePercent < 0m || ratePercent > 100m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ratePercent), "Rate must be between 0 and 100.");
+        }
+
+        return new PayrollRunLine(
+            employeeId,
+            lineType,
+            PayrollLineValueOrigin.Calculated,
+            code,
+            description,
+            PayrollLineUnit.Percent,
+            safeBasis,
+            ratePercent,
+            -(safeBasis * ratePercent / 100m));
+    }
+
+    public static PayrollRunLine CreateManualChfLine(
+        Guid employeeId,
+        PayrollLineType lineType,
+        string code,
+        string description,
+        decimal amountChf)
+    {
+        return new PayrollRunLine(
+            employeeId,
+            lineType,
+            PayrollLineValueOrigin.Direct,
+            code,
+            description,
+            PayrollLineUnit.Chf,
+            null,
+            null,
+            amountChf);
+    }
 }

@@ -37,6 +37,9 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
     public EmployeeMonthlyRecordStatus Status { get; private set; }
     public PayrollParameterSnapshot PayrollParameterSnapshot { get; private set; }
     public EmploymentContractSnapshot EmploymentContractSnapshot { get; private set; }
+    public decimal WithholdingTaxRatePercent { get; private set; }
+    public decimal WithholdingTaxCorrectionAmountChf { get; private set; }
+    public string? WithholdingTaxCorrectionText { get; private set; }
     public IReadOnlyCollection<TimeEntry> TimeEntries => _timeEntries.AsReadOnly();
     public ExpenseEntry? ExpenseEntry { get; private set; }
     public DateOnly PeriodStart => new(Year, Month, 1);
@@ -148,6 +151,19 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
 
         ExpenseEntry.Update(expensesTotalChf);
         return ExpenseEntry;
+    }
+
+    public void SaveWithholdingTaxInputs(decimal ratePercent, decimal correctionAmountChf, string? correctionText)
+    {
+        if (ratePercent < 0m || ratePercent > 100m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ratePercent), "Rate must be between 0 and 100.");
+        }
+
+        WithholdingTaxRatePercent = ratePercent;
+        WithholdingTaxCorrectionAmountChf = correctionAmountChf;
+        WithholdingTaxCorrectionText = string.IsNullOrWhiteSpace(correctionText) ? null : correctionText.Trim();
+        Touch();
     }
 
     private TimeEntry? ResolveTimeEntry(Guid? timeEntryId)

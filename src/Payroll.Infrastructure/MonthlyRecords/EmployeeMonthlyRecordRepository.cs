@@ -111,7 +111,15 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
 
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
         var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
-        var payrollPreview = BuildPayrollPreview(monthlyRecord, employee.BirthDate, contract, department, payrollSettings, currentPayrollSettings);
+        var payrollPreview = BuildPayrollPreview(
+            monthlyRecord,
+            employee.BirthDate,
+            employee.TaxStatus,
+            employee.IsSubjectToWithholdingTax == true,
+            contract,
+            department,
+            payrollSettings,
+            currentPayrollSettings);
         var employeeMonthlyRecords = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Where(record => record.EmployeeId == monthlyRecord.EmployeeId)
@@ -133,6 +141,11 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             contract?.ValidTo,
             contract?.HourlyRateChf,
             contract?.MonthlyBvgDeductionChf,
+            employee.TaxStatus,
+            employee.IsSubjectToWithholdingTax == true,
+            monthlyRecord.WithholdingTaxRatePercent,
+            monthlyRecord.WithholdingTaxCorrectionAmountChf,
+            monthlyRecord.WithholdingTaxCorrectionText,
             monthlyRecord.TimeEntries.Sum(entry => entry.HoursWorked),
             monthlyRecord.TimeEntries.Sum(entry => entry.SupplementHours),
             monthlyRecord.ExpenseEntry?.ExpensesTotalChf ?? 0m,
@@ -345,6 +358,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     private MonthlyPayrollPreviewDto BuildPayrollPreview(
         EmployeeMonthlyRecord monthlyRecord,
         DateOnly? employeeBirthDate,
+        string? employeeTaxStatus,
+        bool isSubjectToWithholdingTax,
         Domain.Employees.EmploymentContract? contract,
         DepartmentOption? department,
         PayrollSettings payrollSettings,
@@ -380,7 +395,15 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 workSummary,
                 expenses,
                 timeEntries,
-                new PayrollDerivationContext(contract.WageType, department?.Name, department?.IsGavMandatory ?? false));
+                new PayrollDerivationContext(
+                    contract.WageType,
+                    department?.Name,
+                    department?.IsGavMandatory ?? false,
+                    isSubjectToWithholdingTax,
+                    employeeTaxStatus,
+                    monthlyRecord.WithholdingTaxRatePercent,
+                    monthlyRecord.WithholdingTaxCorrectionAmountChf,
+                    monthlyRecord.WithholdingTaxCorrectionText));
 
             foreach (var issue in derivationResult.Issues)
             {
@@ -550,6 +573,38 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             ? trainingLine with { RateDisplay = FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), AmountDisplay = FormatMoney(0m, numberCulture, currencyCode), Detail = "Unterdrueckt, weil die Abteilung GAV-pflichtig ist." }
             : trainingLine);
 
+        var withholdingTaxLine = derivationLines.SingleOrDefault(line => line.Code == "WITHHOLDING_TAX");
+        if (withholdingTaxLine is not null)
+        {
+            lines.Add(new MonthlyPayrollPreviewLineDto(
+                "WITHHOLDING_TAX",
+                withholdingTaxLine.Description,
+                "-",
+                FormatRawPercentageRate(monthlyRecord.WithholdingTaxRatePercent, numberCulture),
+                FormatAmount(withholdingTaxLine.AmountChf, numberCulture, currencyCode),
+                $"Basis: {FormatMoney(ahvGrossChf, numberCulture, currencyCode)}.",
+                false,
+                "WITHHOLDING_TAX",
+                "QST",
+                GetPreviewColorHint("WITHHOLDING_TAX")));
+        }
+
+        var withholdingTaxCorrectionLine = derivationLines.SingleOrDefault(line => line.Code == "WITHHOLDING_TAX_CORRECTION");
+        if (withholdingTaxCorrectionLine is not null)
+        {
+            lines.Add(new MonthlyPayrollPreviewLineDto(
+                "WITHHOLDING_TAX_CORRECTION",
+                "Quellensteuer Korrektur / Rueckzahlung",
+                "-",
+                "-",
+                FormatAmount(withholdingTaxCorrectionLine.AmountChf, numberCulture, currencyCode),
+                monthlyRecord.WithholdingTaxCorrectionText,
+                false,
+                "WITHHOLDING_TAX_CORRECTION",
+                "QK",
+                GetPreviewColorHint("WITHHOLDING_TAX")));
+        }
+
         var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
         if (bvgLine is not null)
         {
@@ -629,6 +684,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var derivationGroups = BuildPayrollPreviewDerivationGroups(
             monthlyRecord.PeriodEnd,
             employeeBirthDate,
+            monthlyRecord,
             contract,
             department,
             payrollSettings,
@@ -819,6 +875,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     private static IReadOnlyCollection<MonthlyPayrollPreviewDerivationGroupDto> BuildPayrollPreviewDerivationGroups(
         DateOnly payrollReferenceDate,
         DateOnly? employeeBirthDate,
+        EmployeeMonthlyRecord monthlyRecord,
         Domain.Employees.EmploymentContract? contract,
         DepartmentOption? department,
         PayrollSettings payrollSettings,
@@ -859,6 +916,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         var specialSupplementLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.SpecialSupplement);
         var vacationCompensationLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.VacationCompensation);
         var bvgLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BvgDeduction);
+        var withholdingTaxLine = derivationLines.SingleOrDefault(line => line.Code == "WITHHOLDING_TAX");
+        var withholdingTaxCorrectionLine = derivationLines.SingleOrDefault(line => line.Code == "WITHHOLDING_TAX_CORRECTION");
         var baseLine = derivationLines.SingleOrDefault(line => line.LineType is PayrollLineType.BaseHours or PayrollLineType.MonthlySalary);
         var isMonthlySalary = contract.WageType == Domain.Employees.EmployeeWageType.Monthly;
         var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, payrollReferenceDate);
@@ -893,7 +952,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("RULE_AHV_RATE", "Regel", "AHV/IV/EO", FormatPercentageRate(payrollSettings.AhvIvEoRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AHV_IV_EO"),
             CreateDerivationItem("RULE_ALV_RATE", "Regel", "ALV", FormatPercentageRate(payrollSettings.AlvRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "ALV"),
             CreateDerivationItem("RULE_KTG_RATE", "Regel", "Krankentaggeld/UVG", FormatPercentageRate(payrollSettings.SicknessAccidentInsuranceRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "KTG_UVG"),
-            CreateDerivationItem("RULE_TRAINING_RATE", "Regel", "Aus- und Weiterbildung inkl. Ferien", FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AUSBILDUNG_FERIEN")
+            CreateDerivationItem("RULE_TRAINING_RATE", "Regel", "Aus- und Weiterbildung inkl. Ferien", FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AUSBILDUNG_FERIEN"),
+            CreateDerivationItem("RULE_WITHHOLDING_TAX", "Regel", "Quellensteuer", FormatRawPercentageRate(monthlyRecord.WithholdingTaxRatePercent, numberCulture), null, "Manuell pro Mitarbeiter und Monat erfasster Prozentsatz.", "WITHHOLDING_TAX")
         };
 
         if (contract.MonthlyBvgDeductionChf > 0m)
@@ -941,6 +1001,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             department?.IsGavMandatory == true
                 ? CreateDerivationItem("STEP_TRAINING", "Schritt", "Aus- und Weiterbildung inkl. Ferien", FormatMoney(0m, numberCulture, currencyCode), "-", "Unterdrueckt, weil die Abteilung GAV-pflichtig ist.", "AUSBILDUNG_FERIEN")
                 : BuildDeductionDerivationItem("STEP_TRAINING", "Aus- und Weiterbildung inkl. Ferien", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, "AUSBILDUNG_FERIEN", numberCulture, currencyCode),
+            CreateDerivationItem("STEP_WITHHOLDING_TAX", "Schritt", withholdingTaxLine?.Description ?? "Quellensteuer", withholdingTaxLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(withholdingTaxLine.AmountChf, numberCulture, currencyCode), $"{FormatRawPercentageRate(monthlyRecord.WithholdingTaxRatePercent, numberCulture)} x {FormatMoney(ahvGrossChf, numberCulture, currencyCode)}", "Berechnet vom AHV-pflichtigen Bruttolohn.", "WITHHOLDING_TAX"),
             CreateDerivationItem("STEP_TOTAL", "Schritt", "Total", FormatMoney(totalChf, numberCulture, currencyCode), "Lohnrelevante Positionen minus Abzuege, ohne Spesen", "Netto vor separatem Spesenblock.", "TOTAL"),
             CreateDerivationItem("STEP_EXPENSES", "Schritt", "Spesen gemaess Nachweis", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock uebernommen.", "EXPENSES"),
             CreateDerivationItem("STEP_PAYOUT", "Schritt", "Total Auszahlung", FormatMoney(totalPayoutChf, numberCulture, currencyCode), $"{FormatMoney(totalChf, numberCulture, currencyCode)} + {FormatMoney(expensesChf, numberCulture, currencyCode)}", "Summe aus Total und Spesen, auf 0.05 gerundet.", "TOTAL_PAYOUT")
@@ -949,6 +1010,20 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         if (bvgLine is not null)
         {
             steps.Insert(12, CreateDerivationItem("STEP_BVG", "Schritt", "BVG", FormatMoney(bvgLine.AmountChf, numberCulture, currencyCode), FormatMoney(contract.MonthlyBvgDeductionChf, numberCulture, currencyCode), "Fixbetrag aus dem Vertragsstand.", "BVG"));
+        }
+
+        if (monthlyRecord.WithholdingTaxCorrectionAmountChf != 0m || !string.IsNullOrWhiteSpace(monthlyRecord.WithholdingTaxCorrectionText))
+        {
+            steps.Insert(
+                Math.Min(steps.Count, 14),
+                CreateDerivationItem(
+                    "STEP_WITHHOLDING_TAX_CORRECTION",
+                    "Schritt",
+                    "Quellensteuer Korrektur / Rueckzahlung",
+                    withholdingTaxCorrectionLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(withholdingTaxCorrectionLine.AmountChf, numberCulture, currencyCode),
+                    null,
+                    string.IsNullOrWhiteSpace(monthlyRecord.WithholdingTaxCorrectionText) ? "Manuelle Korrektur ohne Beschreibung." : monthlyRecord.WithholdingTaxCorrectionText,
+                    "WITHHOLDING_TAX_CORRECTION"));
         }
 
         var issueItems = derivationIssues
@@ -1117,6 +1192,11 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     private static string FormatPercentageRate(decimal rate, CultureInfo numberCulture)
     {
         return $"{(rate * 100m).ToString("#,##0.###", numberCulture)} %";
+    }
+
+    private static string FormatRawPercentageRate(decimal ratePercent, CultureInfo numberCulture)
+    {
+        return $"{ratePercent.ToString("#,##0.###", numberCulture)} %";
     }
 
     private static string FormatOptionalPercentageRate(decimal? rate, CultureInfo numberCulture)

@@ -85,6 +85,24 @@ public sealed class MonthlyRecordService
         return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
     }
 
+    public async Task<MonthlyRecordDetailsDto> SaveWithholdingTaxAsync(
+        SaveMonthlyWithholdingTaxCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        _repository.ClearTracking();
+        var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
+        monthlyRecord.SaveWithholdingTaxInputs(
+            command.WithholdingTaxRatePercent,
+            command.WithholdingTaxCorrectionAmountChf,
+            command.WithholdingTaxCorrectionText);
+
+        await _repository.SaveChangesAsync(cancellationToken);
+        _repository.ClearTracking();
+        return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
+    }
+
     public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(
         MonthlyTimeCaptureOverviewQuery query,
         CancellationToken cancellationToken = default)
