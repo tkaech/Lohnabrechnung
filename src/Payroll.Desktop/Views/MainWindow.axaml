@@ -401,6 +401,15 @@
                                  Text="Intern wird kulturunabhaengig mit Dezimalwerten gerechnet. Die UI zeigt Zahlen mit dem hier gewaehlten Trennzeichen."
                                  TextWrapping="Wrap" />
 
+                      <TextBlock FontWeight="SemiBold" Text="Lohnausweis" />
+                      <TextBlock Foreground="#FF5F6B7A"
+                                 Text="Pfad zur PDF-Vorlage fuer den Lohnausweis. Standard ist die Projektvorlage und kann spaeter pro Jahr oder Formularstand ueberschrieben werden."
+                                 TextWrapping="Wrap" />
+                      <StackPanel Spacing="4">
+                        <TextBlock Classes="section-caption" Text="Lohnausweis PDF-Vorlage" />
+                        <TextBox Text="{Binding SettingsSalaryCertificatePdfTemplatePath, Mode=TwoWay}" Watermark="resources/forms/dbst-form-11lohna-rechts-dfi-de.pdf" />
+                      </StackPanel>
+
                       <TextBlock FontWeight="SemiBold" Text="Globale Abzuege" />
                       <TextBlock Foreground="#FF5F6B7A" Text="Die Prozentwerte werden als echte Prozentangaben erfasst und intern fuer die Berechnung automatisch in Dezimalwerte umgerechnet." TextWrapping="Wrap" />
                       <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
@@ -1731,16 +1740,31 @@
           <ScrollViewer Grid.Row="1" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}" MinHeight="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowAnnualSalaryWorkspace}">
             <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}">
               <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}">
-                <Grid ColumnDefinitions="120,Auto,*" HorizontalAlignment="Left">
-                  <StackPanel Spacing="4">
-                    <TextBlock Classes="section-caption" Text="Jahr" />
-                    <TextBox Text="{Binding AnnualSalaryYear, Mode=TwoWay}" />
-                  </StackPanel>
-                  <Button Grid.Column="1"
-                          Margin="8,22,0,0"
-                          VerticalAlignment="Top"
-                          Command="{Binding LoadAnnualSalaryCommand}"
-                          Content="Aktualisieren" />
+                <Grid ColumnDefinitions="Auto,*">
+                  <Grid ColumnDefinitions="120,Auto,Auto" HorizontalAlignment="Left">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="section-caption" Text="Jahr" />
+                      <TextBox Text="{Binding AnnualSalaryYear, Mode=TwoWay}" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Margin="8,22,0,0"
+                            VerticalAlignment="Top"
+                            Command="{Binding LoadAnnualSalaryCommand}"
+                            Content="Aktualisieren" />
+                    <Button Grid.Column="2"
+                            Margin="8,22,0,0"
+                            VerticalAlignment="Top"
+                            Command="{Binding CreateSalaryCertificatePdfCommand}"
+                            Click="OnCreateSalaryCertificatePdfClick"
+                            Content="Lohnausweis erstellen" />
+                  </Grid>
+                  <TextBlock Grid.Column="1"
+                             Margin="12,26,0,0"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Top"
+                             Foreground="#FF5F6B7A"
+                             Text="{Binding SalaryCertificateCreatedDisplay}"
+                             TextAlignment="Right" />
                 </Grid>
 
                 <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
@@ -1765,7 +1789,7 @@
                         <DataTemplate>
                           <Grid ColumnDefinitions="72,94,122,108,96,132,156,132,96,96,96,122">
                             <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding MonthLabel}" /></Border>
-                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Classes="payroll-status" Classes.payroll-status-finalized="{Binding IsFinalized}" Classes.payroll-status-open="{Binding IsOpen}" Text="{Binding StatusDisplay}" /></Border>
+                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Classes="payroll-status" Classes.payroll-status-finalized="{Binding IsStatusFinalized}" Classes.payroll-status-cancelled="{Binding IsStatusCancelled}" Classes.payroll-status-open-with-data="{Binding IsStatusOpenWithRecordedData}" Classes.payroll-status-open="{Binding IsStatusOpen}" Text="{Binding StatusDisplay}" /></Border>
                             <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding GrossSalaryChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
                             <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AhvIvEoDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
                             <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AlvDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>

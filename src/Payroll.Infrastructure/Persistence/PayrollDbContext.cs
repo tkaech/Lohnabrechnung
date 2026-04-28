@@ -4,6 +4,7 @@ using Payroll.Domain.Expenses;
 using Payroll.Domain.Imports;
 using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Payroll;
+using Payroll.Domain.SalaryCertificate;
 using Payroll.Domain.Settings;
 using Payroll.Domain.TimeTracking;
 
@@ -32,6 +33,7 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
     public DbSet<ImportMappingConfiguration> ImportMappingConfigurations => Set<ImportMappingConfiguration>();
     public DbSet<ImportExecutionStatus> ImportExecutionStatuses => Set<ImportExecutionStatus>();
+    public DbSet<SalaryCertificateRecord> SalaryCertificateRecords => Set<SalaryCertificateRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -125,6 +127,7 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(settings => settings.PrintLogoText).HasMaxLength(200).IsRequired();
             builder.Property(settings => settings.PrintLogoPath).HasMaxLength(1000).IsRequired();
             builder.Property(settings => settings.PrintTemplate).HasMaxLength(20000).IsRequired();
+            builder.Property(settings => settings.SalaryCertificatePdfTemplatePath).HasMaxLength(1000).IsRequired();
             builder.Property(settings => settings.DecimalSeparator).HasMaxLength(1).IsRequired();
             builder.Property(settings => settings.ThousandsSeparator).HasMaxLength(1).IsRequired();
             builder.Property(settings => settings.CurrencyCode).HasMaxLength(10).IsRequired();
@@ -229,6 +232,24 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(status => status.Month).IsRequired();
             builder.Property(status => status.ImportedAtUtc).IsRequired();
             builder.HasIndex(status => new { status.Type, status.Year, status.Month }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalaryCertificateRecord>(builder =>
+        {
+            builder.ToTable("SalaryCertificateRecords");
+            builder.HasKey(record => record.Id);
+            builder.Property(record => record.EmployeeId).IsRequired();
+            builder.Property(record => record.Year).IsRequired();
+            builder.Property(record => record.OutputFilePath).HasMaxLength(2000);
+            builder.Property(record => record.FileHash).HasMaxLength(200);
+            builder.Property(record => record.CreatedAtUtc).IsRequired();
+            builder.Property(record => record.UpdatedAtUtc);
+            builder.HasIndex(record => new { record.EmployeeId, record.Year, record.CreatedAtUtc });
+
+            builder.HasOne<Employee>()
+                .WithMany()
+                .HasForeignKey(record => record.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<PayrollRun>(builder =>

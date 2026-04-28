@@ -59,6 +59,7 @@ public sealed class BackupRestoreServiceTests
                 "PA",
                 string.Empty,
                 "BANNER|Lohnblatt|{{Monat}}",
+                global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath,
                 ",",
                 "'",
                 "CHF",
@@ -154,6 +155,7 @@ public sealed class BackupRestoreServiceTests
                 "BSD",
                 string.Empty,
                 "BANNER|Neu|{{Monat}}",
+                "/tmp/custom-lohnausweis.pdf",
                 ".",
                 " ",
                 "EUR",
@@ -192,6 +194,7 @@ public sealed class BackupRestoreServiceTests
             var restoredMonthlyRecord = await monthlyRecordService.GetOrCreateAsync(new MonthlyRecordQuery(employee.EmployeeId, 2026, 4));
 
             Assert.Contains("Firma Alt", restoredSettings.CompanyAddress, StringComparison.Ordinal);
+            Assert.Equal(global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath, restoredSettings.SalaryCertificatePdfTemplatePath);
             Assert.Single(restoredEmployees);
             Assert.NotNull(restoredEmployee);
             Assert.Equal("1000", restoredEmployee!.PersonnelNumber);

@@ -26,6 +26,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
         var loaded = await repository.GetAsync(CancellationToken.None);
 
         Assert.Contains("PAYROLL_LINE|regular|Basislohn", loaded.PrintTemplate, StringComparison.Ordinal);
+        Assert.Equal(global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath, loaded.SalaryCertificatePdfTemplatePath);
     }
 
     [Fact]
@@ -53,6 +54,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Assert.Equal("Helvetica", loaded.PrintFontFamily);
         Assert.Equal(10m, loaded.PrintFontSize);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", loaded.PrintTemplate);
+        Assert.Equal(global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath, loaded.SalaryCertificatePdfTemplatePath);
         Assert.Equal(".", loaded.DecimalSeparator);
         Assert.Equal(" ", loaded.ThousandsSeparator);
         Assert.Equal("EUR", loaded.CurrencyCode);
@@ -125,6 +127,29 @@ public sealed class PayrollSettingsRepositorySqliteTests
 
         Assert.Contains(loaded.Departments, item => item.OptionId == gavDepartmentId && item.IsGavMandatory);
         Assert.Contains(loaded.Departments, item => item.Name == "Buero" && !item.IsGavMandatory);
+    }
+
+    [Fact]
+    public async Task SaveAndLoadAsync_PersistsCustomSalaryCertificatePdfTemplatePath()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new PayrollSettingsRepository(dbContext);
+
+        await repository.SaveAsync(CreateCommand(
+            salaryCertificatePdfTemplatePath: "/tmp/custom-lohnausweis.pdf"),
+            CancellationToken.None);
+        var loaded = await repository.GetAsync(CancellationToken.None);
+
+        Assert.Equal("/tmp/custom-lohnausweis.pdf", loaded.SalaryCertificatePdfTemplatePath);
     }
 
     [Fact]
@@ -278,7 +303,8 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Guid? editingMonthlySalarySettingsVersionId = null,
         DateOnly? monthlySalarySettingsValidFrom = null,
         Guid? currentMonthlySalarySettingsVersionId = null,
-        IReadOnlyCollection<SettingOptionDto>? departments = null)
+        IReadOnlyCollection<SettingOptionDto>? departments = null,
+        string salaryCertificatePdfTemplatePath = global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath)
     {
         return new SavePayrollSettingsCommand(
             "Blesinger Sicherheits Dienste GmbH\nPostfach 28\n6314 Unteraegeri",
@@ -298,6 +324,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
             "BSD",
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
+            salaryCertificatePdfTemplatePath,
             ".",
             " ",
             "EUR",

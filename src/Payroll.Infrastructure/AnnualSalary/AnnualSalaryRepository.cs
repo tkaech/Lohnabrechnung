@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.AnnualSalary;
+using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Payroll;
 using Payroll.Infrastructure.Persistence;
 
@@ -25,25 +26,41 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
 
         var payrollRuns = await _dbContext.PayrollRuns
             .AsNoTracking()
-            .Where(run => run.Status == PayrollRunStatus.Finalized
+            .Where(run => (run.Status == PayrollRunStatus.Finalized || run.Status == PayrollRunStatus.Cancelled)
                 && run.PeriodKey.CompareTo($"{query.Year:D4}-01") >= 0
                 && run.PeriodKey.CompareTo($"{query.Year:D4}-12") <= 0)
             .Include(run => run.Lines)
+            .ToListAsync(cancellationToken);
+
+        var monthlyRecords = await _dbContext.EmployeeMonthlyRecords
+            .AsNoTracking()
+            .Where(record => record.EmployeeId == query.EmployeeId
+                && record.Year == query.Year)
+            .Include(record => record.TimeEntries)
+            .Include(record => record.ExpenseEntry)
             .ToListAsync(cancellationToken);
 
         var rows = new List<AnnualSalaryMonthDto>();
         for (var month = 1; month <= 12; month++)
         {
             var periodKey = $"{query.Year:D4}-{month:D2}";
-            var lines = payrollRuns
+            var runsForMonth = payrollRuns
                 .Where(run => run.PeriodKey == periodKey)
+                .ToArray();
+            var finalizedLines = runsForMonth
+                .Where(run => run.Status == PayrollRunStatus.Finalized)
                 .SelectMany(run => run.Lines)
                 .Where(line => line.EmployeeId == query.EmployeeId)
                 .ToArray();
+            var hasCancelledRun = finalizedLines.Length == 0
+                && runsForMonth.Any(run => run.Status == PayrollRunStatus.Cancelled
+                    && run.Lines.Any(line => line.EmployeeId == query.EmployeeId));
+            var monthlyRecord = monthlyRecords.SingleOrDefault(record => record.Month == month);
+            var hasRecordedMonthData = HasRecordedMonthData(monthlyRecord);
 
-            rows.Add(lines.Length == 0
-                ? CreateEmptyMonth(query.Year, month)
-                : CreateMonth(query.Year, month, lines));
+            rows.Add(finalizedLines.Length == 0
+                ? CreateEmptyMonth(query.Year, month, hasCancelledRun, hasRecordedMonthData)
+                : CreateMonth(query.Year, month, finalizedLines, hasCancelledRun, hasRecordedMonthData));
         }
 
         var totals = new AnnualSalaryTotalsDto(
@@ -73,7 +90,9 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
     private static AnnualSalaryMonthDto CreateMonth(
         int year,
         int month,
-        IReadOnlyCollection<PayrollRunLine> lines)
+        IReadOnlyCollection<PayrollRunLine> lines,
+        bool hasCancelledRun,
+        bool hasRecordedMonthData)
     {
         var grossSalaryChf = lines
             .Where(line => line.LineType is PayrollLineType.BaseHours
@@ -110,6 +129,8 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
             month,
             CreateMonthLabel(year, month),
             true,
+            hasCancelledRun,
+            hasRecordedMonthData,
             grossSalaryChf,
             ahvIvEoDeductionChf,
             alvDeductionChf,
@@ -124,12 +145,16 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
 
     private static AnnualSalaryMonthDto CreateEmptyMonth(
         int year,
-        int month)
+        int month,
+        bool hasCancelledRun,
+        bool hasRecordedMonthData)
     {
         return new AnnualSalaryMonthDto(
             month,
             CreateMonthLabel(year, month),
             false,
+            hasCancelledRun,
+            hasRecordedMonthData,
             0m,
             0m,
             0m,
@@ -140,6 +165,16 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
             0m,
             0m,
             0m);
+    }
+
+    private static bool HasRecordedMonthData(EmployeeMonthlyRecord? monthlyRecord)
+    {
+        return monthlyRecord is not null
+            && (monthlyRecord.TimeEntries.Count > 0
+                || monthlyRecord.ExpenseEntry is not null
+                || monthlyRecord.WithholdingTaxRatePercent != 0m
+                || monthlyRecord.WithholdingTaxCorrectionAmountChf != 0m
+                || !string.IsNullOrWhiteSpace(monthlyRecord.WithholdingTaxCorrectionText));
     }
 
     private static decimal AbsSum(IEnumerable<PayrollRunLine> lines, params string[] codes)

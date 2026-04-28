@@ -270,6 +270,7 @@ public sealed class BackupRestoreService : IBackupRestoreService
             settings.PrintLogoText,
             settings.PrintLogoPath,
             settings.PrintTemplate,
+            settings.SalaryCertificatePdfTemplatePath,
             settings.DecimalSeparator,
             settings.ThousandsSeparator,
             settings.CurrencyCode,

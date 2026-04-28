@@ -34,6 +34,7 @@
     <SolidColorBrush x:Key="Theme.Color.TextStatus">#FF304255</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.PayrollStatus.Finalized">#FF1F7A3D</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.PayrollStatus.Open">#FFC53B3B</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.PayrollStatus.OpenWithData">#FFCC7A00</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.PayrollStatus.Cancelled">#FF6B5A2A</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.Brand">#FF14324A</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.BrandSoft">#FFD1DCE7</SolidColorBrush>
@@ -121,6 +122,10 @@
 
   <Style Selector="TextBlock.payroll-status-open">
     <Setter Property="Foreground" Value="{DynamicResource Theme.Color.PayrollStatus.Open}" />
+  </Style>
+
+  <Style Selector="TextBlock.payroll-status-open-with-data">
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.PayrollStatus.OpenWithData}" />
   </Style>
 
   <Style Selector="TextBlock.payroll-status-cancelled">

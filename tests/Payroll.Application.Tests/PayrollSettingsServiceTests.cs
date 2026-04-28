@@ -29,6 +29,7 @@ public sealed class PayrollSettingsServiceTests
             "BSD",
             "/tmp/print-logo.png",
             "BANNER|Lohnblatt|{{Monat}}",
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath,
             ",",
             "'",
             "CHF",
@@ -47,6 +48,7 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal(10m, saved.PrintFontSize);
         Assert.Equal("BSD", saved.PrintLogoText);
         Assert.Equal("BANNER|Lohnblatt|{{Monat}}", saved.PrintTemplate);
+        Assert.Equal(global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath, saved.SalaryCertificatePdfTemplatePath);
         Assert.Equal(",", saved.DecimalSeparator);
         Assert.Equal("'", saved.ThousandsSeparator);
         Assert.Equal("CHF", saved.CurrencyCode);
@@ -91,6 +93,7 @@ public sealed class PayrollSettingsServiceTests
             "PA",
             string.Empty,
             string.Empty,
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath,
             global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
             global::Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator,
             global::Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode,
@@ -129,6 +132,7 @@ public sealed class PayrollSettingsServiceTests
                 command.PrintLogoText,
                 command.PrintLogoPath,
                 command.PrintTemplate,
+                command.SalaryCertificatePdfTemplatePath,
                 command.DecimalSeparator,
                 command.ThousandsSeparator,
                 command.CurrencyCode,

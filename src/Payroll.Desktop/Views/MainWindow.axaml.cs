@@ -470,6 +470,50 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnCreateSalaryCertificatePdfClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        if (!viewModel.ValidateSalaryCertificateExportPrerequisites())
+        {
+            return;
+        }
+
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null || !storageProvider.CanSave)
+        {
+            viewModel.StatusMessage = "Dateidialog fuer Lohnausweis ist nicht verfuegbar.";
+            return;
+        }
+
+        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Lohnausweis speichern",
+            SuggestedFileName = viewModel.GetSuggestedSalaryCertificateFileName(),
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PDF-Dateien")
+                {
+                    Patterns = ["*.pdf"]
+                }
+            ],
+            DefaultExtension = "pdf",
+            ShowOverwritePrompt = true
+        });
+
+        var localPath = file?.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(localPath))
+        {
+            viewModel.StatusMessage = "Kein Ausgabeort fuer Lohnausweis gewaehlt.";
+            return;
+        }
+
+        await viewModel.CreateSalaryCertificatePdfAsync(localPath);
+    }
+
     private async Task<bool> ShowConfirmationDialogAsync(string title, string message, string confirmButtonText)
     {
         var dialog = new ConfirmationDialogWindow(title, message, confirmButtonText);

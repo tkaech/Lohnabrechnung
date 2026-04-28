@@ -1,10 +1,12 @@
 using Payroll.Application.BackupRestore;
+using Payroll.Application.AnnualSalary;
 using Payroll.Application.Employees;
 using Payroll.Application.Imports;
 using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
+using Payroll.Application.SalaryCertificate;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
 using Payroll.Desktop.ViewModels;
@@ -395,6 +397,168 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.CanExecutePayrollMonthAction);
         Assert.Equal("Monat abschliessen", viewModel.PayrollMonthActionLabel);
         Assert.Contains(nameof(MainWindowViewModel.CanExecutePayrollMonthAction), changedProperties);
+    }
+
+    [Fact]
+    public async Task SalaryCertificateCommand_IsOnlyEnabledWithLoadedFinalizedAnnualSalaryData()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var exportService = CreateSalaryCertificatePdfExportService();
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        Assert.True(viewModel.CanCreateSalaryCertificatePdf);
+        Assert.True(viewModel.CreateSalaryCertificatePdfCommand.CanExecute(null));
+
+        viewModel.AnnualSalaryYear = "2025";
+
+        Assert.False(viewModel.CanCreateSalaryCertificatePdf);
+        Assert.False(viewModel.CreateSalaryCertificatePdfCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task CreateSalaryCertificatePdfAsync_CallsExportServiceWithEmployeeYearAndOutputPath()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var writer = new CaptureSalaryCertificatePdfDocumentWriter();
+        var exportService = CreateSalaryCertificatePdfExportService(writer: writer);
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        var outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
+        await viewModel.CreateSalaryCertificatePdfAsync(outputPath);
+
+        Assert.Equal(GetWorkspaceTemplatePath(), writer.LastTemplatePath);
+        Assert.Equal(outputPath, writer.LastOutputPath);
+        Assert.Contains(writer.LastFields!, field => field.PdfFieldName == "TextLinks_D" && field.Value == "2026");
+        Assert.Equal($"Lohnausweis erstellt: {outputPath}", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task LoadAnnualSalaryAsync_ShowsLatestSalaryCertificateCreatedDate()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var recordRepository = new InMemorySalaryCertificateRecordRepository();
+        recordRepository.Seed(new SalaryCertificateRecordDto(
+            Guid.NewGuid(),
+            employee.EmployeeId,
+            2026,
+            new DateTimeOffset(2026, 4, 27, 14, 30, 0, TimeSpan.Zero),
+            "/tmp/existing.pdf",
+            null));
+        var exportService = CreateSalaryCertificatePdfExportService(recordRepository: recordRepository);
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        Assert.Equal("Lohnausweis erstellt am 27.04.2026", viewModel.SalaryCertificateCreatedDisplay);
+    }
+
+    [Fact]
+    public async Task CreateSalaryCertificatePdfAsync_RefreshesSalaryCertificateCreatedDate()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var recordRepository = new InMemorySalaryCertificateRecordRepository();
+        var exportService = CreateSalaryCertificatePdfExportService(recordRepository: recordRepository);
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        Assert.Equal("Noch kein Lohnausweis erstellt", viewModel.SalaryCertificateCreatedDisplay);
+
+        await viewModel.CreateSalaryCertificatePdfAsync(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf"));
+
+        Assert.Equal($"Lohnausweis erstellt am {DateTimeOffset.Now.ToLocalTime():dd.MM.yyyy}", viewModel.SalaryCertificateCreatedDisplay);
+    }
+
+    [Fact]
+    public async Task CreateSalaryCertificatePdfAsync_ShowsErrorMessageWhenExportFails()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var exportService = CreateSalaryCertificatePdfExportService(writer: new ThrowingSalaryCertificatePdfDocumentWriter("kaputt"));
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        await viewModel.CreateSalaryCertificatePdfAsync(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf"));
+
+        Assert.Equal("Lohnausweis fehlgeschlagen: kaputt", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task CreateSalaryCertificatePdfAsync_BlocksWhenAhvNumberIsMissing()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern") with { AhvNumber = null };
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var writer = new CaptureSalaryCertificatePdfDocumentWriter();
+        var exportService = CreateSalaryCertificatePdfExportService(writer: writer);
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        await viewModel.CreateSalaryCertificatePdfAsync(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf"));
+
+        Assert.Equal("AHV-Nummer fehlt fuer Lohnausweis.", viewModel.StatusMessage);
+        Assert.Null(writer.LastOutputPath);
+    }
+
+    [Fact]
+    public async Task CreateSalaryCertificatePdfAsync_BlocksWhenBirthDateIsMissing()
+    {
+        var employee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern") with { BirthDate = null };
+        var repository = new TestEmployeeRepository(employee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var writer = new CaptureSalaryCertificatePdfDocumentWriter();
+        var exportService = CreateSalaryCertificatePdfExportService(writer: writer);
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService, salaryCertificatePdfExportService: exportService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+        viewModel.AnnualSalaryYear = "2026";
+        viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        await viewModel.CreateSalaryCertificatePdfAsync(Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf"));
+
+        Assert.Equal("Geburtsdatum fehlt fuer Lohnausweis.", viewModel.StatusMessage);
+        Assert.Null(writer.LastOutputPath);
     }
 
     [Fact]
@@ -840,7 +1004,9 @@ public sealed class MainWindowViewModelTests
     private static MainWindowViewModel CreateViewModel(
         TestEmployeeRepository repository,
         InMemoryPayrollSettingsRepository? settingsRepository = null,
-        PayrollRunService? payrollRunService = null)
+        PayrollRunService? payrollRunService = null,
+        AnnualSalaryService? annualSalaryService = null,
+        SalaryCertificatePdfExportService? salaryCertificatePdfExportService = null)
     {
         settingsRepository ??= new InMemoryPayrollSettingsRepository();
         var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
@@ -860,8 +1026,42 @@ public sealed class MainWindowViewModelTests
             new MonthlyRecordViewModel(monthlyRecordService),
             CreateLayoutParameterFilesViewModel(),
             "Test",
-            annualSalaryService: null,
-            payrollRunService: payrollRunService);
+            annualSalaryService: annualSalaryService,
+            payrollRunService: payrollRunService,
+            salaryCertificatePdfExportService: salaryCertificatePdfExportService);
+    }
+
+    private static SalaryCertificatePdfExportService CreateSalaryCertificatePdfExportService(
+        ISalaryCertificatePdfDocumentWriter? writer = null,
+        ISalaryCertificateRecordRepository? recordRepository = null)
+    {
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var salaryCertificateService = new SalaryCertificateService(annualSalaryService);
+        var settingsService = new PayrollSettingsService(new InMemoryPayrollSettingsRepositoryForSalaryCertificate());
+
+        return new SalaryCertificatePdfExportService(
+            salaryCertificateService,
+            settingsService,
+            new StubSalaryCertificatePdfFormFieldReader(),
+            writer ?? new CaptureSalaryCertificatePdfDocumentWriter(),
+            recordRepository ?? new InMemorySalaryCertificateRecordRepository());
+    }
+
+    private static string GetWorkspaceTemplatePath()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var designSystemPath = Path.Combine(current.FullName, "src", "Payroll.Desktop", "Styles", "DesignSystem.axaml");
+            if (File.Exists(designSystemPath))
+            {
+                return Path.Combine(current.FullName, PayrollSettings.DefaultSalaryCertificatePdfTemplatePath);
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Lohnausweis-Vorlage im Workspace wurde nicht gefunden.");
     }
 
     private static LayoutParameterFilesViewModel CreateLayoutParameterFilesViewModel()
@@ -1456,6 +1656,7 @@ public sealed class MainWindowViewModelTests
                 "PA",
                 string.Empty,
                 "BANNER|Lohnblatt|{{Monat}}",
+                global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath,
                 global::Payroll.Domain.Settings.PayrollSettings.DefaultDecimalSeparator,
                 global::Payroll.Domain.Settings.PayrollSettings.DefaultThousandsSeparator,
                 global::Payroll.Domain.Settings.PayrollSettings.DefaultCurrencyCode,
@@ -1521,6 +1722,7 @@ public sealed class MainWindowViewModelTests
                 command.PrintLogoText,
                 command.PrintLogoPath,
                 command.PrintTemplate,
+                command.SalaryCertificatePdfTemplatePath,
                 command.DecimalSeparator,
                 command.ThousandsSeparator,
                 command.CurrencyCode,
@@ -1645,6 +1847,170 @@ public sealed class MainWindowViewModelTests
         public Task<string> ExportPayrollStatementAsync(PayrollStatementPdfDocument document, CancellationToken cancellationToken = default)
         {
             return Task.FromResult("/tmp/Lohnblatt_Test.pdf");
+        }
+    }
+
+    private sealed class StubAnnualSalaryRepository : IAnnualSalaryRepository
+    {
+        private readonly bool _hasFinalizedMonth;
+
+        public StubAnnualSalaryRepository(bool hasFinalizedMonth)
+        {
+            _hasFinalizedMonth = hasFinalizedMonth;
+        }
+
+        public Task<AnnualSalaryOverviewDto> GetOverviewAsync(AnnualSalaryOverviewQuery query, CancellationToken cancellationToken)
+        {
+            var months = _hasFinalizedMonth
+                ? new[]
+                {
+                    new AnnualSalaryMonthDto(1, "Januar", true, false, true, 1000m, 80m, 20m, 0m, 0m, 100m, 50m, 25m, 30m, 825m)
+                }
+                : Array.Empty<AnnualSalaryMonthDto>();
+
+            return Task.FromResult(new AnnualSalaryOverviewDto(
+                query.EmployeeId,
+                "1000",
+                "Anna",
+                "Aktiv",
+                "756.1234.5678.97",
+                new DateOnly(1990, 1, 1),
+                query.Year,
+                months,
+                new AnnualSalaryTotalsDto(1000m, 80m, 20m, 0m, 0m, 100m, 50m, 25m, 30m, 825m)));
+        }
+    }
+
+    private sealed class StubSalaryCertificatePdfFormFieldReader : ISalaryCertificatePdfFormFieldReader
+    {
+        private static readonly IReadOnlyCollection<string> FieldNames = SalaryCertificatePdfFieldMappingCatalog.CreateInitialMapping()
+            .Select(mapping => mapping.PdfFieldName)
+            .ToArray();
+
+        public Task<IReadOnlyCollection<string>> ReadFieldNamesAsync(string templatePath, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(FieldNames);
+        }
+    }
+
+    private sealed class CaptureSalaryCertificatePdfDocumentWriter : ISalaryCertificatePdfDocumentWriter
+    {
+        public string? LastTemplatePath { get; private set; }
+        public string? LastOutputPath { get; private set; }
+        public IReadOnlyCollection<SalaryCertificatePdfFieldWriteDto>? LastFields { get; private set; }
+
+        public Task WriteAsync(string templatePath, string outputPath, IReadOnlyCollection<SalaryCertificatePdfFieldWriteDto> fields, CancellationToken cancellationToken = default)
+        {
+            LastTemplatePath = templatePath;
+            LastOutputPath = outputPath;
+            LastFields = fields;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingSalaryCertificatePdfDocumentWriter : ISalaryCertificatePdfDocumentWriter
+    {
+        private readonly string _message;
+
+        public ThrowingSalaryCertificatePdfDocumentWriter(string message)
+        {
+            _message = message;
+        }
+
+        public Task WriteAsync(string templatePath, string outputPath, IReadOnlyCollection<SalaryCertificatePdfFieldWriteDto> fields, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException(_message);
+        }
+    }
+
+    private sealed class InMemorySalaryCertificateRecordRepository : ISalaryCertificateRecordRepository
+    {
+        private readonly List<SalaryCertificateRecordDto> _records = [];
+
+        public void Seed(SalaryCertificateRecordDto record)
+        {
+            _records.Add(record);
+        }
+
+        public void Add(global::Payroll.Domain.SalaryCertificate.SalaryCertificateRecord record)
+        {
+            _records.Add(new SalaryCertificateRecordDto(
+                record.Id,
+                record.EmployeeId,
+                record.Year,
+                record.CreatedAtUtc,
+                record.OutputFilePath,
+                record.FileHash));
+        }
+
+        public Task<SalaryCertificateRecordDto?> GetLatestAsync(Guid employeeId, int year, CancellationToken cancellationToken = default)
+        {
+            var latest = _records
+                .Where(record => record.EmployeeId == employeeId && record.Year == year)
+                .OrderByDescending(record => record.CreatedAtUtc)
+                .FirstOrDefault();
+
+            return Task.FromResult(latest);
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class InMemoryPayrollSettingsRepositoryForSalaryCertificate : IPayrollSettingsRepository
+    {
+        public Task<PayrollSettingsDto> GetAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new PayrollSettingsDto(
+                string.Empty,
+                PayrollSettings.DefaultAppFontFamily,
+                PayrollSettings.DefaultAppFontSize,
+                PayrollSettings.DefaultAppTextColorHex,
+                PayrollSettings.DefaultAppMutedTextColorHex,
+                PayrollSettings.DefaultAppBackgroundColorHex,
+                PayrollSettings.DefaultAppAccentColorHex,
+                PayrollSettings.DefaultAppLogoText,
+                string.Empty,
+                PayrollSettings.DefaultPrintFontFamily,
+                PayrollSettings.DefaultPrintFontSize,
+                PayrollSettings.DefaultPrintTextColorHex,
+                PayrollSettings.DefaultPrintMutedTextColorHex,
+                PayrollSettings.DefaultPrintAccentColorHex,
+                PayrollSettings.DefaultPrintLogoText,
+                string.Empty,
+                string.Empty,
+                GetWorkspaceTemplatePath(),
+                PayrollSettings.DefaultDecimalSeparator,
+                PayrollSettings.DefaultThousandsSeparator,
+                PayrollSettings.DefaultCurrencyCode,
+                null,
+                null,
+                null,
+                PayrollSettings.DefaultAhvIvEoRate,
+                PayrollSettings.DefaultAlvRate,
+                PayrollSettings.DefaultSicknessAccidentInsuranceRate,
+                PayrollSettings.DefaultTrainingAndHolidayRate,
+                PayrollSettings.DefaultVacationCompensationRate,
+                PayrollSettings.DefaultVacationCompensationRateAge50Plus,
+                0m,
+                0m,
+                0m,
+                [],
+                [],
+                [],
+                []));
+        }
+
+        public Task<WorkTimeSupplementSettings> GetWorkTimeSupplementSettingsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(WorkTimeSupplementSettings.Empty);
+        }
+
+        public Task<PayrollSettingsDto> SaveAsync(SavePayrollSettingsCommand command, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
         }
     }
 

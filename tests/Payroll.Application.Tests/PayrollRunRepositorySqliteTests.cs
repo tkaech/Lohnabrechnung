@@ -293,8 +293,59 @@ public sealed class PayrollRunRepositorySqliteTests
 
         Assert.Equal(100m, march.GrossSalaryChf);
         Assert.Equal("abgeschlossen", march.StatusDisplay);
+        Assert.True(march.IsStatusFinalized);
+        Assert.False(march.IsStatusOpenWithRecordedData);
         Assert.Equal("offen", april.StatusDisplay);
         Assert.Equal(100m, overview.Totals.GrossSalaryChf);
+    }
+
+    [Fact]
+    public async Task AnnualSalary_ShowsOpenMonthWithRecordedDataWithoutIncludingAmounts()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 30), 8m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
+        dbContext.ChangeTracker.Clear();
+
+        var overview = await new AnnualSalaryRepository(dbContext).GetOverviewAsync(
+            new AnnualSalaryOverviewQuery(employee.Id, 2026),
+            CancellationToken.None);
+
+        var april = overview.Months.Single(month => month.Month == 4);
+
+        Assert.True(april.HasRecordedMonthData);
+        Assert.Equal("offen / Daten vorhanden", april.StatusDisplay);
+        Assert.True(april.IsStatusOpenWithRecordedData);
+        Assert.False(april.IsStatusFinalized);
+        Assert.Equal(0m, april.GrossSalaryChf);
+        Assert.Equal(0m, overview.Totals.GrossSalaryChf);
     }
 
     [Fact]
@@ -399,7 +450,11 @@ public sealed class PayrollRunRepositorySqliteTests
             CancellationToken.None);
 
         var march = overview.Months.Single(month => month.Month == 3);
-        Assert.Equal("offen", march.StatusDisplay);
+        Assert.True(march.HasCancelledRun);
+        Assert.True(march.HasRecordedMonthData);
+        Assert.Equal("storniert", march.StatusDisplay);
+        Assert.True(march.IsStatusCancelled);
+        Assert.False(march.IsStatusOpenWithRecordedData);
         Assert.Equal(0m, march.GrossSalaryChf);
         Assert.Equal(0m, overview.Totals.GrossSalaryChf);
         Assert.Equal(0m, overview.Totals.SocialInsuranceDeductionChf);
@@ -661,6 +716,7 @@ public sealed class PayrollRunRepositorySqliteTests
             "BSD",
             "/tmp/print-logo.png",
             "",
+            global::Payroll.Domain.Settings.PayrollSettings.DefaultSalaryCertificatePdfTemplatePath,
             ".",
             " ",
             "CHF",

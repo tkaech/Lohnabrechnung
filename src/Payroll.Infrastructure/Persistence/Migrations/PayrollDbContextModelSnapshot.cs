@@ -188,6 +188,7 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("PrintMutedTextColorHex").IsRequired().HasMaxLength(20).HasColumnType("TEXT");
             b.Property<string>("PrintTemplate").IsRequired().HasMaxLength(20000).HasColumnType("TEXT");
             b.Property<string>("PrintTextColorHex").IsRequired().HasMaxLength(20).HasColumnType("TEXT");
+            b.Property<string>("SalaryCertificatePdfTemplatePath").IsRequired().HasMaxLength(1000).HasColumnType("TEXT");
             b.Property<decimal>("SicknessAccidentInsuranceRate").HasColumnType("TEXT");
             b.Property<decimal>("TrainingAndHolidayRate").HasColumnType("TEXT");
             b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");

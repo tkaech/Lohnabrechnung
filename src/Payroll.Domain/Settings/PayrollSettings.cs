@@ -31,6 +31,7 @@ public sealed class PayrollSettings : AuditableEntity
     public const string DefaultPrintAccentColorHex = "#FFFFFF00";
     public const string DefaultPrintLogoText = "PA";
     public const string DefaultPrintTemplate = "";
+    public const string DefaultSalaryCertificatePdfTemplatePath = "resources/forms/dbst-form-11lohna-rechts-dfi-de.pdf";
     public const string DefaultDecimalSeparator = ",";
     public const string DefaultThousandsSeparator = "'";
     public const string DefaultCurrencyCode = "CHF";
@@ -60,6 +61,7 @@ public sealed class PayrollSettings : AuditableEntity
         PrintLogoText = DefaultPrintLogoText;
         PrintLogoPath = string.Empty;
         PrintTemplate = DefaultPrintTemplate;
+        SalaryCertificatePdfTemplatePath = DefaultSalaryCertificatePdfTemplatePath;
         DecimalSeparator = DefaultDecimalSeparator;
         ThousandsSeparator = DefaultThousandsSeparator;
         CurrencyCode = DefaultCurrencyCode;
@@ -147,6 +149,7 @@ public sealed class PayrollSettings : AuditableEntity
     public string PrintLogoText { get; private set; } = string.Empty;
     public string PrintLogoPath { get; private set; } = string.Empty;
     public string PrintTemplate { get; private set; } = string.Empty;
+    public string SalaryCertificatePdfTemplatePath { get; private set; } = DefaultSalaryCertificatePdfTemplatePath;
     public string DecimalSeparator { get; private set; } = DefaultDecimalSeparator;
     public string ThousandsSeparator { get; private set; } = DefaultThousandsSeparator;
     public string CurrencyCode { get; private set; } = DefaultCurrencyCode;
@@ -290,6 +293,12 @@ public sealed class PayrollSettings : AuditableEntity
     public void UpdatePrintTemplate(string? printTemplate)
     {
         PrintTemplate = NormalizeMultilinePreservingSpacing(printTemplate);
+        Touch();
+    }
+
+    public void UpdateSalaryCertificatePdfTemplatePath(string? salaryCertificatePdfTemplatePath)
+    {
+        SalaryCertificatePdfTemplatePath = NormalizeOptional(salaryCertificatePdfTemplatePath) ?? DefaultSalaryCertificatePdfTemplatePath;
         Touch();
     }
 

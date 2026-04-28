@@ -9,6 +9,7 @@ using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
+using Payroll.Application.SalaryCertificate;
 using Payroll.Application.Settings;
 using Payroll.Desktop.ViewModels;
 using Payroll.Infrastructure.AnnualSalary;
@@ -20,6 +21,7 @@ using Payroll.Infrastructure.MonthlyRecords;
 using Payroll.Infrastructure.Payroll;
 using Payroll.Infrastructure.Persistence;
 using Payroll.Infrastructure.Reporting;
+using Payroll.Infrastructure.SalaryCertificate;
 using Payroll.Infrastructure.Settings;
 
 namespace Payroll.Desktop.Bootstrapping;
@@ -49,6 +51,14 @@ public sealed class AppBootstrapper
         var payrollRunService = new PayrollRunService(payrollRunRepository);
         var annualSalaryRepository = new AnnualSalaryRepository(dbContext);
         var annualSalaryService = new AnnualSalaryService(annualSalaryRepository);
+        var salaryCertificateService = new SalaryCertificateService(annualSalaryService);
+        var salaryCertificateRecordRepository = new SalaryCertificateRecordRepository(dbContext);
+        var salaryCertificatePdfExportService = new SalaryCertificatePdfExportService(
+            salaryCertificateService,
+            payrollSettingsService,
+            new PdfFormFieldReader(),
+            new SalaryCertificatePdfDocumentWriter(),
+            salaryCertificateRecordRepository);
         var sqlExplorerViewModel = new SqlExplorerViewModel(dbContext);
         var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
         var backupRestoreService = new BackupRestoreService(() => CreateDbContext(databasePath), employeeService, monthlyRecordService, payrollSettingsService, backupDirectory);
@@ -75,7 +85,8 @@ public sealed class AppBootstrapper
             databasePath,
             runtimeOptions.EnvironmentName,
             annualSalaryService,
-            payrollRunService);
+            payrollRunService,
+            salaryCertificatePdfExportService);
     }
 
     private static string ResolveWorkspaceRoot()
@@ -423,6 +434,12 @@ public sealed class AppBootstrapper
                 "AppTableCellVerticalPadding",
                 "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"AppTableCellVerticalPadding\" TEXT NOT NULL DEFAULT 6;");
 
+            EnsureTableColumn(
+                connection,
+                "PayrollSettings",
+                "SalaryCertificatePdfTemplatePath",
+                "ALTER TABLE \"PayrollSettings\" ADD COLUMN \"SalaryCertificatePdfTemplatePath\" TEXT NOT NULL DEFAULT 'resources/forms/dbst-form-11lohna-rechts-dfi-de.pdf';");
+
             EnsureTable(
                 connection,
                 "PayrollGeneralSettingsVersions",
@@ -686,6 +703,26 @@ public sealed class AppBootstrapper
                 connection,
                 "IX_ImportExecutionStatuses_Type_Year_Month",
                 "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_ImportExecutionStatuses_Type_Year_Month\" ON \"ImportExecutionStatuses\" (\"Type\", \"Year\", \"Month\");");
+
+            EnsureTable(
+                connection,
+                "SalaryCertificateRecords",
+                """
+                CREATE TABLE IF NOT EXISTS "SalaryCertificateRecords" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_SalaryCertificateRecords" PRIMARY KEY,
+                    "EmployeeId" TEXT NOT NULL,
+                    "Year" INTEGER NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NULL,
+                    "OutputFilePath" TEXT NULL,
+                    "FileHash" TEXT NULL,
+                    CONSTRAINT "FK_SalaryCertificateRecords_Employees_EmployeeId" FOREIGN KEY ("EmployeeId") REFERENCES "Employees" ("Id") ON DELETE CASCADE
+                );
+                """);
+            EnsureIndex(
+                connection,
+                "IX_SalaryCertificateRecords_EmployeeId_Year_CreatedAtUtc",
+                "CREATE INDEX IF NOT EXISTS \"IX_SalaryCertificateRecords_EmployeeId_Year_CreatedAtUtc\" ON \"SalaryCertificateRecords\" (\"EmployeeId\", \"Year\", \"CreatedAtUtc\");");
         }
         finally
         {

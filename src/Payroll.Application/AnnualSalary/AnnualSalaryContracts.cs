@@ -1,5 +1,13 @@
 namespace Payroll.Application.AnnualSalary;
 
+public enum AnnualSalaryMonthStatus
+{
+    Finalized,
+    Cancelled,
+    OpenWithRecordedData,
+    Open
+}
+
 public sealed record AnnualSalaryOverviewQuery(
     Guid EmployeeId,
     int Year);
@@ -19,6 +27,8 @@ public sealed record AnnualSalaryMonthDto(
     int Month,
     string MonthLabel,
     bool IsFinalized,
+    bool HasCancelledRun,
+    bool HasRecordedMonthData,
     decimal GrossSalaryChf,
     decimal AhvIvEoDeductionChf,
     decimal AlvDeductionChf,
@@ -30,8 +40,25 @@ public sealed record AnnualSalaryMonthDto(
     decimal ExpensesChf,
     decimal NetSalaryChf)
 {
-    public string StatusDisplay => IsFinalized ? "abgeschlossen" : "offen";
+    public AnnualSalaryMonthStatus Status => IsFinalized
+        ? AnnualSalaryMonthStatus.Finalized
+        : HasCancelledRun
+            ? AnnualSalaryMonthStatus.Cancelled
+            : HasRecordedMonthData
+                ? AnnualSalaryMonthStatus.OpenWithRecordedData
+                : AnnualSalaryMonthStatus.Open;
+    public string StatusDisplay => Status switch
+    {
+        AnnualSalaryMonthStatus.Finalized => "abgeschlossen",
+        AnnualSalaryMonthStatus.Cancelled => "storniert",
+        AnnualSalaryMonthStatus.OpenWithRecordedData => "offen / Daten vorhanden",
+        _ => "offen"
+    };
     public bool IsOpen => !IsFinalized;
+    public bool IsStatusFinalized => Status == AnnualSalaryMonthStatus.Finalized;
+    public bool IsStatusCancelled => Status == AnnualSalaryMonthStatus.Cancelled;
+    public bool IsStatusOpenWithRecordedData => Status == AnnualSalaryMonthStatus.OpenWithRecordedData;
+    public bool IsStatusOpen => Status == AnnualSalaryMonthStatus.Open;
     public decimal AhvIvEoAlvDeductionChf => AhvIvEoDeductionChf + AlvDeductionChf;
     public decimal NbuDeductionChf => SicknessDailyAllowanceDeductionChf;
 }

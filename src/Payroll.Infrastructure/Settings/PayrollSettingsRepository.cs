@@ -76,6 +76,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             command.PrintLogoText,
             command.PrintLogoPath);
         settings.UpdatePrintTemplate(command.PrintTemplate);
+        settings.UpdateSalaryCertificatePdfTemplatePath(command.SalaryCertificatePdfTemplatePath);
         settings.UpdateDecimalSeparator(command.DecimalSeparator);
         settings.UpdateThousandsSeparator(command.ThousandsSeparator);
         settings.UpdateCurrencyCode(command.CurrencyCode);
@@ -337,6 +338,7 @@ public sealed class PayrollSettingsRepository : IPayrollSettingsRepository
             settings.PrintLogoText,
             settings.PrintLogoPath,
             printTemplate,
+            settings.SalaryCertificatePdfTemplatePath,
             settings.DecimalSeparator,
             settings.ThousandsSeparator,
             settings.CurrencyCode,

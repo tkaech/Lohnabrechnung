@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using Avalonia.Media.Imaging;
 using Payroll.Application.AnnualSalary;
 using Payroll.Application.BackupRestore;
@@ -10,6 +11,7 @@ using Payroll.Application.Layout;
 using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
+using Payroll.Application.SalaryCertificate;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
 using Payroll.Desktop.Styles;
@@ -19,6 +21,7 @@ namespace Payroll.Desktop.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
+    private static readonly CultureInfo SwissCulture = CultureInfo.GetCultureInfo("de-CH");
     private const string ActivityFilterAll = "Alle";
     private const string ActivityFilterActive = "Aktiv";
     private const string ActivityFilterInactive = "Inaktiv";
@@ -51,6 +54,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly MonthlyRecordService _monthlyRecordService;
     private readonly AnnualSalaryService? _annualSalaryService;
     private readonly PayrollRunService? _payrollRunService;
+    private readonly SalaryCertificatePdfExportService? _salaryCertificatePdfExportService;
     private readonly SqlExplorerViewModel _sqlExplorer;
     private readonly LayoutParameterFilesViewModel _layoutParameterFiles;
     private readonly LayoutParameterHelpViewModel _layoutParameterHelp;
@@ -119,6 +123,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _settingsVehiclePauschalzone2RateChf = string.Empty;
     private string _settingsVehicleRegiezone1RateChf = string.Empty;
     private string _settingsCompanyAddress = string.Empty;
+    private string _settingsSalaryCertificatePdfTemplatePath = string.Empty;
     private string _settingsAppFontFamily = string.Empty;
     private string _settingsAppFontSize = string.Empty;
     private string _settingsAppTextColorHex = string.Empty;
@@ -194,13 +199,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _annualSalaryYear = DateTime.Today.Year.ToString();
     private string _annualSalaryTitle = "Jahreslohn";
     private string _annualSalarySummary = "Mitarbeitenden und Jahr waehlen.";
+    private string _salaryCertificateCreatedDisplay = string.Empty;
     private AnnualSalaryTotalsDto? _annualSalaryTotals;
+    private Guid? _loadedAnnualSalaryEmployeeId;
+    private int? _loadedAnnualSalaryYear;
     private string _payrollRunStatusDisplay = "offen";
     private int _payrollRunStatusLoadVersion;
     private IReadOnlyCollection<PayrollGeneralSettingsVersionDto> _generalSettingsHistory = [];
     private IReadOnlyCollection<PayrollHourlySettingsVersionDto> _hourlySettingsHistory = [];
     private IReadOnlyCollection<PayrollMonthlySalarySettingsVersionDto> _monthlySalarySettingsHistory = [];
-    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null, PayrollRunService? payrollRunService = null)
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null, PayrollRunService? payrollRunService = null, SalaryCertificatePdfExportService? salaryCertificatePdfExportService = null)
         : this(
             employeeService,
             importService,
@@ -215,11 +223,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             databasePath,
             environmentName,
             annualSalaryService,
-            payrollRunService)
+            payrollRunService,
+            salaryCertificatePdfExportService)
     {
     }
 
-    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null, PayrollRunService? payrollRunService = null)
+    public MainWindowViewModel(EmployeeService employeeService, ImportService importService, IBackupRestoreService backupRestoreService, PayrollSettingsService payrollSettingsService, ReportingService reportingService, MonthlyRecordService monthlyRecordService, SqlExplorerViewModel sqlExplorer, MonthlyRecordViewModel monthlyRecord, LayoutParameterFilesViewModel layoutParameterFiles, string workspaceLabel, string? databasePath = null, string? environmentName = null, AnnualSalaryService? annualSalaryService = null, PayrollRunService? payrollRunService = null, SalaryCertificatePdfExportService? salaryCertificatePdfExportService = null)
     {
         _employeeService = employeeService;
         _importService = importService;
@@ -229,6 +238,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         _monthlyRecordService = monthlyRecordService;
         _annualSalaryService = annualSalaryService;
         _payrollRunService = payrollRunService;
+        _salaryCertificatePdfExportService = salaryCertificatePdfExportService;
         _sqlExplorer = sqlExplorer;
         _layoutParameterFiles = layoutParameterFiles;
         _layoutParameterHelp = new LayoutParameterHelpViewModel();
@@ -316,6 +326,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         CreateBackupCommand = new DelegateCommand(CreateBackupAsync, () => CanCreateBackup);
         RestoreBackupCommand = new DelegateCommand(RestoreBackupAsync, () => CanRestoreBackup);
         CreatePayrollPdfCommand = new DelegateCommand(CreatePayrollPdfAsync, () => CanCreatePayrollPdf);
+        CreateSalaryCertificatePdfCommand = new DelegateCommand(() => { }, () => CanCreateSalaryCertificatePdf);
         FinalizePayrollMonthCommand = new DelegateCommand(FinalizePayrollMonthAsync, () => CanFinalizePayrollMonth);
         CancelPayrollMonthCommand = new DelegateCommand(CancelPayrollMonthAsync, () => CanCancelPayrollMonth);
         AddDepartmentOptionCommand = new DelegateCommand(AddDepartmentOption, () => CanManageSettingsOptions);
@@ -372,6 +383,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             RaisePropertyChanged(nameof(ShowPrimaryWorkspaceArea));
             RaisePropertyChanged(nameof(ShowPrimaryWorkspaceHeader));
             RaisePropertyChanged(nameof(CanSaveSettings));
+            RaisePropertyChanged(nameof(CanCreateSalaryCertificatePdf));
             RaisePropertyChanged(nameof(CanCreatePayrollPdf));
             RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
             RaisePropertyChanged(nameof(CanCancelPayrollMonth));
@@ -488,6 +500,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public DelegateCommand CreateBackupCommand { get; }
     public DelegateCommand RestoreBackupCommand { get; }
     public DelegateCommand CreatePayrollPdfCommand { get; }
+    public DelegateCommand CreateSalaryCertificatePdfCommand { get; }
     public DelegateCommand FinalizePayrollMonthCommand { get; }
     public DelegateCommand CancelPayrollMonthCommand { get; }
     public DelegateCommand AddDepartmentOptionCommand { get; }
@@ -526,6 +539,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         && _currentEmployeeId.HasValue
         && int.TryParse(AnnualSalaryYear, out var year)
         && year is >= 1900 and <= 9999;
+    public bool CanCreateSalaryCertificatePdf => !IsBusy
+        && IsAnnualSalaryWorkspace
+        && _salaryCertificatePdfExportService is not null
+        && _currentEmployeeId.HasValue
+        && int.TryParse(AnnualSalaryYear, out var year)
+        && year is >= 1900 and <= 9999
+        && _loadedAnnualSalaryEmployeeId == _currentEmployeeId
+        && _loadedAnnualSalaryYear == year
+        && AnnualSalaryMonths.Any(month => month.IsFinalized);
     public string MonthCaptureMonthLabel => MonthlyRecord.SelectedMonth.HasValue
         ? $"{MonthlyRecord.SelectedMonth.Value:MM/yyyy}"
         : "-";
@@ -536,8 +558,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (SetProperty(ref _annualSalaryYear, value))
             {
+                InvalidateAnnualSalaryLoadState();
                 RaisePropertyChanged(nameof(CanLoadAnnualSalary));
+                RaisePropertyChanged(nameof(CanCreateSalaryCertificatePdf));
                 LoadAnnualSalaryCommand.RaiseCanExecuteChanged();
+                CreateSalaryCertificatePdfCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -558,6 +583,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _annualSalaryTotals;
         private set => SetProperty(ref _annualSalaryTotals, value);
+    }
+
+    public string SalaryCertificateCreatedDisplay
+    {
+        get => _salaryCertificateCreatedDisplay;
+        private set => SetProperty(ref _salaryCertificateCreatedDisplay, value);
     }
 
     public string MonthCaptureSummary
@@ -1244,6 +1275,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => _settingsCompanyAddress;
         set => SetProperty(ref _settingsCompanyAddress, value);
+    }
+
+    public string SettingsSalaryCertificatePdfTemplatePath
+    {
+        get => _settingsSalaryCertificatePdfTemplatePath;
+        set => SetProperty(ref _settingsSalaryCertificatePdfTemplatePath, value);
     }
 
     public string SettingsAppFontFamily
@@ -2188,6 +2225,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             SettingsPrintLogoText,
             SettingsPrintLogoPath,
             SettingsPrintTemplate,
+            SettingsSalaryCertificatePdfTemplatePath,
             SettingsDecimalSeparator,
             ToThousandsSeparatorValue(SettingsThousandsSeparator),
             SettingsCurrencyCode,
@@ -3077,6 +3115,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         RefreshCommand.RaiseCanExecuteChanged();
         SearchCommand.RaiseCanExecuteChanged();
         LoadAnnualSalaryCommand.RaiseCanExecuteChanged();
+        CreateSalaryCertificatePdfCommand.RaiseCanExecuteChanged();
         NewEmployeeCommand.RaiseCanExecuteChanged();
         EditEmployeeCommand.RaiseCanExecuteChanged();
         SaveCommand.RaiseCanExecuteChanged();
@@ -3139,6 +3178,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (_annualSalaryService is null || !_currentEmployeeId.HasValue)
         {
+            InvalidateAnnualSalaryLoadState();
             AnnualSalaryMonths.Clear();
             AnnualSalaryTotals = null;
             AnnualSalaryTitle = "Jahreslohn";
@@ -3148,6 +3188,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (!int.TryParse(AnnualSalaryYear, out var year) || year is < 1900 or > 9999)
         {
+            InvalidateAnnualSalaryLoadState();
             AnnualSalarySummary = "Jahr ist ungueltig.";
             return;
         }
@@ -3164,7 +3205,114 @@ public sealed class MainWindowViewModel : ViewModelBase
         AnnualSalaryTotals = overview.Totals;
         AnnualSalaryTitle = $"Jahreslohn {overview.LastName} {overview.FirstName} | {overview.PersonnelNumber}";
         AnnualSalarySummary = "Auswertung aus gespeicherten Lohnlauf-Snapshots.";
+        _loadedAnnualSalaryEmployeeId = _currentEmployeeId;
+        _loadedAnnualSalaryYear = year;
+        await RefreshSalaryCertificateCreatedDisplayAsync(_currentEmployeeId.Value, year);
+        RaisePropertyChanged(nameof(CanCreateSalaryCertificatePdf));
+        CreateSalaryCertificatePdfCommand.RaiseCanExecuteChanged();
         StatusMessage = $"Jahreslohn {overview.Year} geladen.";
+    }
+
+    public async Task CreateSalaryCertificatePdfAsync(string outputPath)
+    {
+        if (!ValidateSalaryCertificateExportPrerequisites() || string.IsNullOrWhiteSpace(outputPath) || !_currentEmployeeId.HasValue || _salaryCertificatePdfExportService is null)
+        {
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                StatusMessage = "Kein Ausgabeort fuer Lohnausweis gewaehlt.";
+            }
+
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            try
+            {
+                var exportPath = await _salaryCertificatePdfExportService.ExportAsync(
+                    new SalaryCertificatePdfExportCommand(
+                        _currentEmployeeId.Value,
+                        _loadedAnnualSalaryYear!.Value,
+                        outputPath));
+
+                await RefreshSalaryCertificateCreatedDisplayAsync(_currentEmployeeId.Value, _loadedAnnualSalaryYear.Value);
+                StatusMessage = $"Lohnausweis erstellt: {exportPath}";
+            }
+            catch (Exception exception)
+            {
+                StatusMessage = $"Lohnausweis fehlgeschlagen: {exception.Message}";
+            }
+        });
+    }
+
+    public bool ValidateSalaryCertificateExportPrerequisites()
+    {
+        if (!_currentEmployeeId.HasValue)
+        {
+            StatusMessage = "Kein Mitarbeitender fuer Lohnausweis ausgewaehlt.";
+            return false;
+        }
+
+        if (!int.TryParse(AnnualSalaryYear, out var year) || year is < 1900 or > 9999)
+        {
+            StatusMessage = "Jahr fuer Lohnausweis ist ungueltig.";
+            return false;
+        }
+
+        if (_salaryCertificatePdfExportService is null
+            || _loadedAnnualSalaryEmployeeId != _currentEmployeeId
+            || _loadedAnnualSalaryYear != year
+            || !AnnualSalaryMonths.Any(month => month.IsFinalized))
+        {
+            StatusMessage = "Lohnausweis nur mit geladenem Jahreslohn und mindestens einem finalisierten Lohnlauf moeglich.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(AhvNumber))
+        {
+            StatusMessage = "AHV-Nummer fehlt fuer Lohnausweis.";
+            return false;
+        }
+
+        if (!BirthDate.HasValue)
+        {
+            StatusMessage = "Geburtsdatum fehlt fuer Lohnausweis.";
+            return false;
+        }
+
+        return true;
+    }
+
+    public string GetSuggestedSalaryCertificateFileName()
+    {
+        var personnelNumber = string.IsNullOrWhiteSpace(PersonnelNumber) ? "Mitarbeiter" : PersonnelNumber.Trim();
+        var year = _loadedAnnualSalaryYear ?? DateTime.Today.Year;
+        return $"Lohnausweis_{personnelNumber}_{year}.pdf";
+    }
+
+    private void InvalidateAnnualSalaryLoadState()
+    {
+        _loadedAnnualSalaryEmployeeId = null;
+        _loadedAnnualSalaryYear = null;
+        SalaryCertificateCreatedDisplay = string.Empty;
+        RaisePropertyChanged(nameof(CanCreateSalaryCertificatePdf));
+        CreateSalaryCertificatePdfCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task RefreshSalaryCertificateCreatedDisplayAsync(Guid employeeId, int year)
+    {
+        if (_salaryCertificatePdfExportService is null)
+        {
+            SalaryCertificateCreatedDisplay = string.Empty;
+            return;
+        }
+
+        var latestRecord = await _salaryCertificatePdfExportService.GetLatestRecordAsync(
+            new SalaryCertificateRecordQuery(employeeId, year));
+
+        SalaryCertificateCreatedDisplay = latestRecord is null
+            ? "Noch kein Lohnausweis erstellt"
+            : $"Lohnausweis erstellt am {latestRecord.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy", SwissCulture)}";
     }
 
     private async Task LoadImportConfigurationsAsync()
@@ -3819,6 +3967,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         SettingsPrintLogoText = settings.PrintLogoText;
         SettingsPrintLogoPath = settings.PrintLogoPath;
         SettingsPrintTemplate = settings.PrintTemplate;
+        SettingsSalaryCertificatePdfTemplatePath = settings.SalaryCertificatePdfTemplatePath;
         SettingsDecimalSeparator = settings.DecimalSeparator;
         SettingsThousandsSeparator = settings.ThousandsSeparator;
         SettingsCurrencyCode = settings.CurrencyCode;
