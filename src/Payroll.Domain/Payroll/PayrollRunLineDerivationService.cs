@@ -194,7 +194,23 @@ public sealed class PayrollRunLineDerivationService
         AddPercentageDeductionLine(lines, contract.EmployeeId, "KTG_UVG", "Krankentaggeld/UVG", contributableGrossChf, payrollSettings.SicknessAccidentInsuranceRate);
         if (!context.IsDepartmentGavMandatory)
         {
-            AddPercentageDeductionLine(lines, contract.EmployeeId, "AUSBILDUNG_FERIEN", "Aus- und Weiterbildung inkl. Ferien", contributableGrossChf, payrollSettings.TrainingAndHolidayRate);
+            var baseHoursLine = lines.SingleOrDefault(line => line.LineType == PayrollLineType.BaseHours);
+            var baseHours = baseHoursLine?.Quantity ?? 0m;
+            var effectiveSupplementHours = GetEffectiveSupplementHours(
+                baseHoursLine?.RateChf,
+                lines.Where(line => line.LineType is PayrollLineType.NightSupplement or PayrollLineType.SundaySupplement or PayrollLineType.HolidaySupplement));
+            var hoursIncludingVacationCompensation = (baseHours + effectiveSupplementHours) * (1m + vacationCompensationRate);
+            var trainingAndHolidayAmountChf = hoursIncludingVacationCompensation * (payrollSettings.TrainingAndHolidayRate * 100m);
+
+            if (trainingAndHolidayAmountChf > 0m)
+            {
+                lines.Add(PayrollRunLine.CreateCalculatedFixedDeduction(
+                    contract.EmployeeId,
+                    PayrollLineType.SocialContribution,
+                    "AUSBILDUNG_FERIEN",
+                    "Aus- und Weiterbildung inkl. Ferien",
+                    trainingAndHolidayAmountChf));
+            }
         }
 
         if (context.IsSubjectToWithholdingTax)
@@ -306,6 +322,18 @@ public sealed class PayrollRunLineDerivationService
             code,
             description,
             contributableGrossChf * rate));
+    }
+
+    private static decimal GetEffectiveSupplementHours(
+        decimal? baseHourlyRateChf,
+        IEnumerable<PayrollRunLine> supplementLines)
+    {
+        if (!baseHourlyRateChf.HasValue || baseHourlyRateChf.Value <= 0m)
+        {
+            return 0m;
+        }
+
+        return supplementLines.Sum(line => line.AmountChf / baseHourlyRateChf.Value);
     }
 
     private static string BuildWithholdingTaxDescription(string? taxStatus)

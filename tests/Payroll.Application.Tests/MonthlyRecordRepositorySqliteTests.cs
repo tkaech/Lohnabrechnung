@@ -205,6 +205,48 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
+    public async Task GetDetailsAsync_UsesVacationCompensationBasisForTrainingAndHolidayDerivation()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 32.5m, 280m, 3.00m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: new WorkTimeSupplementSettings(0.25m, 0.50m, 1.00m),
+            ahvIvEoRate: 0.053m,
+            alvRate: 0.011m,
+            sicknessAccidentInsuranceRate: 0.00821m,
+            trainingAndHolidayRate: 0.0003m,
+            vacationCompensationRate: 0.1064m,
+            vacationCompensationRateAge50Plus: 0.1264m,
+            vehiclePauschalzone1RateChf: 5.6m,
+            vehiclePauschalzone2RateChf: 16.8m,
+            vehicleRegiezone1RateChf: 0.32m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var record = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        record.SaveTimeEntry(null, new DateOnly(2026, 4, 5), 8m, 1m, 0m, 0m, 120m, 0m, 0m, "Fruehdienst");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(record.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung" && line.RateDisplay == "0,03 %" && line.AmountDisplay == "-0.27 CHF");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.StepId == "STEP_TRAINING" && item.FormulaDisplay == "(8 h + 1 h x 25 %) = 8,25 h | x (1 + 10,64 %) = 9,13 h | x 0,03 %");
+        Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.StepId == "STEP_TRAINING" && item.Detail == "Basisstunden 8 h, ZT-Stunden 1 h, Zuschlags-Prozent Night supplement 1 h x 25 % = 0,25 h, effektive Zuschlagsstunden 0,25 h, Gesamtstunden 8,25 h, Ferienaufschlag 10,64 %, Endbetrag 0.27 CHF.");
+    }
+
+    [Fact]
     public async Task GetDetailsAsync_ShowsAge50PlusVacationCompensationHint_FromStartOfYearEmployeeTurns50()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -243,6 +285,7 @@ public sealed class MonthlyRecordRepositorySqliteTests
         Assert.NotNull(details);
         Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.RateDisplay == "12,64 %");
         Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Ferienentschaedigung" && line.Detail == "Ferienentschaedigung ab 50 Jahren angewendet (gueltig ab 01.01.2026).");
+        Assert.Contains(details.PayrollPreview.Lines, line => line.Label == "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung" && line.RateDisplay == "0,015 %" && line.AmountDisplay == "-0.14 CHF");
         Assert.Contains(details.PayrollPreview.DerivationGroups.SelectMany(group => group.Items), item => item.Label == "Ferienentschaedigungssatz" && item.Detail == "Ferienentschaedigung ab 50 Jahren angewendet. Der erhoehte Satz gilt seit 01.01.2026.");
     }
 

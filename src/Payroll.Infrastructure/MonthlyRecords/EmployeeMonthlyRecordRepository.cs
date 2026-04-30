@@ -568,7 +568,13 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO", derivationLines, "AHV_IV_EO", payrollSettings.AhvIvEoRate, "AHV_IV_EO", "AHV", numberCulture, currencyCode));
         lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.AlvCode, "ALV", derivationLines, "ALV", payrollSettings.AlvRate, "ALV", "ALV", numberCulture, currencyCode));
         lines.Add(BuildNamedAmountLine(PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, "KTG_UVG", "UVG", numberCulture, currencyCode));
-        var trainingLine = BuildNamedAmountLine(PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, "AUSBILDUNG_FERIEN", "AW", numberCulture, currencyCode);
+        var trainingLine = BuildTrainingAndHolidayLine(
+            employeeBirthDate,
+            monthlyRecord.PeriodEnd,
+            derivationLines,
+            payrollSettings,
+            numberCulture,
+            currencyCode);
         lines.Add(department?.IsGavMandatory == true
             ? trainingLine with { RateDisplay = FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), AmountDisplay = FormatMoney(0m, numberCulture, currencyCode), Detail = "Unterdrueckt, weil die Abteilung GAV-pflichtig ist." }
             : trainingLine);
@@ -872,6 +878,37 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             GetPreviewColorHint(linkKey));
     }
 
+    private static MonthlyPayrollPreviewLineDto BuildTrainingAndHolidayLine(
+        DateOnly? employeeBirthDate,
+        DateOnly payrollReferenceDate,
+        IEnumerable<PayrollRunLine> derivationLines,
+        PayrollSettings payrollSettings,
+        CultureInfo numberCulture,
+        string currencyCode)
+    {
+        var matchingLine = derivationLines.SingleOrDefault(line => line.Code == "AUSBILDUNG_FERIEN");
+        var effectiveVacationCompensationRate = payrollSettings.GetVacationCompensationRate(employeeBirthDate, payrollReferenceDate);
+        var baseHoursLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BaseHours);
+        var supplementLines = derivationLines
+            .Where(line => line.LineType is PayrollLineType.NightSupplement or PayrollLineType.SundaySupplement or PayrollLineType.HolidaySupplement)
+            .ToArray();
+        var detail = matchingLine is null
+            ? null
+            : BuildTrainingAndHolidayDetail(baseHoursLine, supplementLines, effectiveVacationCompensationRate, payrollSettings.TrainingAndHolidayRate, numberCulture, currencyCode);
+
+        return new MonthlyPayrollPreviewLineDto(
+            PayrollPreviewHelpCatalog.TrainingAndHolidayCode,
+            "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung",
+            "-",
+            matchingLine is null ? "-" : FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture),
+            FormatAmount(matchingLine?.AmountChf, numberCulture, currencyCode),
+            detail,
+            false,
+            "AUSBILDUNG_FERIEN",
+            "AW",
+            GetPreviewColorHint("AUSBILDUNG_FERIEN"));
+    }
+
     private static IReadOnlyCollection<MonthlyPayrollPreviewDerivationGroupDto> BuildPayrollPreviewDerivationGroups(
         DateOnly payrollReferenceDate,
         DateOnly? employeeBirthDate,
@@ -952,7 +989,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("RULE_AHV_RATE", "Regel", "AHV/IV/EO", FormatPercentageRate(payrollSettings.AhvIvEoRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AHV_IV_EO"),
             CreateDerivationItem("RULE_ALV_RATE", "Regel", "ALV", FormatPercentageRate(payrollSettings.AlvRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "ALV"),
             CreateDerivationItem("RULE_KTG_RATE", "Regel", "Krankentaggeld/UVG", FormatPercentageRate(payrollSettings.SicknessAccidentInsuranceRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "KTG_UVG"),
-            CreateDerivationItem("RULE_TRAINING_RATE", "Regel", "Aus- und Weiterbildung inkl. Ferien", FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), null, "Prozentualer Abzug aus dem gespeicherten Monatsparameter-Snapshot.", "AUSBILDUNG_FERIEN"),
+            CreateDerivationItem("RULE_TRAINING_RATE", "Regel", "Aus- und Weiterbildung inkl. Ferien", FormatPercentageRate(payrollSettings.TrainingAndHolidayRate, numberCulture), null, "Konfigurierter Satz aus dem gespeicherten Monatsparameter-Snapshot.", "AUSBILDUNG_FERIEN"),
             CreateDerivationItem("RULE_WITHHOLDING_TAX", "Regel", "Quellensteuer", FormatRawPercentageRate(monthlyRecord.WithholdingTaxRatePercent, numberCulture), null, "Manuell pro Mitarbeiter und Monat erfasster Prozentsatz.", "WITHHOLDING_TAX")
         };
 
@@ -1000,7 +1037,13 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             BuildDeductionDerivationItem("STEP_KTG", "Krankentaggeld/UVG", derivationLines, "KTG_UVG", payrollSettings.SicknessAccidentInsuranceRate, "KTG_UVG", numberCulture, currencyCode),
             department?.IsGavMandatory == true
                 ? CreateDerivationItem("STEP_TRAINING", "Schritt", "Aus- und Weiterbildung inkl. Ferien", FormatMoney(0m, numberCulture, currencyCode), "-", "Unterdrueckt, weil die Abteilung GAV-pflichtig ist.", "AUSBILDUNG_FERIEN")
-                : BuildDeductionDerivationItem("STEP_TRAINING", "Aus- und Weiterbildung inkl. Ferien", derivationLines, "AUSBILDUNG_FERIEN", payrollSettings.TrainingAndHolidayRate, "AUSBILDUNG_FERIEN", numberCulture, currencyCode),
+                : BuildTrainingAndHolidayDerivationItem(
+                    "STEP_TRAINING",
+                    derivationLines,
+                    effectiveVacationCompensationRate,
+                    payrollSettings.TrainingAndHolidayRate,
+                    numberCulture,
+                    currencyCode),
             CreateDerivationItem("STEP_WITHHOLDING_TAX", "Schritt", withholdingTaxLine?.Description ?? "Quellensteuer", withholdingTaxLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(withholdingTaxLine.AmountChf, numberCulture, currencyCode), $"{FormatRawPercentageRate(monthlyRecord.WithholdingTaxRatePercent, numberCulture)} x {FormatMoney(ahvGrossChf, numberCulture, currencyCode)}", "Berechnet vom AHV-pflichtigen Bruttolohn.", "WITHHOLDING_TAX"),
             CreateDerivationItem("STEP_TOTAL", "Schritt", "Total", FormatMoney(totalChf, numberCulture, currencyCode), "Lohnrelevante Positionen minus Abzuege, ohne Spesen", "Netto vor separatem Spesenblock.", "TOTAL"),
             CreateDerivationItem("STEP_EXPENSES", "Schritt", "Spesen gemaess Nachweis", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock uebernommen.", "EXPENSES"),
@@ -1315,6 +1358,39 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             supplementLines.Select(line => $"{line.Description} {FormatQuantity(line.Quantity ?? 0m, numberCulture)} h = {FormatMoney(line.AmountChf, numberCulture, currencyCode)}"));
     }
 
+    private static MonthlyPayrollPreviewDerivationItemDto BuildTrainingAndHolidayDerivationItem(
+        string stepId,
+        IEnumerable<PayrollRunLine> derivationLines,
+        decimal effectiveVacationCompensationRate,
+        decimal trainingAndHolidayRate,
+        CultureInfo numberCulture,
+        string currencyCode)
+    {
+        var matchingLine = derivationLines.SingleOrDefault(line => line.Code == "AUSBILDUNG_FERIEN");
+        var baseHoursLine = derivationLines.SingleOrDefault(line => line.LineType == PayrollLineType.BaseHours);
+        var supplementLines = derivationLines
+            .Where(line => line.LineType is PayrollLineType.NightSupplement or PayrollLineType.SundaySupplement or PayrollLineType.HolidaySupplement)
+            .ToArray();
+        var baseHours = baseHoursLine?.Quantity ?? 0m;
+        var supplementHours = supplementLines.Sum(line => line.Quantity ?? 0m);
+        var effectiveSupplementHours = GetEffectiveTrainingSupplementHours(baseHoursLine, supplementLines);
+        var hoursIncludingVacationCompensation = GetTrainingAndHolidayHoursIncludingVacation(baseHoursLine, supplementLines, effectiveVacationCompensationRate);
+        var supplementFormula = BuildTrainingSupplementFormula(baseHoursLine, supplementLines, numberCulture);
+
+        return CreateDerivationItem(
+            stepId,
+            "Schritt",
+            "Aus- und Weiterbildung inkl. Ferien",
+            FormatAmount(matchingLine?.AmountChf, numberCulture, currencyCode),
+            matchingLine is null
+                ? "-"
+                : $"({FormatQuantity(baseHours, numberCulture)} h + {supplementFormula}) = {FormatQuantity(baseHours + effectiveSupplementHours, numberCulture)} h | x (1 + {FormatPercentageRate(effectiveVacationCompensationRate, numberCulture)}) = {FormatQuantity(hoursIncludingVacationCompensation, numberCulture)} h | x {FormatPercentageRate(trainingAndHolidayRate, numberCulture)}",
+            matchingLine is null
+                ? "Keine ableitbare Basis aus Basislohn und Zeitzuschlaegen vorhanden."
+                : BuildTrainingAndHolidayDetail(baseHoursLine, supplementLines, effectiveVacationCompensationRate, trainingAndHolidayRate, numberCulture, currencyCode),
+            "AUSBILDUNG_FERIEN");
+    }
+
     private static MonthlyPayrollPreviewDerivationItemDto BuildDeductionDerivationItem(
         string stepId,
         string label,
@@ -1338,6 +1414,84 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             matchingLine is null ? "-" : $"{FormatPercentageRate(rate, numberCulture)} x {basisDisplay}",
             "Abzug aus der im Berechnungslauf abgeleiteten beitragspflichtigen Basis.",
             linkKey);
+    }
+
+    private static decimal GetTrainingAndHolidayHoursIncludingVacation(
+        PayrollRunLine? baseHoursLine,
+        IEnumerable<PayrollRunLine> supplementLines,
+        decimal effectiveVacationCompensationRate)
+    {
+        var baseHours = baseHoursLine?.Quantity ?? 0m;
+        var effectiveSupplementHours = GetEffectiveTrainingSupplementHours(baseHoursLine, supplementLines);
+        return (baseHours + effectiveSupplementHours) * (1m + effectiveVacationCompensationRate);
+    }
+
+    private static decimal GetEffectiveTrainingSupplementHours(
+        PayrollRunLine? baseHoursLine,
+        IEnumerable<PayrollRunLine> supplementLines)
+    {
+        var baseHourlyRateChf = baseHoursLine?.RateChf;
+        if (!baseHourlyRateChf.HasValue || baseHourlyRateChf.Value <= 0m)
+        {
+            return 0m;
+        }
+
+        return supplementLines.Sum(line => line.AmountChf / baseHourlyRateChf.Value);
+    }
+
+    private static string BuildTrainingSupplementFormula(
+        PayrollRunLine? baseHoursLine,
+        IReadOnlyCollection<PayrollRunLine> supplementLines,
+        CultureInfo numberCulture)
+    {
+        if (supplementLines.Count == 0)
+        {
+            return "0 h";
+        }
+
+        return string.Join(
+            " + ",
+            supplementLines.Select(line =>
+            {
+                var supplementRate = GetSupplementPercentage(baseHoursLine, line);
+                return $"{FormatQuantity(line.Quantity ?? 0m, numberCulture)} h x {FormatPercentageRate(supplementRate, numberCulture)}";
+            }));
+    }
+
+    private static decimal GetSupplementPercentage(
+        PayrollRunLine? baseHoursLine,
+        PayrollRunLine supplementLine)
+    {
+        var baseHourlyRateChf = baseHoursLine?.RateChf;
+        if (!baseHourlyRateChf.HasValue || baseHourlyRateChf.Value <= 0m || !supplementLine.RateChf.HasValue)
+        {
+            return 0m;
+        }
+
+        return supplementLine.RateChf.Value / baseHourlyRateChf.Value;
+    }
+
+    private static string BuildTrainingAndHolidayDetail(
+        PayrollRunLine? baseHoursLine,
+        IReadOnlyCollection<PayrollRunLine> supplementLines,
+        decimal effectiveVacationCompensationRate,
+        decimal trainingAndHolidayRate,
+        CultureInfo numberCulture,
+        string currencyCode)
+    {
+        var baseHours = baseHoursLine?.Quantity ?? 0m;
+        var supplementHours = supplementLines.Sum(line => line.Quantity ?? 0m);
+        var effectiveSupplementHours = GetEffectiveTrainingSupplementHours(baseHoursLine, supplementLines);
+        var hoursIncludingVacationCompensation = GetTrainingAndHolidayHoursIncludingVacation(baseHoursLine, supplementLines, effectiveVacationCompensationRate);
+        var trainingAndHolidayAmountChf = hoursIncludingVacationCompensation * (trainingAndHolidayRate * 100m);
+        var supplementRateDetail = supplementLines.Count == 0
+            ? "-"
+            : string.Join(
+                " | ",
+                supplementLines.Select(line =>
+                    $"{line.Description} {FormatQuantity(line.Quantity ?? 0m, numberCulture)} h x {FormatPercentageRate(GetSupplementPercentage(baseHoursLine, line), numberCulture)} = {FormatQuantity((line.Quantity ?? 0m) * GetSupplementPercentage(baseHoursLine, line), numberCulture)} h"));
+
+        return $"Basisstunden {FormatQuantity(baseHours, numberCulture)} h, ZT-Stunden {FormatQuantity(supplementHours, numberCulture)} h, Zuschlags-Prozent {supplementRateDetail}, effektive Zuschlagsstunden {FormatQuantity(effectiveSupplementHours, numberCulture)} h, Gesamtstunden {FormatQuantity(baseHours + effectiveSupplementHours, numberCulture)} h, Ferienaufschlag {FormatPercentageRate(effectiveVacationCompensationRate, numberCulture)}, Endbetrag {FormatMoney(trainingAndHolidayAmountChf, numberCulture, currencyCode)}.";
     }
 
     private static MonthlyPayrollPreviewDerivationItemDto CreateDerivationItem(
