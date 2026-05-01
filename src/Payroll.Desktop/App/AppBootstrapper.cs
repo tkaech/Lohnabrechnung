@@ -63,7 +63,7 @@ public sealed class AppBootstrapper
         var backupDirectory = Path.Combine(Path.GetDirectoryName(databasePath) ?? AppContext.BaseDirectory, "backups");
         var backupRestoreService = new BackupRestoreService(() => CreateDbContext(databasePath), employeeService, monthlyRecordService, payrollSettingsService, backupDirectory);
         var pdfExportService = new PdfExportService();
-        var reportingService = new ReportingService(employeeService, monthlyRecordService, payrollSettingsService, pdfExportService);
+        var reportingService = new ReportingService(employeeService, monthlyRecordService, payrollSettingsService, pdfExportService, payrollRunRepository);
         var monthlyRecordViewModel = new MonthlyRecordViewModel(monthlyRecordService);
         var workspaceRootPath = ResolveWorkspaceRoot();
         var layoutParameterFileRepository = new LayoutParameterFileRepository(workspaceRootPath);

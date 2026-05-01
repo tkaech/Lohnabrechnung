@@ -5,6 +5,7 @@ namespace Payroll.Application.Payroll;
 
 public interface IPayrollRunRepository
 {
+    Task<IReadOnlyCollection<PayrollRun>> ListFinalizedRunsAsync(int year, int fromMonth, int toMonth, CancellationToken cancellationToken);
     Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
     Task<PayrollRun?> GetFinalizedRunForEmployeePeriodForUpdateAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);
     Task<PayrollRun?> GetLatestRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken);

@@ -17,6 +17,27 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
         _dbContext = dbContext;
     }
 
+    public async Task<IReadOnlyCollection<PayrollRun>> ListFinalizedRunsAsync(
+        int year,
+        int fromMonth,
+        int toMonth,
+        CancellationToken cancellationToken)
+    {
+        _ = new DateOnly(year, fromMonth, 1);
+        _ = new DateOnly(year, toMonth, 1);
+
+        var runs = await _dbContext.PayrollRuns
+            .AsNoTracking()
+            .Include(run => run.Lines)
+            .Where(run => run.Status == PayrollRunStatus.Finalized && EF.Functions.Like(run.PeriodKey, $"{year:D4}-%"))
+            .ToListAsync(cancellationToken);
+
+        return runs
+            .Where(run => TryGetMonthFromPeriodKey(run.PeriodKey, out var month) && month >= fromMonth && month <= toMonth)
+            .OrderBy(run => run.PeriodKey, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(
         Guid employeeId,
         string periodKey,
@@ -157,5 +178,16 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool TryGetMonthFromPeriodKey(string periodKey, out int month)
+    {
+        month = 0;
+        if (string.IsNullOrWhiteSpace(periodKey) || periodKey.Length < 7)
+        {
+            return false;
+        }
+
+        return int.TryParse(periodKey.AsSpan(5, 2), out month);
     }
 }

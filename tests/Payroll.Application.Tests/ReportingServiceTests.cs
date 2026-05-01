@@ -1,11 +1,14 @@
 using Payroll.Application.Employees;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Payroll;
 using Payroll.Application.Reporting;
 using Payroll.Application.Settings;
 using Payroll.Domain.Employees;
+using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Employees;
 using Payroll.Infrastructure.MonthlyRecords;
+using Payroll.Infrastructure.Payroll;
 using Payroll.Infrastructure.Persistence;
 using Payroll.Infrastructure.Settings;
 using Microsoft.Data.Sqlite;
@@ -166,6 +169,113 @@ public sealed class ReportingServiceTests
         var document = pdfExportService.LastDocument!;
         Assert.Contains(document.Lines, line => line.Label.Contains("Quellensteuer Tarif B", StringComparison.Ordinal));
         Assert.DoesNotContain(document.Lines, line => line.Label == "Quellensteuer Korrektur / Rueckzahlung");
+    }
+
+    [Fact]
+    public async Task GetPayrollTotalsAsync_AggregatesFinalizedRunsAcrossEmployeesAndFiltersByMonthRange()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var firstEmployee = new Employee(
+            "9100",
+            "Anna",
+            "Aggregat",
+            new DateOnly(1990, 1, 1),
+            new DateOnly(2020, 1, 1),
+            null,
+            true,
+            new EmployeeAddress("Testweg", "1", null, "6300", "Zug", "Schweiz"),
+            "Schweiz",
+            "CH",
+            "B",
+            "Ordentlich",
+            false,
+            "756.1111.1111.11",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            EmployeeWageType.Hourly);
+        var secondEmployee = new Employee(
+            "9101",
+            "Bruno",
+            "Summiert",
+            new DateOnly(1991, 1, 1),
+            new DateOnly(2021, 1, 1),
+            null,
+            true,
+            new EmployeeAddress("Testweg", "2", null, "6300", "Zug", "Schweiz"),
+            "Schweiz",
+            "CH",
+            "B",
+            "Ordentlich",
+            false,
+            "756.2222.2222.22",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            EmployeeWageType.Hourly);
+        dbContext.Employees.AddRange(firstEmployee, secondEmployee);
+
+        var firstEmployeeId = firstEmployee.Id;
+        var secondEmployeeId = secondEmployee.Id;
+
+        var januaryRun = new PayrollRun("2026-01", new DateOnly(2026, 1, 31));
+        januaryRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(firstEmployeeId, PayrollLineType.BaseHours, "BASE", "Base hours", 10m, 10m));
+        januaryRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(firstEmployeeId, PayrollLineType.SpecialSupplement, "SPECIAL_CONTRACT", "Spezialzuschlag gemaess Vertrag", 10m, 1m));
+        januaryRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(firstEmployeeId, PayrollLineType.SocialContribution, "AHV_IV_EO", "AHV/IV/EO", 5m));
+        januaryRun.AddLine(PayrollRunLine.CreateDirectChfLine(firstEmployeeId, PayrollLineType.Expense, "EXPENSES", "Spesen gemaess Nachweis", 20m));
+        januaryRun.FinalizeRun();
+
+        var februaryRun = new PayrollRun("2026-02", new DateOnly(2026, 2, 28));
+        februaryRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(secondEmployeeId, PayrollLineType.BaseHours, "BASE", "Base hours", 20m, 10m));
+        februaryRun.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(secondEmployeeId, PayrollLineType.SocialContribution, "ALV", "ALV", 2m));
+        februaryRun.AddLine(PayrollRunLine.CreateDirectChfLine(secondEmployeeId, PayrollLineType.Expense, "EXPENSES", "Spesen gemaess Nachweis", 10m));
+        februaryRun.FinalizeRun();
+
+        var openMarchRun = new PayrollRun("2026-03", new DateOnly(2026, 3, 31));
+        openMarchRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(firstEmployeeId, PayrollLineType.BaseHours, "BASE", "Base hours", 99m, 10m));
+
+        dbContext.PayrollRuns.AddRange(januaryRun, februaryRun, openMarchRun);
+        await dbContext.SaveChangesAsync();
+
+        var reportingService = new ReportingService(
+            new EmployeeService(new EmployeeRepository(dbContext)),
+            new MonthlyRecordService(new EmployeeMonthlyRecordRepository(dbContext)),
+            new PayrollSettingsService(new PayrollSettingsRepository(dbContext)),
+            new CapturePdfExportService(),
+            new PayrollRunRepository(dbContext));
+
+        var fullYearReport = await reportingService.GetPayrollTotalsAsync(new PayrollTotalsQuery(2026, 1, 12));
+        var januaryOnlyReport = await reportingService.GetPayrollTotalsAsync(new PayrollTotalsQuery(2026, 1, 1));
+
+        Assert.Equal([1, 2], fullYearReport.IncludedMonths.OrderBy(month => month).ToArray());
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "Basislohn" && line.AmountChf == 300m);
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "Spezialzuschlag gemaess Vertrag" && line.AmountChf == 10m);
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "AHV/IV/EO" && line.AmountChf == -5m);
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "ALV" && line.AmountChf == -2m);
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "Spesen gemaess Nachweis" && line.AmountChf == 30m);
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "Total" && line.AmountChf == 303m);
+        Assert.Contains(fullYearReport.Lines, line => line.Label == "Total Auszahlung" && line.AmountChf == 333m);
+        Assert.DoesNotContain(fullYearReport.Lines, line => line.AmountChf == 990m);
+
+        Assert.Equal([1], januaryOnlyReport.IncludedMonths);
+        Assert.Contains(januaryOnlyReport.Lines, line => line.Label == "Basislohn" && line.AmountChf == 100m);
+        Assert.DoesNotContain(januaryOnlyReport.Lines, line => line.Label == "ALV");
+        Assert.Contains(januaryOnlyReport.Lines, line => line.Label == "Total Auszahlung" && line.AmountChf == 125m);
     }
 
     private sealed class CapturePdfExportService : IPdfExportService

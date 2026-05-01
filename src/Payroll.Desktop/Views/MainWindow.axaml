@@ -1824,68 +1824,123 @@
 
           <ScrollViewer Grid.Row="1" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}" MinHeight="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowReportingWorkspace}">
             <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}">
-              <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}">
-                <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto" HorizontalAlignment="Left">
-                  <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
-                    <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
-                    <TextBox Width="118" IsReadOnly="True" Text="{Binding MonthCaptureMonthLabel}" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="4" Width="220">
-                    <TextBlock Classes="section-caption" Text="Filter" />
-                    <ComboBox ItemsSource="{Binding MonthCaptureFilters}" SelectedItem="{Binding SelectedMonthCaptureFilter, Mode=TwoWay}" />
-                  </StackPanel>
-                </Grid>
-
-                <TextBlock Classes="section-caption" Text="{Binding MonthCaptureSummary}" TextWrapping="Wrap" />
-
-                <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
-                  <StackPanel Spacing="0">
-                    <Grid ColumnDefinitions="82,120,120,70,70,70,78,78,78,160,66" Background="#FFF8FAFC">
-                      <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="PNr" /></Border>
-                      <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Vorname" /></Border>
-                      <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nachname" /></Border>
-                      <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
-                      <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Erfasst" /></Border>
-                      <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Arbeit" /></Border>
-                      <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nacht" /></Border>
-                      <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Sonntag" /></Border>
-                      <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Feiertag" /></Border>
-                      <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Fahrzeug" /></Border>
-                      <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Einträge" /></Border>
+              <TabControl>
+                <TabItem Header="Mitarbeitendenuebersicht">
+                  <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}" Margin="0,10,0,0">
+                    <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto" HorizontalAlignment="Left">
+                      <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+                        <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
+                        <controls:MonthPicker Width="118" SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="4" Width="220">
+                        <TextBlock Classes="section-caption" Text="Filter" />
+                        <ComboBox ItemsSource="{Binding MonthCaptureFilters}" SelectedItem="{Binding SelectedMonthCaptureFilter, Mode=TwoWay}" />
+                      </StackPanel>
                     </Grid>
 
-                    <ItemsControl ItemsSource="{Binding MonthCaptureOverviewRows}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <Grid ColumnDefinitions="82,120,120,70,70,70,78,78,78,160,66">
-                            <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding PersonnelNumber}" /></Border>
-                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding FirstName}" /></Border>
-                            <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding LastName}" /></Border>
-                            <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding StatusDisplay}" /></Border>
-                            <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding CaptureDisplay}" /></Border>
-                            <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding HoursWorked, StringFormat='{}{0:0.##} h'}" /></Border>
-                            <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding NightHours, StringFormat='{}{0:0.##}'}" /></Border>
-                            <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding SundayHours, StringFormat='{}{0:0.##}'}" /></Border>
-                            <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding HolidayHours, StringFormat='{}{0:0.##}'}" /></Border>
-                            <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
-                              <TextBlock>
-                                <TextBlock.Text>
-                                  <MultiBinding StringFormat="P1 {0:0.##} | P2 {1:0.##} | R1 {2:0.##}">
-                                    <Binding Path="VehiclePauschalzone1" />
-                                    <Binding Path="VehiclePauschalzone2" />
-                                    <Binding Path="VehicleRegiezone1" />
-                                  </MultiBinding>
-                                </TextBlock.Text>
-                              </TextBlock>
-                            </Border>
-                            <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding TimeEntryCount}" /></Border>
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <TextBlock Classes="section-caption" Text="{Binding MonthCaptureSummary}" TextWrapping="Wrap" />
+
+                    <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
+                      <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="82,120,120,70,70,70,78,78,78,160,66" Background="#FFF8FAFC">
+                          <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="PNr" /></Border>
+                          <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Vorname" /></Border>
+                          <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nachname" /></Border>
+                          <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
+                          <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Erfasst" /></Border>
+                          <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Arbeit" /></Border>
+                          <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nacht" /></Border>
+                          <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Sonntag" /></Border>
+                          <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Feiertag" /></Border>
+                          <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Fahrzeug" /></Border>
+                          <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Einträge" /></Border>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding MonthCaptureOverviewRows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Grid ColumnDefinitions="82,120,120,70,70,70,78,78,78,160,66">
+                                <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding PersonnelNumber}" /></Border>
+                                <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding FirstName}" /></Border>
+                                <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding LastName}" /></Border>
+                                <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding StatusDisplay}" /></Border>
+                                <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding CaptureDisplay}" /></Border>
+                                <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding HoursWorked, StringFormat='{}{0:0.##} h'}" /></Border>
+                                <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding NightHours, StringFormat='{}{0:0.##}'}" /></Border>
+                                <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding SundayHours, StringFormat='{}{0:0.##}'}" /></Border>
+                                <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding HolidayHours, StringFormat='{}{0:0.##}'}" /></Border>
+                                <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
+                                  <TextBlock>
+                                    <TextBlock.Text>
+                                      <MultiBinding StringFormat="P1 {0:0.##} | P2 {1:0.##} | R1 {2:0.##}">
+                                        <Binding Path="VehiclePauschalzone1" />
+                                        <Binding Path="VehiclePauschalzone2" />
+                                        <Binding Path="VehicleRegiezone1" />
+                                      </MultiBinding>
+                                    </TextBlock.Text>
+                                  </TextBlock>
+                                </Border>
+                                <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding TimeEntryCount}" /></Border>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
                   </StackPanel>
-                </Border>
-              </StackPanel>
+                </TabItem>
+
+                <TabItem Header="Gesamttotale">
+                  <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}" Margin="0,10,0,0">
+                    <Grid ColumnDefinitions="110,110,110,160,*" RowDefinitions="Auto" HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+                        <TextBlock Classes="section-caption" Text="Jahr" />
+                        <TextBox Text="{Binding ReportingPayrollTotalsYear, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0">
+                        <TextBlock Classes="section-caption" Text="Von-Monat" />
+                        <ComboBox ItemsSource="{Binding ReportingPayrollTotalsMonthOptions}" IsEnabled="{Binding IsReportingPayrollTotalsMonthRangeEnabled}" SelectedItem="{Binding SelectedReportingPayrollTotalsFromMonth, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0">
+                        <TextBlock Classes="section-caption" Text="Bis-Monat" />
+                        <ComboBox ItemsSource="{Binding ReportingPayrollTotalsMonthOptions}" IsEnabled="{Binding IsReportingPayrollTotalsMonthRangeEnabled}" SelectedItem="{Binding SelectedReportingPayrollTotalsToMonth, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="3" Spacing="4" VerticalAlignment="Bottom">
+                        <TextBlock Classes="section-caption" Text="Zeitraum" />
+                        <CheckBox Content="Ganzes Jahr" IsChecked="{Binding ReportingPayrollTotalsUseFullYear, Mode=TwoWay}" />
+                      </StackPanel>
+                    </Grid>
+
+                    <TextBlock Classes="section-caption" Text="{Binding ReportingPayrollTotalsSummary}" TextWrapping="Wrap" />
+                    <TextBlock Classes="section-caption" Text="{Binding ReportingPayrollTotalsIncludedMonths}" TextWrapping="Wrap" />
+
+                    <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
+                      <StackPanel Spacing="0">
+                        <Grid ColumnDefinitions="*,180" Background="#FFF8FAFC">
+                          <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Position" /></Border>
+                          <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Total" TextAlignment="Right" /></Border>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding ReportingPayrollTotalsRows}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Grid ColumnDefinitions="*,180">
+                                <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
+                                  <TextBlock Text="{Binding Label}" />
+                                </Border>
+                                <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
+                                  <TextBlock Text="{Binding AmountChf, Converter={StaticResource ChfAmountConverter}}"
+                                             TextAlignment="Right" />
+                                </Border>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </TabItem>
+              </TabControl>
             </Border>
           </ScrollViewer>
 

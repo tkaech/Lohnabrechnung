@@ -669,6 +669,404 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task ReportingWorkspace_MonthChange_UsesCentralSelectedMonthAndReloadsRows()
+    {
+        var employeeRepository = new TestEmployeeRepository(
+            TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"),
+            TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich"));
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            4,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(Guid.NewGuid(), "1000", "Anna", "Aktiv", true, true, 12m, 1m, 0m, 0m, 2m, 0m, 0m, 2),
+                new MonthlyTimeCaptureOverviewRowDto(Guid.NewGuid(), "1001", "Bruno", "Bereit", true, false, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0)
+            ]);
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            5,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(Guid.NewGuid(), "1000", "Anna", "Aktiv", true, false, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0),
+                new MonthlyTimeCaptureOverviewRowDto(Guid.NewGuid(), "1001", "Bruno", "Bereit", true, true, 9m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowReportingCommand.Execute(null);
+
+        await WaitUntilAsync(() => viewModel.IsReportingWorkspace && viewModel.MonthCaptureOverviewRows.Count == 2);
+
+        Assert.Equal("04/2026", viewModel.MonthCaptureMonthLabel);
+        Assert.Equal("1000", viewModel.MonthCaptureOverviewRows[0].PersonnelNumber);
+
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await WaitUntilAsync(() =>
+            viewModel.MonthCaptureMonthLabel == "05/2026"
+            && viewModel.MonthCaptureOverviewRows.Count == 2
+            && viewModel.MonthCaptureOverviewRows[0].PersonnelNumber == "1000"
+            && viewModel.MonthCaptureOverviewRows[1].PersonnelNumber == "1001");
+
+        Assert.Equal("05/2026", viewModel.MonthCaptureMonthLabel);
+        Assert.Equal(0m, viewModel.MonthCaptureOverviewRows[0].HoursWorked);
+        Assert.Equal(9m, viewModel.MonthCaptureOverviewRows[1].HoursWorked);
+    }
+
+    [Fact]
+    public async Task ReportingTotals_LoadsFinalizedPayrollRunLinesAndReactsToMonthRange()
+    {
+        var employeeRepository = new TestEmployeeRepository(
+            TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"),
+            TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich"));
+        var payrollRunRepository = new ReportingTotalsPayrollRunRepository(
+            CreateFinalizedPayrollRun("2026-01", Guid.NewGuid(), 100m, 20m, 5m),
+            CreateFinalizedPayrollRun("2026-02", Guid.NewGuid(), 200m, 10m, 2m),
+            CreateDraftPayrollRun("2026-03", Guid.NewGuid(), 999m));
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var reportingService = new ReportingService(
+            new EmployeeService(employeeRepository),
+            monthlyRecordService,
+            new PayrollSettingsService(settingsRepository),
+            new TestPdfExportService(),
+            payrollRunRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            CreateImportService(employeeRepository),
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            reportingService,
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowReportingCommand.Execute(null);
+
+        await WaitUntilAsync(() => viewModel.ReportingPayrollTotalsRows.Count > 0);
+
+        Assert.Contains(viewModel.ReportingPayrollTotalsRows, line => line.Label == "Basislohn" && line.AmountChf == 300m);
+        Assert.Contains(viewModel.ReportingPayrollTotalsRows, line => line.Label == "Spesen gemaess Nachweis" && line.AmountChf == 30m);
+        Assert.Contains(viewModel.ReportingPayrollTotalsRows, line => line.Label == "Total Auszahlung" && line.AmountChf == 323m);
+
+        viewModel.ReportingPayrollTotalsUseFullYear = false;
+        viewModel.SelectedReportingPayrollTotalsFromMonth = "01";
+        viewModel.SelectedReportingPayrollTotalsToMonth = "01";
+
+        await WaitUntilAsync(() => viewModel.ReportingPayrollTotalsRows.Any(line => line.Label == "Basislohn" && line.AmountChf == 100m));
+
+        Assert.DoesNotContain(viewModel.ReportingPayrollTotalsRows, line => line.Label == "ALV");
+        Assert.Contains(viewModel.ReportingPayrollTotalsRows, line => line.Label == "Total Auszahlung" && line.AmountChf == 115m);
+    }
+
+    [Fact]
+    public async Task PayrollRunsFilter_LohnlaufMoeglich_IgnoresEmptyMonthCaptures()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var employeeRepository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            4,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 12m, 1m, 0m, 0m, 2m, 0m, 0m, 2),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+        viewModel.SelectedActivityFilter = "Lohnlauf moeglich";
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 1);
+
+        Assert.Single(viewModel.Employees);
+        Assert.Equal("1000", viewModel.Employees[0].PersonnelNumber);
+    }
+
+    [Fact]
+    public async Task PayrollRunsFilter_LohnlaufMoeglich_ReactsToMonthChange()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var employeeRepository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            4,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 12m, 1m, 0m, 0m, 2m, 0m, 0m, 2),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, false, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0)
+            ]);
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            5,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+        viewModel.SelectedActivityFilter = "Lohnlauf moeglich";
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 1 && viewModel.Employees[0].PersonnelNumber == "1000");
+
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 0);
+
+        Assert.Empty(viewModel.Employees);
+    }
+
+    [Fact]
+    public async Task PayrollRunsFilter_LohnlaufMoeglich_UsesCurrentSelectedMonthWhenFilterIsApplied()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var employeeRepository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            4,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 12m, 1m, 0m, 0m, 2m, 0m, 0m, 2),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, false, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0)
+            ]);
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            5,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+        viewModel.SelectedActivityFilter = "Lohnlauf moeglich";
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 0);
+
+        Assert.Empty(viewModel.Employees);
+    }
+
+    [Fact]
+    public async Task PayrollRunsFilter_LohnlaufMoeglich_ShowsEmployeesWithWorkedHours()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var employeeRepository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            5,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, true, 9m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+        viewModel.SelectedActivityFilter = "Lohnlauf moeglich";
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 1 && viewModel.Employees[0].PersonnelNumber == "1001");
+
+        Assert.Single(viewModel.Employees);
+        Assert.Equal("1001", viewModel.Employees[0].PersonnelNumber);
+    }
+
+    [Fact]
+    public async Task TimeAndExpensesFilter_LohnlaufMoeglich_ShowsOnlyEmployeesWithPayrollRelevantData()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var employeeRepository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            5,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, true, 9m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        Assert.True(viewModel.IsTimeAndExpensesWorkspace);
+
+        viewModel.SelectedActivityFilter = "Lohnlauf moeglich";
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 1 && viewModel.Employees[0].PersonnelNumber == "1001");
+
+        Assert.Single(viewModel.Employees);
+        Assert.Equal("1001", viewModel.Employees[0].PersonnelNumber);
+    }
+
+    [Fact]
+    public async Task EmployeeFilter_LohnlaufMoeglich_PersistsAcrossWorkspaceSwitches()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var employeeRepository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        monthlyRecordRepository.SetOverviewRows(
+            2026,
+            5,
+            [
+                new MonthlyTimeCaptureOverviewRowDto(firstEmployee.EmployeeId, "1000", "Anna", "Aktiv", true, true, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 1),
+                new MonthlyTimeCaptureOverviewRowDto(secondEmployee.EmployeeId, "1001", "Bruno", "Bereit", true, true, 9m, 0m, 0m, 0m, 0m, 0m, 0m, 1)
+            ]);
+
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var importService = CreateImportService(employeeRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+        viewModel.MonthlyRecord.SelectedMonth = new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await viewModel.InitializeAsync();
+        viewModel.SelectedActivityFilter = "Lohnlauf moeglich";
+
+        await WaitUntilAsync(() => viewModel.Employees.Count == 1 && viewModel.Employees[0].PersonnelNumber == "1001");
+
+        viewModel.ShowPayrollRunsCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.IsPayrollRunsWorkspace);
+        Assert.Single(viewModel.Employees);
+        Assert.Equal("1001", viewModel.Employees[0].PersonnelNumber);
+
+        viewModel.ShowTimeAndExpensesCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.IsTimeAndExpensesWorkspace);
+        Assert.Single(viewModel.Employees);
+        Assert.Equal("1001", viewModel.Employees[0].PersonnelNumber);
+    }
+
+    [Fact]
     public async Task SettingsWorkspace_LoadsAndSavesCentralSupplementRatesWithoutEmployeeSelection()
     {
         var employeeRepository = new TestEmployeeRepository();
@@ -1568,6 +1966,16 @@ public sealed class MainWindowViewModelTests
             _finalizedPeriodKey = finalizedPeriodKey;
         }
 
+        public Task<IReadOnlyCollection<PayrollRun>> ListFinalizedRunsAsync(int year, int fromMonth, int toMonth, CancellationToken cancellationToken)
+        {
+            if (_finalized && year == 2026 && fromMonth <= 3 && toMonth >= 3)
+            {
+                return Task.FromResult<IReadOnlyCollection<PayrollRun>>([CreateRun(_finalizedPeriodKey, PayrollRunStatus.Finalized)]);
+            }
+
+            return Task.FromResult<IReadOnlyCollection<PayrollRun>>([]);
+        }
+
         public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken)
         {
             return Task.FromResult(_finalized && periodKey == _finalizedPeriodKey
@@ -1627,6 +2035,62 @@ public sealed class MainWindowViewModelTests
 
             return run;
         }
+    }
+
+    private sealed class ReportingTotalsPayrollRunRepository : IPayrollRunRepository
+    {
+        private readonly IReadOnlyCollection<PayrollRun> _runs;
+
+        public ReportingTotalsPayrollRunRepository(params PayrollRun[] runs)
+        {
+            _runs = runs;
+        }
+
+        public Task<IReadOnlyCollection<PayrollRun>> ListFinalizedRunsAsync(int year, int fromMonth, int toMonth, CancellationToken cancellationToken)
+        {
+            var filtered = _runs
+                .Where(run => run.Status == PayrollRunStatus.Finalized)
+                .Where(run => run.PeriodKey.StartsWith($"{year:D4}-", StringComparison.Ordinal))
+                .Where(run => int.TryParse(run.PeriodKey.AsSpan(5, 2), out var month) && month >= fromMonth && month <= toMonth)
+                .ToArray();
+
+            return Task.FromResult<IReadOnlyCollection<PayrollRun>>(filtered);
+        }
+
+        public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken) => Task.FromResult<PayrollRun?>(null);
+        public Task<PayrollRun?> GetFinalizedRunForEmployeePeriodForUpdateAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken) => Task.FromResult<PayrollRun?>(null);
+        public Task<PayrollRun?> GetLatestRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken) => Task.FromResult<PayrollRun?>(null);
+        public Task<bool> HasCancelledRunForEmployeePeriodAsync(Guid employeeId, string periodKey, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<PayrollRunMonthlyInputDto?> LoadMonthlyInputAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken) => Task.FromResult<PayrollRunMonthlyInputDto?>(null);
+        public Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken) => Task.FromResult(new PayrollSettings());
+        public Task<PayrollSettings> LoadPayrollSettingsForPeriodAsync(int year, int month, CancellationToken cancellationToken) => Task.FromResult(new PayrollSettings());
+        public void Add(PayrollRun payrollRun) { }
+        public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private static PayrollRun CreateFinalizedPayrollRun(string periodKey, Guid employeeId, decimal baseAmountChf, decimal expensesChf, decimal deductionAmountChf)
+    {
+        var run = new PayrollRun(periodKey, new DateOnly(2026, 4, 5));
+        run.AddLine(PayrollRunLine.CreateDirectChfLine(employeeId, PayrollLineType.BaseHours, "BASE", "Basislohn", baseAmountChf));
+        if (expensesChf > 0m)
+        {
+            run.AddLine(PayrollRunLine.CreateDirectChfLine(employeeId, PayrollLineType.Expense, "EXPENSES", "Spesen gemaess Nachweis", expensesChf));
+        }
+
+        if (deductionAmountChf > 0m)
+        {
+            run.AddLine(PayrollRunLine.CreateCalculatedFixedDeduction(employeeId, PayrollLineType.SocialContribution, "AHV_IV_EO", "AHV/IV/EO", deductionAmountChf));
+        }
+
+        run.FinalizeRun();
+        return run;
+    }
+
+    private static PayrollRun CreateDraftPayrollRun(string periodKey, Guid employeeId, decimal baseAmountChf)
+    {
+        var run = new PayrollRun(periodKey, new DateOnly(2026, 4, 5));
+        run.AddLine(PayrollRunLine.CreateDirectChfLine(employeeId, PayrollLineType.BaseHours, "BASE", "Basislohn", baseAmountChf));
+        return run;
     }
 
     private sealed class TestEmployeeRepository : IEmployeeRepository

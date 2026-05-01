@@ -34,3 +34,21 @@ public sealed record PayrollStatementPdfDocument(
     string ServiceYearsLabel,
     IReadOnlyCollection<PayrollStatementPdfLineDto> Lines,
     IReadOnlyCollection<string> Notes);
+
+public sealed record PayrollTotalsQuery(
+    int Year,
+    int FromMonth,
+    int ToMonth);
+
+public sealed record PayrollTotalsLineDto(
+    string Code,
+    string Label,
+    decimal AmountChf,
+    bool IsEmphasized);
+
+public sealed record PayrollTotalsReportDto(
+    int Year,
+    int FromMonth,
+    int ToMonth,
+    IReadOnlyCollection<int> IncludedMonths,
+    IReadOnlyCollection<PayrollTotalsLineDto> Lines);

@@ -25,10 +25,20 @@ public sealed record MonthlyTimeCaptureOverviewRowDto(
     decimal VehiclePauschalzone1,
     decimal VehiclePauschalzone2,
     decimal VehicleRegiezone1,
-    int TimeEntryCount)
+    int TimeEntryCount,
+    decimal ExpensesTotalChf = 0m)
 {
     public string StatusDisplay => IsActive ? "Aktiv" : "Inaktiv";
     public string CaptureDisplay => HasMonthCapture ? "Ja" : "Nein";
+    public bool HasPayrollRelevantData =>
+        HoursWorked > 0m
+        || NightHours > 0m
+        || SundayHours > 0m
+        || HolidayHours > 0m
+        || VehiclePauschalzone1 > 0m
+        || VehiclePauschalzone2 > 0m
+        || VehicleRegiezone1 > 0m
+        || ExpensesTotalChf > 0m;
 }
 
 public sealed record MonthlyRecordHeaderDto(

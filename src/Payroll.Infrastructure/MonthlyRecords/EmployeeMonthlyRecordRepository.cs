@@ -222,6 +222,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .AsNoTracking()
             .Where(record => record.Year == year && record.Month == month)
             .Include(record => record.TimeEntries)
+            .Include(record => record.ExpenseEntry)
             .ToListAsync(cancellationToken);
 
         var recordsByEmployeeId = monthlyRecords.ToDictionary(record => record.EmployeeId);
@@ -246,7 +247,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                     timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf),
                     timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf),
                     timeEntries.Sum(entry => entry.VehicleRegiezone1Chf),
-                    timeEntries.Count);
+                    timeEntries.Count,
+                    monthlyRecord?.ExpenseEntry?.ExpensesTotalChf ?? 0m);
             })
             .ToArray();
     }

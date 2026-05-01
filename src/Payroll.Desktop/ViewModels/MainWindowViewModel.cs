@@ -29,6 +29,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string ActivityFilterAll = "Alle";
     private const string ActivityFilterActive = "Aktiv";
     private const string ActivityFilterInactive = "Inaktiv";
+    private const string ActivityFilterPayrollPossible = "Lohnlauf moeglich";
     private const string MonthCaptureFilterAll = "Alle Mitarbeitenden";
     private const string MonthCaptureFilterWithoutMonth = "Ohne Monatserfassung";
     private const string MonthCaptureFilterWithMonth = "Mit Monatserfassung";
@@ -201,6 +202,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _selectedMonthCaptureFilter = MonthCaptureFilterAll;
     private string _monthCaptureSummary = "Keine Stundenerfassungen geladen.";
     private IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto> _allMonthCaptureOverviewRows = [];
+    private bool _reportingPayrollTotalsUseFullYear = true;
+    private string _reportingPayrollTotalsYear = DateTime.Today.Year.ToString();
+    private string _selectedReportingPayrollTotalsFromMonth = "01";
+    private string _selectedReportingPayrollTotalsToMonth = "12";
+    private string _reportingPayrollTotalsSummary = "Keine Gesamttotale geladen.";
+    private string _reportingPayrollTotalsIncludedMonths = "Keine Monate beruecksichtigt.";
     private string _annualSalaryYear = DateTime.Today.Year.ToString();
     private string _annualSalaryTitle = "Jahreslohn";
     private string _annualSalarySummary = "Mitarbeitenden und Jahr waehlen.";
@@ -268,9 +275,25 @@ public sealed class MainWindowViewModel : ViewModelBase
         TimeImportPreviewItems = [];
         ImportedTimeMonths = [];
         MonthCaptureOverviewRows = [];
+        ReportingPayrollTotalsRows = [];
         AnnualSalaryMonths = [];
-        ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive];
+        ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive, ActivityFilterPayrollPossible];
         MonthCaptureFilters = [MonthCaptureFilterAll, MonthCaptureFilterWithoutMonth, MonthCaptureFilterWithMonth];
+        ReportingPayrollTotalsMonthOptions =
+        [
+            "01",
+            "02",
+            "03",
+            "04",
+            "05",
+            "06",
+            "07",
+            "08",
+            "09",
+            "10",
+            "11",
+            "12"
+        ];
         WithholdingTaxOptions = [WithholdingTaxUnknown, WithholdingTaxYes, WithholdingTaxNo];
         WageTypeOptions = [WageTypeHourlyLabel, WageTypeMonthlyLabel];
         BackupContentTypeOptions = [BackupTypeConfigurationLabel, BackupTypeUserDataLabel, BackupTypeBothLabel];
@@ -455,9 +478,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<TimeImportPreviewItemViewModel> TimeImportPreviewItems { get; }
     public ObservableCollection<ImportedMonthStatusItemViewModel> ImportedTimeMonths { get; }
     public ObservableCollection<MonthlyTimeCaptureOverviewRowDto> MonthCaptureOverviewRows { get; }
+    public ObservableCollection<PayrollTotalsLineDto> ReportingPayrollTotalsRows { get; }
     public ObservableCollection<AnnualSalaryMonthDto> AnnualSalaryMonths { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> MonthCaptureFilters { get; }
+    public IReadOnlyList<string> ReportingPayrollTotalsMonthOptions { get; }
     public IReadOnlyList<string> WithholdingTaxOptions { get; }
     public IReadOnlyList<string> WageTypeOptions { get; }
     public IReadOnlyList<string> BackupContentTypeOptions { get; }
@@ -613,6 +638,69 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ApplyMonthCaptureOverviewFilter();
             }
         }
+    }
+
+    public bool ReportingPayrollTotalsUseFullYear
+    {
+        get => _reportingPayrollTotalsUseFullYear;
+        set
+        {
+            if (SetProperty(ref _reportingPayrollTotalsUseFullYear, value))
+            {
+                RaisePropertyChanged(nameof(IsReportingPayrollTotalsMonthRangeEnabled));
+                TriggerReportingPayrollTotalsReload();
+            }
+        }
+    }
+
+    public bool IsReportingPayrollTotalsMonthRangeEnabled => !ReportingPayrollTotalsUseFullYear;
+
+    public string ReportingPayrollTotalsYear
+    {
+        get => _reportingPayrollTotalsYear;
+        set
+        {
+            if (SetProperty(ref _reportingPayrollTotalsYear, value))
+            {
+                TriggerReportingPayrollTotalsReload();
+            }
+        }
+    }
+
+    public string SelectedReportingPayrollTotalsFromMonth
+    {
+        get => _selectedReportingPayrollTotalsFromMonth;
+        set
+        {
+            if (SetProperty(ref _selectedReportingPayrollTotalsFromMonth, value))
+            {
+                TriggerReportingPayrollTotalsReload();
+            }
+        }
+    }
+
+    public string SelectedReportingPayrollTotalsToMonth
+    {
+        get => _selectedReportingPayrollTotalsToMonth;
+        set
+        {
+            if (SetProperty(ref _selectedReportingPayrollTotalsToMonth, value))
+            {
+                TriggerReportingPayrollTotalsReload();
+            }
+        }
+    }
+
+    public string ReportingPayrollTotalsSummary
+    {
+        get => _reportingPayrollTotalsSummary;
+        private set => SetProperty(ref _reportingPayrollTotalsSummary, value);
+    }
+
+    public string ReportingPayrollTotalsIncludedMonths
+    {
+        get => _reportingPayrollTotalsIncludedMonths;
+        private set => SetProperty(ref _reportingPayrollTotalsIncludedMonths, value);
     }
 
     public string FormTitle => _isCreatingNew
@@ -800,7 +888,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string SelectedActivityFilter
     {
         get => _selectedActivityFilter;
-        set => SetProperty(ref _selectedActivityFilter, value);
+        set
+        {
+            if (SetProperty(ref _selectedActivityFilter, value) && !IsBusy)
+            {
+                _ = RefreshAsync();
+            }
+        }
     }
 
     public EmployeeListItemViewModel? SelectedEmployee
@@ -1787,9 +1881,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         await ExecuteBusyAsync(async () =>
         {
             var selectedEmployeeId = _currentEmployeeId;
+            if (ShouldApplyPayrollPossibleFilter())
+            {
+                await LoadMonthCaptureOverviewAsync();
+            }
+
             await ReloadEmployeesAsync();
             await RestoreSelectionAfterReloadAsync(selectedEmployeeId, selectFirstIfMissing: !_isEditing);
-            await LoadMonthCaptureOverviewAsync();
+            if (!ShouldApplyPayrollPossibleFilter())
+            {
+                await LoadMonthCaptureOverviewAsync();
+            }
+
             await LoadPayrollRunStatusAsync();
             StatusMessage = $"{Employees.Count} Mitarbeitende geladen.";
         });
@@ -2843,6 +2946,17 @@ public sealed class MainWindowViewModel : ViewModelBase
     private async Task ReloadEmployeesAsync()
     {
         var employees = await _employeeService.ListAsync(new EmployeeListQuery(SearchText, ParseActivityFilter(SelectedActivityFilter)));
+        if (ShouldApplyPayrollPossibleFilter())
+        {
+            var eligibleEmployeeIds = _allMonthCaptureOverviewRows
+                .Where(row => row.HasPayrollRelevantData)
+                .Select(row => row.EmployeeId)
+                .ToHashSet();
+            employees = employees
+                .Where(employee => eligibleEmployeeIds.Contains(employee.EmployeeId))
+                .ToArray();
+        }
+
         Employees.Clear();
 
         foreach (var employee in employees)
@@ -3491,6 +3605,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             RaisePropertyChanged(nameof(MonthCaptureMonthLabel));
             await LoadMonthCaptureOverviewAsync();
+            if (ShouldApplyPayrollPossibleFilter())
+            {
+                await ReloadEmployeesAsync();
+            }
             await LoadPayrollRunStatusAsync();
             RaisePropertyChanged(nameof(CanCreatePayrollPdf));
             RaisePropertyChanged(nameof(CanFinalizePayrollMonth));
@@ -3552,6 +3670,89 @@ public sealed class MainWindowViewModel : ViewModelBase
         MonthCaptureSummary = rows.Length == 1
             ? $"1 Mitarbeitender fuer {MonthCaptureMonthLabel} in der aktuellen Ansicht."
             : $"{rows.Length} Mitarbeitende fuer {MonthCaptureMonthLabel} in der aktuellen Ansicht.";
+    }
+
+    private void TriggerReportingPayrollTotalsReload()
+    {
+        if (IsReportingWorkspace)
+        {
+            _ = LoadReportingPayrollTotalsAsync();
+        }
+    }
+
+    private async Task LoadReportingPayrollTotalsAsync()
+    {
+        if (!IsReportingWorkspace)
+        {
+            return;
+        }
+
+        if (!TryBuildReportingPayrollTotalsQuery(out var query, out var validationMessage))
+        {
+            ReportingPayrollTotalsRows.Clear();
+            ReportingPayrollTotalsIncludedMonths = "Keine Monate beruecksichtigt.";
+            ReportingPayrollTotalsSummary = validationMessage;
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var report = await _reportingService.GetPayrollTotalsAsync(query);
+
+            ReportingPayrollTotalsRows.Clear();
+            foreach (var line in report.Lines)
+            {
+                ReportingPayrollTotalsRows.Add(line);
+            }
+
+            ReportingPayrollTotalsIncludedMonths = report.IncludedMonths.Count == 0
+                ? "Keine abgeschlossenen Monate im gewaehlten Zeitraum."
+                : $"Beruecksichtigte Monate: {string.Join(", ", report.IncludedMonths.Select(month => $"{month:00}/{report.Year}"))}";
+            ReportingPayrollTotalsSummary = report.Lines.Count == 0
+                ? "Keine abgeschlossenen Lohnlaeufe im gewaehlten Zeitraum gefunden."
+                : $"{report.Lines.Count} aggregierte Positionen aus abgeschlossenen Lohnlaeufen.";
+        });
+    }
+
+    private bool TryBuildReportingPayrollTotalsQuery(out PayrollTotalsQuery query, out string validationMessage)
+    {
+        query = new PayrollTotalsQuery(DateTime.Today.Year, 1, 12);
+        validationMessage = string.Empty;
+
+        if (!int.TryParse(ReportingPayrollTotalsYear, out var year) || year is < 1900 or > 9999)
+        {
+            validationMessage = "Gueltiges Jahr fuer Gesamttotale eingeben.";
+            return false;
+        }
+
+        var fromMonth = ReportingPayrollTotalsUseFullYear
+            ? 1
+            : ParseReportingPayrollTotalsMonth(SelectedReportingPayrollTotalsFromMonth);
+        var toMonth = ReportingPayrollTotalsUseFullYear
+            ? 12
+            : ParseReportingPayrollTotalsMonth(SelectedReportingPayrollTotalsToMonth);
+
+        if (fromMonth == 0 || toMonth == 0)
+        {
+            validationMessage = "Gueltigen Monatsbereich fuer Gesamttotale waehlen.";
+            return false;
+        }
+
+        if (fromMonth > toMonth)
+        {
+            validationMessage = "Von-Monat darf nicht groesser als Bis-Monat sein.";
+            return false;
+        }
+
+        query = new PayrollTotalsQuery(year, fromMonth, toMonth);
+        return true;
+    }
+
+    private static int ParseReportingPayrollTotalsMonth(string value)
+    {
+        return int.TryParse(value, out var month) && month is >= 1 and <= 12
+            ? month
+            : 0;
     }
 
     private async Task<bool> LoadEmployeeIntoViewAsync(Guid employeeId)
@@ -4408,6 +4609,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         };
     }
 
+    private bool ShouldApplyPayrollPossibleFilter()
+    {
+        return string.Equals(SelectedActivityFilter, ActivityFilterPayrollPossible, StringComparison.Ordinal);
+    }
+
     private static string BuildContactSummary(string? city, string? country, string? email)
     {
         var location = string.Join(", ", new[] { city, country }.Where(value => !string.IsNullOrWhiteSpace(value)));
@@ -4438,6 +4644,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void SwitchToPayrollRunsWorkspace()
     {
         SelectMainNavigationSection(MainSection.PayrollRuns);
+        if (ShouldApplyPayrollPossibleFilter())
+        {
+            _ = RefreshAsync();
+            return;
+        }
+
         _ = LoadPayrollRunStatusAsync();
     }
 
@@ -4450,6 +4662,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void SwitchToReportingWorkspace()
     {
         SelectMainNavigationSection(MainSection.Reporting);
+        _ = LoadReportingPayrollTotalsAsync();
     }
 
     private void SwitchToSettingsWorkspace()

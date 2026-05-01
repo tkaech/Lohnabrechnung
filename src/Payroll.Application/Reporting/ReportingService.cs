@@ -1,7 +1,9 @@
 using System.Globalization;
 using Payroll.Application.Employees;
 using Payroll.Application.MonthlyRecords;
+using Payroll.Application.Payroll;
 using Payroll.Application.Settings;
+using Payroll.Domain.Payroll;
 
 namespace Payroll.Application.Reporting;
 
@@ -13,17 +15,29 @@ public sealed class ReportingService
     private readonly MonthlyRecordService _monthlyRecordService;
     private readonly PayrollSettingsService _payrollSettingsService;
     private readonly IPdfExportService _pdfExportService;
+    private readonly IPayrollRunRepository? _payrollRunRepository;
 
     public ReportingService(
         EmployeeService employeeService,
         MonthlyRecordService monthlyRecordService,
         PayrollSettingsService payrollSettingsService,
         IPdfExportService pdfExportService)
+        : this(employeeService, monthlyRecordService, payrollSettingsService, pdfExportService, null)
+    {
+    }
+
+    public ReportingService(
+        EmployeeService employeeService,
+        MonthlyRecordService monthlyRecordService,
+        PayrollSettingsService payrollSettingsService,
+        IPdfExportService pdfExportService,
+        IPayrollRunRepository? payrollRunRepository)
     {
         _employeeService = employeeService;
         _monthlyRecordService = monthlyRecordService;
         _payrollSettingsService = payrollSettingsService;
         _pdfExportService = pdfExportService;
+        _payrollRunRepository = payrollRunRepository;
     }
 
     public async Task<string> CreatePayrollStatementPdfAsync(
@@ -83,6 +97,105 @@ public sealed class ReportingService
             monthlyRecord.PayrollPreview.Notes);
 
         return await _pdfExportService.ExportPayrollStatementAsync(document, cancellationToken);
+    }
+
+    public async Task<PayrollTotalsReportDto> GetPayrollTotalsAsync(
+        PayrollTotalsQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        _ = new DateOnly(query.Year, query.FromMonth, 1);
+        _ = new DateOnly(query.Year, query.ToMonth, 1);
+        if (query.FromMonth > query.ToMonth)
+        {
+            throw new InvalidOperationException("Von-Monat darf nicht groesser als Bis-Monat sein.");
+        }
+
+        if (_payrollRunRepository is null)
+        {
+            return new PayrollTotalsReportDto(query.Year, query.FromMonth, query.ToMonth, [], []);
+        }
+
+        var runs = await _payrollRunRepository.ListFinalizedRunsAsync(query.Year, query.FromMonth, query.ToMonth, cancellationToken);
+        var includedMonths = runs
+            .Select(run => TryGetMonthFromPeriodKey(run.PeriodKey, out var month) ? month : 0)
+            .Where(month => month is >= 1 and <= 12)
+            .Distinct()
+            .OrderBy(month => month)
+            .ToArray();
+
+        if (runs.Count == 0)
+        {
+            return new PayrollTotalsReportDto(query.Year, query.FromMonth, query.ToMonth, includedMonths, []);
+        }
+
+        var allLines = runs.SelectMany(run => run.Lines).ToArray();
+        var subtotalChf = SumAmounts(allLines, line =>
+            line.LineType is PayrollLineType.BaseHours
+                or PayrollLineType.MonthlySalary
+                or PayrollLineType.NightSupplement
+                or PayrollLineType.SundaySupplement
+                or PayrollLineType.HolidaySupplement
+                or PayrollLineType.SpecialSupplement
+                || IsVehicleCode(line.Code));
+        var ahvGrossChf = SumAmounts(allLines, line =>
+            line.LineType is PayrollLineType.BaseHours
+                or PayrollLineType.MonthlySalary
+                or PayrollLineType.NightSupplement
+                or PayrollLineType.SundaySupplement
+                or PayrollLineType.HolidaySupplement
+                or PayrollLineType.SpecialSupplement
+                or PayrollLineType.VacationCompensation
+                or PayrollLineType.VehicleCompensation);
+        var totalChf = SumAmounts(allLines, line => line.LineType != PayrollLineType.Expense);
+        var totalPayoutChf = runs.Sum(run => RoundToFiveRappen(run.Lines.Sum(line => line.AmountChf)));
+
+        var lines = new List<PayrollTotalsLineDto>();
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn",
+            SumAmounts(allLines, line => line.LineType is PayrollLineType.BaseHours or PayrollLineType.MonthlySalary));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.TimeSupplementCode, "Stunden mit Zeitzuschlag",
+            SumAmounts(allLines, line => line.LineType is PayrollLineType.NightSupplement or PayrollLineType.SundaySupplement or PayrollLineType.HolidaySupplement));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.SpecialSupplementCode, "Spezialzuschlag gemaess Vertrag",
+            SumAmounts(allLines, line => line.LineType == PayrollLineType.SpecialSupplement));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.VehiclePauschalzone1Code, "Fahrzeitentschaedigung Pauschalzone 1",
+            SumAmounts(allLines, line => string.Equals(line.Code, "VEHICLE_P1", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.VehiclePauschalzone2Code, "Fahrzeitentschaedigung Pauschalzone 2",
+            SumAmounts(allLines, line => string.Equals(line.Code, "VEHICLE_P2", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.VehicleRegiezone1Code, "Fahrzeitentschaedigung Regiezone",
+            SumAmounts(allLines, line => string.Equals(line.Code, "VEHICLE_R1", StringComparison.Ordinal)));
+        lines.Add(new PayrollTotalsLineDto(PayrollPreviewHelpCatalog.SubtotalCode, "Zwischentotal", subtotalChf, true));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.VacationCompensationCode, "Ferienentschaedigung",
+            SumAmounts(allLines, line => line.LineType == PayrollLineType.VacationCompensation));
+        lines.Add(new PayrollTotalsLineDto(PayrollPreviewHelpCatalog.AhvGrossCode, "AHV-pflichtiger Bruttolohn", ahvGrossChf, true));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.AhvIvEoCode, "AHV/IV/EO",
+            SumAmounts(allLines, line => string.Equals(line.Code, "AHV_IV_EO", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.AlvCode, "ALV",
+            SumAmounts(allLines, line => string.Equals(line.Code, "ALV", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.KtgUvgCode, "Krankentaggeld/UVG",
+            SumAmounts(allLines, line => string.Equals(line.Code, "KTG_UVG", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.TrainingAndHolidayCode, "Aus- und Weiterbildungskosten inkl. Ferienentschaedigung",
+            SumAmounts(allLines, line => string.Equals(line.Code, "AUSBILDUNG_FERIEN", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, "WITHHOLDING_TAX", "Quellensteuer",
+            SumAmounts(allLines, line => string.Equals(line.Code, "WITHHOLDING_TAX", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, "WITHHOLDING_TAX_CORRECTION", "Quellensteuer Korrektur / Rueckzahlung",
+            SumAmounts(allLines, line => string.Equals(line.Code, "WITHHOLDING_TAX_CORRECTION", StringComparison.Ordinal)));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.BvgCode, "BVG",
+            SumAmounts(allLines, line => line.LineType == PayrollLineType.BvgDeduction));
+        lines.Add(new PayrollTotalsLineDto(PayrollPreviewHelpCatalog.TotalCode, "Total", totalChf, true));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.ExpensesCode, "Spesen gemaess Nachweis",
+            SumAmounts(allLines, line => line.LineType == PayrollLineType.Expense));
+        lines.Add(new PayrollTotalsLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", totalPayoutChf, true));
+
+        return new PayrollTotalsReportDto(
+            query.Year,
+            query.FromMonth,
+            query.ToMonth,
+            includedMonths,
+            lines
+                .OrderBy(line => GetTotalsSortOrder(line.Code))
+                .ThenBy(line => line.Label, StringComparer.Ordinal)
+                .ToArray());
     }
 
     private static IReadOnlyDictionary<string, string> BuildTemplatePlaceholders(
@@ -243,5 +356,70 @@ public sealed class ReportingService
     private static string Fallback(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+    }
+
+    private static decimal SumAmounts(IEnumerable<PayrollRunLine> lines, Func<PayrollRunLine, bool> predicate)
+    {
+        return lines.Where(predicate).Sum(line => line.AmountChf);
+    }
+
+    private static void AddLineIfNonZero(ICollection<PayrollTotalsLineDto> lines, string code, string label, decimal amountChf)
+    {
+        if (amountChf == 0m)
+        {
+            return;
+        }
+
+        lines.Add(new PayrollTotalsLineDto(code, label, amountChf, false));
+    }
+
+    private static bool IsVehicleCode(string code)
+    {
+        return string.Equals(code, "VEHICLE_P1", StringComparison.Ordinal)
+            || string.Equals(code, "VEHICLE_P2", StringComparison.Ordinal)
+            || string.Equals(code, "VEHICLE_R1", StringComparison.Ordinal);
+    }
+
+    private static int GetTotalsSortOrder(string code)
+    {
+        return code switch
+        {
+            PayrollPreviewHelpCatalog.BaseSalaryCode => 10,
+            PayrollPreviewHelpCatalog.TimeSupplementCode => 20,
+            PayrollPreviewHelpCatalog.SpecialSupplementCode => 30,
+            PayrollPreviewHelpCatalog.VehiclePauschalzone1Code => 40,
+            PayrollPreviewHelpCatalog.VehiclePauschalzone2Code => 50,
+            PayrollPreviewHelpCatalog.VehicleRegiezone1Code => 60,
+            PayrollPreviewHelpCatalog.SubtotalCode => 70,
+            PayrollPreviewHelpCatalog.VacationCompensationCode => 80,
+            PayrollPreviewHelpCatalog.AhvGrossCode => 90,
+            PayrollPreviewHelpCatalog.AhvIvEoCode => 100,
+            PayrollPreviewHelpCatalog.AlvCode => 110,
+            PayrollPreviewHelpCatalog.KtgUvgCode => 120,
+            PayrollPreviewHelpCatalog.TrainingAndHolidayCode => 130,
+            "WITHHOLDING_TAX" => 140,
+            "WITHHOLDING_TAX_CORRECTION" => 145,
+            PayrollPreviewHelpCatalog.BvgCode => 150,
+            PayrollPreviewHelpCatalog.TotalCode => 160,
+            PayrollPreviewHelpCatalog.ExpensesCode => 170,
+            PayrollPreviewHelpCatalog.TotalPayoutCode => 180,
+            _ => 999
+        };
+    }
+
+    private static decimal RoundToFiveRappen(decimal value)
+    {
+        return Math.Round(value * 20m, MidpointRounding.AwayFromZero) / 20m;
+    }
+
+    private static bool TryGetMonthFromPeriodKey(string periodKey, out int month)
+    {
+        month = 0;
+        if (string.IsNullOrWhiteSpace(periodKey) || periodKey.Length < 7)
+        {
+            return false;
+        }
+
+        return int.TryParse(periodKey.AsSpan(5, 2), out month);
     }
 }

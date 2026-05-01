@@ -638,13 +638,14 @@ public sealed class MonthlyRecordRepositorySqliteTests
         var repository = new EmployeeMonthlyRecordRepository(dbContext);
         var aprilRecord = await repository.GetOrCreateAsync(firstEmployee.Id, 2026, 4, CancellationToken.None);
         aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 10), 7m, 1m, 0m, 0m, 2m, 3m, 4m, "April");
+        aprilRecord.SaveExpenseEntry(18.50m);
         await repository.SaveChangesAsync(CancellationToken.None);
 
         var rows = await repository.ListTimeCaptureOverviewAsync(2026, 4, CancellationToken.None);
 
         Assert.Equal(2, rows.Count);
-        Assert.Contains(rows, row => row.PersonnelNumber == "9000" && row.HasMonthCapture && row.HoursWorked == 7m && row.TimeEntryCount == 1);
-        Assert.Contains(rows, row => row.PersonnelNumber == "9001" && !row.HasMonthCapture && row.HoursWorked == 0m && row.TimeEntryCount == 0);
+        Assert.Contains(rows, row => row.PersonnelNumber == "9000" && row.HasMonthCapture && row.HoursWorked == 7m && row.TimeEntryCount == 1 && row.ExpensesTotalChf == 18.50m && row.HasPayrollRelevantData);
+        Assert.Contains(rows, row => row.PersonnelNumber == "9001" && !row.HasMonthCapture && row.HoursWorked == 0m && row.TimeEntryCount == 0 && row.ExpensesTotalChf == 0m && !row.HasPayrollRelevantData);
     }
 
     [Fact]
