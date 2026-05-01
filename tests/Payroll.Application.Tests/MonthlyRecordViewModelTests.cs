@@ -505,6 +505,13 @@ public sealed class MonthlyRecordViewModelTests
             return details;
         }
 
+        public Task<bool> HasTimeEntriesAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            var exists = _records.TryGetValue((employeeId, year, month), out var record)
+                && record.TimeEntries.Count > 0;
+            return Task.FromResult(exists);
+        }
+
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
         {
             return Task.FromResult((IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());

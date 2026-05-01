@@ -68,6 +68,26 @@ public sealed class ImportServiceTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("Personalnummer", StringComparison.Ordinal));
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void ValidateMappings_MissingOptionalColumnDoesNotBlockImport()
+    {
+        var service = CreateImportService(new InMemoryEmployeeRepository());
+
+        var result = service.ValidateMappings(
+            ImportConfigurationType.TimeData,
+            ["Personalnummer", "1001"],
+            [
+                new ImportFieldMappingDto("personnel_number", "Personalnummer", false),
+                new ImportFieldMappingDto("hours_worked", "1001", false),
+                new ImportFieldMappingDto("sunday_hours", "1005", true)
+            ]);
+
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Errors);
+        Assert.Contains(result.Warnings, warning => warning.Contains("1005", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -109,6 +129,64 @@ public sealed class ImportServiceTests
             Assert.Equal("Anna", row["Vorname"]);
             Assert.Equal("Muster", row["Nachname"]);
             Assert.Equal("St. Gallen", row["Ort"]);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ReadCsvDocument_DetectsTabDelimitedMatrixWithUnquotedHeaderAndQuotedData()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.tsv");
+        await File.WriteAllTextAsync(filePath, "Personalnr.\tMitarbeiter\t1001\t1004\t1005\t1006\n\"888942\"\t\"Baumann, Rolf Markus\"\t\"100.50\"\t\"7.00\"\t\"\"\t\"1.00\"\n");
+
+        try
+        {
+            var reader = new CsvImportFileReader();
+            var result = await reader.ReadAsync(
+                new ReadCsvImportDocumentCommand(filePath, ";", false, "'"),
+                CancellationToken.None);
+
+            Assert.Equal(["Personalnr.", "Mitarbeiter", "1001", "1004", "1005", "1006"], result.Headers);
+
+            var row = Assert.Single(result.Rows);
+            Assert.Equal("888942", row["Personalnr."]);
+            Assert.Equal("Baumann, Rolf Markus", row["Mitarbeiter"]);
+            Assert.Equal("100.50", row["1001"]);
+            Assert.Equal("7.00", row["1004"]);
+            Assert.Equal(string.Empty, row["1005"]);
+            Assert.Equal("1.00", row["1006"]);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ReadCsvDocument_DetectsSemicolonDelimitedMatrixIndependentOfCsvSettings()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "Personalnr.;Mitarbeiter;1001;1004;1005;1006\n\"888942\";\"Baumann, Rolf Markus\";\"100.50\";\"7.00\";\"\";\"1.00\"\n");
+
+        try
+        {
+            var reader = new CsvImportFileReader();
+            var result = await reader.ReadAsync(
+                new ReadCsvImportDocumentCommand(filePath, ",", false, "'"),
+                CancellationToken.None);
+
+            Assert.Equal(["Personalnr.", "Mitarbeiter", "1001", "1004", "1005", "1006"], result.Headers);
+
+            var row = Assert.Single(result.Rows);
+            Assert.Equal("888942", row["Personalnr."]);
+            Assert.Equal("Baumann, Rolf Markus", row["Mitarbeiter"]);
+            Assert.Equal("100.50", row["1001"]);
+            Assert.Equal("7.00", row["1004"]);
+            Assert.Equal(string.Empty, row["1005"]);
+            Assert.Equal("1.00", row["1006"]);
         }
         finally
         {
@@ -511,6 +589,261 @@ public sealed class ImportServiceTests
     }
 
     [Fact]
+    public async Task PreviewTimeData_MatrixFileMatchesPersonnelNumberAndShowsEmployeeName()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "\"Personalnr.\";\"Mitarbeiter\";\"1001\";\"1004\";\"1005\";\"1006\"\n\"888942\";\"Baumann, Rolf Markus\";\"100.50\";\"7.00\";\"\";\"1.00\"\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888942", "Rolf Markus", "Baumann", "Zug"), CancellationToken.None);
+            var service = CreateImportService(employeeRepository);
+
+            var preview = await service.PreviewTimeDataAsync(new PreviewTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                4,
+                BuildMappings(
+                    ("personnel_number", "Personalnr.", false),
+                    ("hours_worked", "1001", false),
+                    ("night_hours", "1004", true),
+                    ("holiday_hours", "1006", true))),
+                CancellationToken.None);
+
+            var item = Assert.Single(preview);
+            Assert.Equal("888942", item.PersonnelNumber);
+            Assert.Equal("Rolf Markus Baumann", item.FullName);
+            Assert.True(item.EmployeeMatched);
+            Assert.Equal("Import bereit", item.Status);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task PreviewTimeData_TabDelimitedMatrixShowsAllMappingColumns()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.tsv");
+        await File.WriteAllTextAsync(filePath, "Personalnr.\tMitarbeiter\t1001\t1004\t1005\t1006\n\"888942\"\t\"Baumann, Rolf Markus\"\t\"100.50\"\t\"7.00\"\t\"\"\t\"1.00\"\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888942", "Rolf Markus", "Baumann", "Zug"), CancellationToken.None);
+            var service = CreateImportService(employeeRepository);
+
+            var document = await service.ReadCsvDocumentAsync(
+                new ReadCsvImportDocumentCommand(filePath, ";", false, "'"),
+                CancellationToken.None);
+
+            Assert.Contains("Personalnr.", document.Headers);
+            Assert.Contains("Mitarbeiter", document.Headers);
+            Assert.Contains("1001", document.Headers);
+            Assert.Contains("1004", document.Headers);
+            Assert.Contains("1005", document.Headers);
+            Assert.Contains("1006", document.Headers);
+
+            var preview = await service.PreviewTimeDataAsync(new PreviewTimeDataCommand(
+                filePath,
+                ";",
+                false,
+                "'",
+                2026,
+                4,
+                BuildMappings(
+                    ("personnel_number", "Personalnr.", false),
+                    ("hours_worked", "1001", false),
+                    ("night_hours", "1004", true),
+                    ("sunday_hours", "1005", true),
+                    ("holiday_hours", "1006", true))),
+                CancellationToken.None);
+
+            var item = Assert.Single(preview);
+            Assert.Equal("888942", item.PersonnelNumber);
+            Assert.Equal("Rolf Markus Baumann", item.FullName);
+            Assert.True(item.EmployeeMatched);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task PreviewTimeData_RecognizesExistingMonthlyData()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "Personalnr.;1001\n888942;8\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888942", "Rolf Markus", "Baumann", "Zug"), CancellationToken.None);
+            var employee = await employeeRepository.GetByPersonnelNumberAsync("888942", CancellationToken.None);
+            var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+            var record = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 4, CancellationToken.None);
+            record.SaveTimeEntry(null, new DateOnly(2026, 4, 1), 3m, 0m, 0m, 0m, 0m, 0m, 0m, "bestehend");
+
+            var service = CreateImportService(employeeRepository, monthlyRecordRepository);
+
+            var preview = await service.PreviewTimeDataAsync(new PreviewTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                4,
+                BuildMappings(
+                    ("personnel_number", "Personalnr.", false),
+                    ("hours_worked", "1001", false))),
+                CancellationToken.None);
+
+            var item = Assert.Single(preview);
+            Assert.True(item.MonthlyDataExists);
+            Assert.Equal("Monatsdaten vorhanden", item.Status);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportTimeData_MatrixMappingTreatsEmptyValuesAsZero()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "\"Personalnr.\";\"1001\";\"1004\";\"1005\";\"1006\"\n\"888942\";\"100.50\";\"\";\"\";\"1.00\"\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888942", "Rolf Markus", "Baumann", "Zug"), CancellationToken.None);
+            var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+            var service = CreateImportService(employeeRepository, monthlyRecordRepository);
+
+            var result = await service.ImportTimeDataAsync(new ImportTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                4,
+                false,
+                BuildMappings(
+                    ("personnel_number", "Personalnr.", false),
+                    ("hours_worked", "1001", false),
+                    ("night_hours", "1004", true),
+                    ("sunday_hours", "1005", true),
+                    ("holiday_hours", "1006", true))),
+                CancellationToken.None);
+
+            var employee = await employeeRepository.GetByPersonnelNumberAsync("888942", CancellationToken.None);
+            var monthlyRecord = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 4, CancellationToken.None);
+            var entry = Assert.Single(monthlyRecord.TimeEntries);
+
+            Assert.Equal(1, result.ImportedCount);
+            Assert.Equal(100.50m, entry.HoursWorked);
+            Assert.Equal(0m, entry.NightHours);
+            Assert.Equal(0m, entry.SundayHours);
+            Assert.Equal(1.00m, entry.HolidayHours);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportTimeData_MissingOptionalMappedColumnImportsAsZero()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "Personalnr.;1001\n888942;100.50\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888942", "Rolf Markus", "Baumann", "Zug"), CancellationToken.None);
+            var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+            var service = CreateImportService(employeeRepository, monthlyRecordRepository);
+
+            var result = await service.ImportTimeDataAsync(new ImportTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                4,
+                false,
+                BuildMappings(
+                    ("personnel_number", "Personalnr.", false),
+                    ("hours_worked", "1001", false),
+                    ("sunday_hours", "1005", true))),
+                CancellationToken.None);
+
+            var employee = await employeeRepository.GetByPersonnelNumberAsync("888942", CancellationToken.None);
+            var monthlyRecord = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 4, CancellationToken.None);
+            var entry = Assert.Single(monthlyRecord.TimeEntries);
+
+            Assert.Equal(1, result.ImportedCount);
+            Assert.Equal(100.50m, entry.HoursWorked);
+            Assert.Equal(0m, entry.SundayHours);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task ImportTimeData_ImportsOnlySelectedMatrixRows()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"time-matrix-{Guid.NewGuid():N}.csv");
+        await File.WriteAllTextAsync(filePath, "Personalnr.;1001\n888942;8\n888943;9\n");
+
+        try
+        {
+            var employeeRepository = new InMemoryEmployeeRepository();
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888942", "Rolf Markus", "Baumann", "Zug"), CancellationToken.None);
+            await employeeRepository.SaveAsync(CreateEmployeeCommand(null, "888943", "Petra", "Keller", "Luzern"), CancellationToken.None);
+            var monthlyRecordRepository = new InMemoryEmployeeMonthlyRecordRepository();
+            var service = CreateImportService(employeeRepository, monthlyRecordRepository);
+
+            var result = await service.ImportTimeDataAsync(new ImportTimeDataCommand(
+                filePath,
+                ";",
+                true,
+                "\"",
+                2026,
+                4,
+                false,
+                BuildMappings(
+                    ("personnel_number", "Personalnr.", false),
+                    ("hours_worked", "1001", false)),
+                [2]),
+                CancellationToken.None);
+
+            var firstEmployee = await employeeRepository.GetByPersonnelNumberAsync("888942", CancellationToken.None);
+            var secondEmployee = await employeeRepository.GetByPersonnelNumberAsync("888943", CancellationToken.None);
+            var firstRecord = await monthlyRecordRepository.GetOrCreateAsync(firstEmployee!.EmployeeId, 2026, 4, CancellationToken.None);
+            var secondRecord = await monthlyRecordRepository.GetOrCreateAsync(secondEmployee!.EmployeeId, 2026, 4, CancellationToken.None);
+
+            Assert.Equal(1, result.ImportedCount);
+            Assert.Single(firstRecord.TimeEntries);
+            Assert.Empty(secondRecord.TimeEntries);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public async Task IsMonthImported_RecognizesAlreadyImportedMonth()
     {
         var service = CreateImportService(
@@ -834,6 +1167,13 @@ public sealed class ImportServiceTests
         public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
             return Task.FromResult<MonthlyRecordDetailsDto?>(null);
+        }
+
+        public Task<bool> HasTimeEntriesAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            var exists = _records.TryGetValue((employeeId, year, month), out var record)
+                && record.TimeEntries.Count > 0;
+            return Task.FromResult(exists);
         }
 
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)

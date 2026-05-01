@@ -1,0 +1,48 @@
+<Window
+    x:Class="Payroll.Desktop.Views.TimeImportPreviewWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Import-Vorschau Stundendaten"
+    Width="1080"
+    Height="720"
+    MinWidth="820"
+    MinHeight="520"
+    Background="{DynamicResource Theme.Color.AppBackground}">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20">
+    <StackPanel Spacing="6">
+      <TextBlock FontSize="22" FontWeight="SemiBold" Text="Import-Vorschau" />
+      <TextBlock Foreground="#FF5F6B7A" Text="Waehle aus, welche Stundendatensaetze importiert werden sollen. Vorhandene Monatsdaten werden pro Mitarbeitenden aktualisiert." TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Margin="0,16,0,16" BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="8" Padding="12">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="8">
+          <Grid ColumnDefinitions="Auto,180,*,220">
+            <TextBlock FontWeight="SemiBold" Text="Import" />
+            <TextBlock Grid.Column="1" Margin="12,0,0,0" FontWeight="SemiBold" Text="Personalnummer" />
+            <TextBlock Grid.Column="2" Margin="12,0,0,0" FontWeight="SemiBold" Text="Mitarbeiter" />
+            <TextBlock Grid.Column="3" Margin="12,0,0,0" FontWeight="SemiBold" Text="Status" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding TimeImportPreviewItems}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="Auto,180,*,220" Margin="0,0,0,6">
+                  <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" IsEnabled="{Binding IsImportable}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding PersonnelNumber}" />
+                  <TextBlock Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding FullName}" />
+                  <TextBlock Grid.Column="3" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding Status}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto">
+      <TextBlock Foreground="#FF5F6B7A" VerticalAlignment="Center" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
+      <Button Grid.Column="1" Margin="12,0,0,0" Content="Abbrechen" Click="OnCancelClick" />
+      <Button Grid.Column="2" Margin="12,0,0,0" Classes="primary-action" Content="Definitiv importieren" Click="OnConfirmImportClick" IsEnabled="{Binding CanImportSelectedTimeData}" />
+    </Grid>
+  </Grid>
+</Window>

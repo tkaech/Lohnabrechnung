@@ -159,7 +159,10 @@ public sealed class ImportService
         IReadOnlyCollection<ImportFieldMappingDto> mappings)
     {
         var errors = new List<string>();
+        var warnings = new List<string>();
         var headers = csvHeaders.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var fieldDefinitionsByKey = GetFieldDefinitions(type)
+            .ToDictionary(field => field.FieldKey, StringComparer.OrdinalIgnoreCase);
         var mappingByField = mappings
             .Where(item => !string.IsNullOrWhiteSpace(item.CsvColumnName))
             .GroupBy(item => item.FieldKey, StringComparer.OrdinalIgnoreCase)
@@ -182,13 +185,25 @@ public sealed class ImportService
 
         foreach (var mappedColumn in mappingByField.Values.Select(item => item.CsvColumnName.Trim()))
         {
-            if (!headers.Contains(mappedColumn))
+            if (headers.Contains(mappedColumn))
+            {
+                continue;
+            }
+
+            var mapping = mappingByField.Values.First(item => string.Equals(item.CsvColumnName.Trim(), mappedColumn, StringComparison.OrdinalIgnoreCase));
+            if (fieldDefinitionsByKey.TryGetValue(mapping.FieldKey, out var fieldDefinition) && fieldDefinition.IsRequired)
             {
                 errors.Add($"CSV-Spalte `{mappedColumn}` ist in der geladenen Datei nicht vorhanden.");
+                continue;
+            }
+
+            if (fieldDefinitionsByKey.TryGetValue(mapping.FieldKey, out var optionalFieldDefinition))
+            {
+                warnings.Add($"Optionale Spalte `{mappedColumn}` fuer `{optionalFieldDefinition.Label}` fehlt und wird als 0 bzw. leer importiert.");
             }
         }
 
-        return new ImportValidationResultDto(errors.Count == 0, errors);
+        return new ImportValidationResultDto(errors.Count == 0, errors, warnings.Distinct(StringComparer.Ordinal).ToArray());
     }
 
     public async Task<PersonDataImportResultDto> ImportPersonDataAsync(ImportPersonDataCommand command, CancellationToken cancellationToken = default)
@@ -381,6 +396,72 @@ public sealed class ImportService
         return previewItems;
     }
 
+    public async Task<IReadOnlyCollection<TimeImportPreviewItemDto>> PreviewTimeDataAsync(PreviewTimeDataCommand command, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        _ = new DateOnly(command.Year, command.Month, 1);
+
+        var document = await _csvImportFileReader.ReadAsync(
+            new ReadCsvImportDocumentCommand(
+                command.FilePath,
+                command.Delimiter,
+                command.FieldsEnclosed,
+                command.TextQualifier),
+            cancellationToken);
+
+        var mappingByField = command.Mappings
+            .Where(item => !string.IsNullOrWhiteSpace(item.CsvColumnName))
+            .GroupBy(item => item.FieldKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToDictionary(item => item.FieldKey, item => item, StringComparer.OrdinalIgnoreCase);
+
+        if (!mappingByField.ContainsKey("personnel_number"))
+        {
+            return [];
+        }
+
+        var previewItems = new List<TimeImportPreviewItemDto>();
+        var rowIndex = 1;
+        foreach (var row in document.Rows)
+        {
+            rowIndex++;
+            if (IsEmptyRow(row))
+            {
+                continue;
+            }
+
+            var personnelNumber = GetOptionalString(row, mappingByField, "personnel_number");
+            if (string.IsNullOrWhiteSpace(personnelNumber))
+            {
+                continue;
+            }
+
+            var employee = await _employeeRepository.GetByPersonnelNumberAsync(personnelNumber, cancellationToken);
+            if (employee is null)
+            {
+                previewItems.Add(new TimeImportPreviewItemDto(
+                    rowIndex,
+                    personnelNumber,
+                    string.Empty,
+                    false,
+                    false,
+                    "Personalnummer nicht gefunden"));
+                continue;
+            }
+
+            var monthlyDataExists = await _monthlyRecordRepository.HasTimeEntriesAsync(employee.EmployeeId, command.Year, command.Month, cancellationToken);
+            previewItems.Add(new TimeImportPreviewItemDto(
+                rowIndex,
+                personnelNumber,
+                $"{employee.FirstName} {employee.LastName}".Trim(),
+                true,
+                monthlyDataExists,
+                monthlyDataExists ? "Monatsdaten vorhanden" : "Import bereit"));
+        }
+
+        return previewItems;
+    }
+
     public Task<IReadOnlyCollection<ImportedMonthStatusDto>> ListImportedMonthsAsync(ImportConfigurationType type, CancellationToken cancellationToken = default)
     {
         return _importExecutionStatusRepository.ListAsync(type, cancellationToken);
@@ -406,13 +487,15 @@ public sealed class ImportService
             return new TimeDataImportResultDto(0, validation.Errors.Count, validation.Errors);
         }
 
+        var selectedRowNumbers = command.SelectedRowNumbers?.ToHashSet() ?? [];
+        var importsSubset = selectedRowNumbers.Count > 0;
         var alreadyImported = await _importExecutionStatusRepository.ExistsAsync(ImportConfigurationType.TimeData, command.Year, command.Month, cancellationToken);
-        if (alreadyImported && !command.OverwriteExistingMonth)
+        if (alreadyImported && !command.OverwriteExistingMonth && !importsSubset)
         {
             throw new InvalidOperationException("Fuer diesen Monat wurden bereits Stundendaten importiert.");
         }
 
-        if (alreadyImported)
+        if (alreadyImported && command.OverwriteExistingMonth && !importsSubset)
         {
             await _monthlyRecordRepository.DeleteTimeEntriesForMonthAsync(command.Year, command.Month, cancellationToken);
             await _importExecutionStatusRepository.DeleteAsync(ImportConfigurationType.TimeData, command.Year, command.Month, cancellationToken);
@@ -434,6 +517,11 @@ public sealed class ImportService
         foreach (var row in document.Rows)
         {
             rowIndex++;
+            if (importsSubset && !selectedRowNumbers.Contains(rowIndex))
+            {
+                continue;
+            }
+
             if (IsEmptyRow(row))
             {
                 continue;

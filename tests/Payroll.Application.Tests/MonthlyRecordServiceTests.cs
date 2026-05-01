@@ -189,6 +189,16 @@ public sealed class MonthlyRecordServiceTests
             return Task.FromResult<MonthlyRecordDetailsDto?>(details);
         }
 
+        public Task<bool> HasTimeEntriesAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            var exists = _monthlyRecordsById.Values.Any(item =>
+                item.EmployeeId == employeeId
+                && item.Year == year
+                && item.Month == month
+                && item.TimeEntries.Count > 0);
+            return Task.FromResult(exists);
+        }
+
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
         {
             return Task.FromResult((IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>)Array.Empty<MonthlyTimeCaptureOverviewRowDto>());

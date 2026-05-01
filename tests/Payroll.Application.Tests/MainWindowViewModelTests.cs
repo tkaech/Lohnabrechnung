@@ -919,25 +919,37 @@ public sealed class MainWindowViewModelTests
     public async Task TimeImport_RequiresMonthSelectionBeforeImportIsEnabled()
     {
         var repository = new TestEmployeeRepository();
-        var viewModel = CreateViewModel(repository);
+        var csvReader = new InMemoryCsvImportFileReader();
+        csvReader.SetDocument(
+            "/tmp/stunden.csv",
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                []));
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(repository, csvReader, new InMemoryMonthlyRecordRepository());
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(repository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(repository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
 
         await viewModel.InitializeAsync();
         viewModel.ShowSettingsCommand.Execute(null);
 
         viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
-        foreach (var row in viewModel.TimeImportFieldMappings)
-        {
-            if (row.FieldKey == "personnel_number")
-            {
-                row.ApplyAvailableCsvColumns(["Personalnummer", "Stunden"]);
-                row.SelectedCsvColumn = "Personalnummer";
-            }
-            else if (row.FieldKey == "hours_worked")
-            {
-                row.ApplyAvailableCsvColumns(["Personalnummer", "Stunden"]);
-                row.SelectedCsvColumn = "Stunden";
-            }
-        }
+        await viewModel.ReloadTimeImportCsvAsync();
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn = "Personalnummer";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn = "Stunden";
 
         viewModel.TimeImportMonth = null;
 
@@ -999,6 +1011,440 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("geladen", viewModel.TimeImportStatusMessage, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Personalnummer", viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn);
         Assert.Equal("Stunden", viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn);
+    }
+
+    [Fact]
+    public async Task TimeImport_LoadingSavedMappingWithLoadedFileEnablesImportWithoutFieldChange()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var importRepository = new InMemoryImportMappingConfigurationRepository();
+        await importRepository.SaveAsync(
+            new SaveImportConfigurationCommand(
+                null,
+                ImportConfigurationType.TimeData,
+                "Stunden CSV",
+                ";",
+                true,
+                "\"",
+                [
+                    new ImportFieldMappingDto("personnel_number", "Personalnummer", false),
+                    new ImportFieldMappingDto("hours_worked", "Stunden", false)
+                ]),
+            CancellationToken.None);
+
+        var csvReader = new InMemoryCsvImportFileReader();
+        csvReader.SetDocument(
+            "/tmp/stunden.csv",
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                []));
+
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(
+            employeeRepository,
+            csvReader,
+            new InMemoryMonthlyRecordRepository(),
+            importMappingConfigurationRepository: importRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
+
+        var savedItem = viewModel.TimeImportConfigurations.Single(item => item.Name == "Stunden CSV");
+        viewModel.SelectedTimeImportConfiguration = savedItem;
+
+        await WaitUntilAsync(() => viewModel.TimeImportConfigurationName == "Stunden CSV" && viewModel.CanImportTimeData);
+
+        Assert.True(viewModel.CanImportTimeData);
+    }
+
+    [Fact]
+    public async Task TimeImport_BlockedReason_ShowsMissingHeadersUntilFileContextIsRead()
+    {
+        var repository = new TestEmployeeRepository();
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
+
+        Assert.False(viewModel.CanImportTimeData);
+        Assert.Contains(viewModel.TimeImportBlockedReasons, reason => reason.Contains("Header", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task TimeImport_MissingOptionalColumnDoesNotBlockAndShowsWarning()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var csvReader = new InMemoryCsvImportFileReader();
+        csvReader.SetDocument(
+            "/tmp/stunden.csv",
+            new CsvImportDocumentDto(
+                ["Personalnummer", "1001"],
+                []));
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(employeeRepository, csvReader, new InMemoryMonthlyRecordRepository());
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
+        await viewModel.ReloadTimeImportCsvAsync();
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn = "Personalnummer";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn = "1001";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "sunday_hours").SelectedCsvColumn = "1005";
+
+        await WaitUntilAsync(() => viewModel.CanImportTimeData);
+
+        Assert.True(viewModel.CanImportTimeData);
+        Assert.Contains(viewModel.TimeImportWarnings, warning => warning.Contains("1005", StringComparison.Ordinal));
+        Assert.Empty(viewModel.TimeImportBlockedReasons);
+    }
+
+    [Fact]
+    public async Task TimeImport_MissingRequiredColumnBlocksImport()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var csvReader = new InMemoryCsvImportFileReader();
+        csvReader.SetDocument(
+            "/tmp/stunden.csv",
+            new CsvImportDocumentDto(
+                ["Personalnummer"],
+                []));
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(employeeRepository, csvReader, new InMemoryMonthlyRecordRepository());
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
+        await viewModel.ReloadTimeImportCsvAsync();
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn = "Personalnummer";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn = "1001";
+
+        Assert.False(viewModel.CanImportTimeData);
+        Assert.Contains(viewModel.TimeImportBlockedReasons, reason => reason.Contains("Arbeitsstunden", StringComparison.OrdinalIgnoreCase) || reason.Contains("1001", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task TimeImport_AfterRestartWithSameFileAndMapping_KeepsImportedMonthBlockedButEnablesDifferentMonth()
+    {
+        var employeeRepository = new TestEmployeeRepository();
+        var importRepository = new InMemoryImportMappingConfigurationRepository();
+        await importRepository.SaveAsync(
+            new SaveImportConfigurationCommand(
+                null,
+                ImportConfigurationType.TimeData,
+                "Stunden CSV",
+                ";",
+                true,
+                "\"",
+                [
+                    new ImportFieldMappingDto("personnel_number", "Personalnummer", false),
+                    new ImportFieldMappingDto("hours_worked", "Stunden", false)
+                ]),
+            CancellationToken.None);
+
+        var csvReader = new InMemoryCsvImportFileReader();
+        csvReader.SetDocument(
+            "/tmp/stunden.csv",
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                []));
+
+        var importStatusRepository = new InMemoryImportExecutionStatusRepository(
+            new ImportedMonthStatusDto(2026, 1, DateTimeOffset.UtcNow));
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(
+            employeeRepository,
+            csvReader,
+            new InMemoryMonthlyRecordRepository(),
+            importStatusRepository,
+            importRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportCsvFilePath = "/tmp/stunden.csv";
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 1, 1));
+        viewModel.SelectedTimeImportConfiguration = viewModel.TimeImportConfigurations.Single(item => item.Name == "Stunden CSV");
+
+        await WaitUntilAsync(() => viewModel.TimeImportConfigurationName == "Stunden CSV");
+        Assert.False(viewModel.CanImportTimeData);
+        Assert.Contains(viewModel.TimeImportBlockedReasons, reason => reason.Contains("bereits importiert", StringComparison.OrdinalIgnoreCase));
+
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 2, 1));
+
+        await WaitUntilAsync(() => viewModel.CanImportTimeData);
+        Assert.True(viewModel.CanImportTimeData);
+        Assert.Empty(viewModel.TimeImportBlockedReasons);
+    }
+
+    [Fact]
+    public async Task TimeImport_CanReuseSameMappingAcrossFilesAndMonthsWithoutOverwritingPreviousMonth()
+    {
+        var employeeRepository = new TestEmployeeRepository(TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"));
+        var csvReader = new InMemoryCsvImportFileReader();
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        var importStatusRepository = new InMemoryImportExecutionStatusRepository();
+        var aprilPath = "/tmp/stunden-april.csv";
+        var mayPath = "/tmp/stunden-mai.csv";
+        csvReader.SetDocument(
+            aprilPath,
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                [
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Personalnummer"] = "1000",
+                        ["Stunden"] = "8"
+                    }
+                ]));
+        csvReader.SetDocument(
+            mayPath,
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                [
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Personalnummer"] = "1000",
+                        ["Stunden"] = "9"
+                    }
+                ]));
+
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(employeeRepository, csvReader, monthlyRecordRepository, importStatusRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        viewModel.TimeImportCsvFilePath = aprilPath;
+        await viewModel.ReloadTimeImportCsvAsync();
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn = "Personalnummer";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn = "Stunden";
+
+        Assert.True(viewModel.CanImportTimeData);
+
+        var aprilPrepared = await viewModel.PrepareTimeImportPreviewAsync();
+        Assert.True(aprilPrepared);
+        await viewModel.ImportSelectedTimeDataAsync();
+        Assert.False(viewModel.CanImportTimeData);
+
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 5, 1));
+        viewModel.TimeImportCsvFilePath = mayPath;
+        await viewModel.ReloadTimeImportCsvAsync();
+
+        Assert.True(viewModel.CanImportTimeData);
+
+        var mayPrepared = await viewModel.PrepareTimeImportPreviewAsync();
+        Assert.True(mayPrepared);
+        await viewModel.ImportSelectedTimeDataAsync();
+
+        var employee = await employeeRepository.GetByPersonnelNumberAsync("1000", CancellationToken.None);
+        var aprilRecord = await monthlyRecordRepository.GetOrCreateAsync(employee!.EmployeeId, 2026, 4, CancellationToken.None);
+        var mayRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.EmployeeId, 2026, 5, CancellationToken.None);
+
+        Assert.Single(aprilRecord.TimeEntries);
+        Assert.Single(mayRecord.TimeEntries);
+        Assert.Equal(8m, aprilRecord.TimeEntries.Single().HoursWorked);
+        Assert.Equal(9m, mayRecord.TimeEntries.Single().HoursWorked);
+        Assert.True(await importStatusRepository.ExistsAsync(ImportConfigurationType.TimeData, 2026, 4, CancellationToken.None));
+        Assert.True(await importStatusRepository.ExistsAsync(ImportConfigurationType.TimeData, 2026, 5, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TimeImport_DeletingImportedMonthEnablesImportAgain()
+    {
+        var employeeRepository = new TestEmployeeRepository(TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"));
+        var csvReader = new InMemoryCsvImportFileReader();
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        var importStatusRepository = new InMemoryImportExecutionStatusRepository();
+        var path = "/tmp/stunden.csv";
+        csvReader.SetDocument(
+            path,
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                [
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Personalnummer"] = "1000",
+                        ["Stunden"] = "8"
+                    }
+                ]));
+
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(employeeRepository, csvReader, monthlyRecordRepository, importStatusRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        viewModel.TimeImportCsvFilePath = path;
+        await viewModel.ReloadTimeImportCsvAsync();
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn = "Personalnummer";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn = "Stunden";
+
+        Assert.True(await viewModel.PrepareTimeImportPreviewAsync());
+        await viewModel.ImportSelectedTimeDataAsync();
+        Assert.False(viewModel.CanImportTimeData);
+
+        viewModel.SelectedImportedTimeMonth = viewModel.ImportedTimeMonths.Single(item => item.Year == 2026 && item.Month == 4);
+        await viewModel.DeleteImportedTimeMonthAsync();
+
+        Assert.True(viewModel.CanImportTimeData);
+    }
+
+    [Fact]
+    public async Task TimeImport_DuplicateDetectionUsesCurrentMonthPerEmployee()
+    {
+        var employeeRepository = new TestEmployeeRepository(TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern"));
+        var csvReader = new InMemoryCsvImportFileReader();
+        var monthlyRecordRepository = new InMemoryMonthlyRecordRepository();
+        var importStatusRepository = new InMemoryImportExecutionStatusRepository();
+        var path = "/tmp/stunden.csv";
+        csvReader.SetDocument(
+            path,
+            new CsvImportDocumentDto(
+                ["Personalnummer", "Stunden"],
+                [
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Personalnummer"] = "1000",
+                        ["Stunden"] = "8"
+                    }
+                ]));
+
+        var settingsRepository = new InMemoryPayrollSettingsRepository();
+        var monthlyRecordService = new MonthlyRecordService(new InMemoryMonthlyRecordRepository());
+        var importService = CreateImportService(employeeRepository, csvReader, monthlyRecordRepository, importStatusRepository);
+        var viewModel = new MainWindowViewModel(
+            new EmployeeService(employeeRepository),
+            importService,
+            new InMemoryBackupRestoreService(),
+            new PayrollSettingsService(settingsRepository),
+            new ReportingService(
+                new EmployeeService(employeeRepository),
+                monthlyRecordService,
+                new PayrollSettingsService(settingsRepository),
+                new TestPdfExportService()),
+            monthlyRecordService,
+            new MonthlyRecordViewModel(monthlyRecordService),
+            CreateLayoutParameterFilesViewModel(),
+            "Test");
+
+        await viewModel.InitializeAsync();
+        viewModel.ShowSettingsCommand.Execute(null);
+        viewModel.TimeImportCsvFilePath = path;
+        await viewModel.ReloadTimeImportCsvAsync();
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "personnel_number").SelectedCsvColumn = "Personalnummer";
+        viewModel.TimeImportFieldMappings.Single(item => item.FieldKey == "hours_worked").SelectedCsvColumn = "Stunden";
+
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        Assert.True(await viewModel.PrepareTimeImportPreviewAsync());
+        await viewModel.ImportSelectedTimeDataAsync();
+
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 4, 1));
+        Assert.True(await viewModel.PrepareTimeImportPreviewAsync());
+        var aprilPreview = Assert.Single(viewModel.TimeImportPreviewItems);
+        Assert.True(aprilPreview.MonthlyDataExists);
+        Assert.Equal("Monatsdaten vorhanden", aprilPreview.Status);
+
+        viewModel.TimeImportMonth = new DateTimeOffset(new DateTime(2026, 5, 1));
+        Assert.True(await viewModel.PrepareTimeImportPreviewAsync());
+        var mayPreview = Assert.Single(viewModel.TimeImportPreviewItems);
+        Assert.False(mayPreview.MonthlyDataExists);
+        Assert.Equal("Import bereit", mayPreview.Status);
     }
 
     private static MainWindowViewModel CreateViewModel(
@@ -1077,6 +1523,21 @@ public sealed class MainWindowViewModelTests
             employeeRepository,
             new InMemoryMonthlyRecordRepository(),
             new InMemoryImportExecutionStatusRepository());
+    }
+
+    private static ImportService CreateImportService(
+        IEmployeeRepository employeeRepository,
+        ICsvImportFileReader csvImportFileReader,
+        IEmployeeMonthlyRecordRepository monthlyRecordRepository,
+        IImportExecutionStatusRepository? importExecutionStatusRepository = null,
+        IImportMappingConfigurationRepository? importMappingConfigurationRepository = null)
+    {
+        return new ImportService(
+            importMappingConfigurationRepository ?? new InMemoryImportMappingConfigurationRepository(),
+            csvImportFileReader,
+            employeeRepository,
+            monthlyRecordRepository,
+            importExecutionStatusRepository ?? new InMemoryImportExecutionStatusRepository());
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
@@ -1518,8 +1979,20 @@ public sealed class MainWindowViewModelTests
 
     private sealed class InMemoryCsvImportFileReader : ICsvImportFileReader
     {
+        private readonly Dictionary<string, CsvImportDocumentDto> _documentsByPath = new(StringComparer.OrdinalIgnoreCase);
+
+        public void SetDocument(string filePath, CsvImportDocumentDto document)
+        {
+            _documentsByPath[filePath] = document;
+        }
+
         public Task<CsvImportDocumentDto> ReadAsync(ReadCsvImportDocumentCommand command, CancellationToken cancellationToken)
         {
+            if (_documentsByPath.TryGetValue(command.FilePath, out var document))
+            {
+                return Task.FromResult(document);
+            }
+
             return Task.FromResult(new CsvImportDocumentDto(["Personalnummer"], []));
         }
     }
@@ -1527,6 +2000,7 @@ public sealed class MainWindowViewModelTests
     private sealed class InMemoryMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
     {
         private readonly Dictionary<(int Year, int Month), IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> _overviewRows = [];
+        private readonly Dictionary<(Guid EmployeeId, int Year, int Month), EmployeeMonthlyRecord> _records = [];
 
         public void SetOverviewRows(int year, int month, IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto> rows)
         {
@@ -1535,7 +2009,14 @@ public sealed class MainWindowViewModelTests
 
         public Task<EmployeeMonthlyRecord> GetOrCreateAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new EmployeeMonthlyRecord(employeeId, year, month));
+            var key = (employeeId, year, month);
+            if (!_records.TryGetValue(key, out var record))
+            {
+                record = new EmployeeMonthlyRecord(employeeId, year, month);
+                _records[key] = record;
+            }
+
+            return Task.FromResult(record);
         }
 
         public Task<EmployeeMonthlyRecord?> GetByIdAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
@@ -1546,6 +2027,13 @@ public sealed class MainWindowViewModelTests
         public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
             return Task.FromResult<MonthlyRecordDetailsDto?>(null);
+        }
+
+        public Task<bool> HasTimeEntriesAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+        {
+            var exists = _records.TryGetValue((employeeId, year, month), out var record)
+                && record.TimeEntries.Count > 0;
+            return Task.FromResult(exists);
         }
 
         public Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
@@ -1562,6 +2050,14 @@ public sealed class MainWindowViewModelTests
 
         public Task DeleteTimeEntriesForMonthAsync(int year, int month, CancellationToken cancellationToken)
         {
+            foreach (var record in _records.Values.Where(item => item.Year == year && item.Month == month).ToArray())
+            {
+                foreach (var timeEntry in record.TimeEntries.ToArray())
+                {
+                    record.RemoveTimeEntry(timeEntry.Id);
+                }
+            }
+
             return Task.CompletedTask;
         }
 
@@ -1576,24 +2072,42 @@ public sealed class MainWindowViewModelTests
 
     private sealed class InMemoryImportExecutionStatusRepository : IImportExecutionStatusRepository
     {
+        private readonly Dictionary<(ImportConfigurationType Type, int Year, int Month), ImportedMonthStatusDto> _items = [];
+
+        public InMemoryImportExecutionStatusRepository(params ImportedMonthStatusDto[] items)
+        {
+            foreach (var item in items)
+            {
+                _items[(ImportConfigurationType.TimeData, item.Year, item.Month)] = item;
+            }
+        }
+
         public Task<bool> ExistsAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken)
         {
-            return Task.FromResult(false);
+            return Task.FromResult(_items.ContainsKey((type, year, month)));
         }
 
         public Task MarkImportedAsync(ImportConfigurationType type, int year, int month, DateTimeOffset importedAtUtc, CancellationToken cancellationToken)
         {
+            _items[(type, year, month)] = new ImportedMonthStatusDto(year, month, importedAtUtc);
             return Task.CompletedTask;
         }
 
         public Task DeleteAsync(ImportConfigurationType type, int year, int month, CancellationToken cancellationToken)
         {
+            _items.Remove((type, year, month));
             return Task.CompletedTask;
         }
 
         public Task<IReadOnlyCollection<ImportedMonthStatusDto>> ListAsync(ImportConfigurationType type, CancellationToken cancellationToken)
         {
-            return Task.FromResult<IReadOnlyCollection<ImportedMonthStatusDto>>([]);
+            var items = _items
+                .Where(item => item.Key.Type == type)
+                .Select(item => item.Value)
+                .OrderBy(item => item.Year)
+                .ThenBy(item => item.Month)
+                .ToArray();
+            return Task.FromResult<IReadOnlyCollection<ImportedMonthStatusDto>>(items);
         }
     }
 

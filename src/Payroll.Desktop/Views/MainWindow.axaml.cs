@@ -356,6 +356,7 @@ public sealed partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(localPath))
         {
             viewModel.TimeImportCsvFilePath = localPath;
+            await viewModel.ReloadTimeImportCsvAsync();
         }
     }
 
@@ -387,24 +388,18 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var alreadyImported = await viewModel.IsSelectedTimeImportMonthAlreadyImportedAsync();
-        if (alreadyImported)
+        var prepared = await viewModel.PrepareTimeImportPreviewAsync();
+        if (!prepared || viewModel.TimeImportPreviewItems.Count == 0)
         {
-            var shouldOverwrite = await ShowConfirmationDialogAsync(
-                "Stundendaten ueberschreiben",
-                "Fuer den gewaelten Monat wurden bereits Stundendaten importiert. Soll der bestehende Monatsimport vollstaendig ersetzt werden?",
-                "Ueberschreiben");
-
-            if (!shouldOverwrite)
-            {
-                return;
-            }
-
-            await viewModel.ImportTimeDataAsync(true);
             return;
         }
 
-        await viewModel.ImportTimeDataAsync();
+        var previewWindow = new TimeImportPreviewWindow
+        {
+            DataContext = viewModel
+        };
+
+        await previewWindow.ShowDialog<bool?>(this);
     }
 
     private async void OnDeleteImportedTimeMonthClick(object? sender, RoutedEventArgs e)

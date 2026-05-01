@@ -46,7 +46,8 @@ public sealed record CsvImportDocumentDto(
 
 public sealed record ImportValidationResultDto(
     bool IsValid,
-    IReadOnlyCollection<string> Errors);
+    IReadOnlyCollection<string> Errors,
+    IReadOnlyCollection<string> Warnings);
 
 public sealed record ImportPersonDataCommand(
     string FilePath,
@@ -83,7 +84,25 @@ public sealed record ImportTimeDataCommand(
     int Year,
     int Month,
     bool OverwriteExistingMonth,
+    IReadOnlyCollection<ImportFieldMappingDto> Mappings,
+    IReadOnlyCollection<int>? SelectedRowNumbers = null);
+
+public sealed record PreviewTimeDataCommand(
+    string FilePath,
+    string Delimiter,
+    bool FieldsEnclosed,
+    string TextQualifier,
+    int Year,
+    int Month,
     IReadOnlyCollection<ImportFieldMappingDto> Mappings);
+
+public sealed record TimeImportPreviewItemDto(
+    int RowNumber,
+    string PersonnelNumber,
+    string FullName,
+    bool EmployeeMatched,
+    bool MonthlyDataExists,
+    string Status);
 
 public sealed record TimeDataImportResultDto(
     int ImportedCount,

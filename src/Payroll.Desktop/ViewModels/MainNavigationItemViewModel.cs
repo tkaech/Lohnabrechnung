@@ -6,7 +6,6 @@ public enum MainSection
     TimeAndExpenses,
     PayrollRuns,
     AnnualSalary,
-    WithholdingTax,
     Reporting,
     Settings,
     Help

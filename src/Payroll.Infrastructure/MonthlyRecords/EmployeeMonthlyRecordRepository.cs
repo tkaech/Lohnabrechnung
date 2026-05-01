@@ -251,6 +251,14 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .ToArray();
     }
 
+    public Task<bool> HasTimeEntriesAsync(Guid employeeId, int year, int month, CancellationToken cancellationToken)
+    {
+        return _dbContext.EmployeeMonthlyRecords
+            .AsNoTracking()
+            .Where(record => record.EmployeeId == employeeId && record.Year == year && record.Month == month)
+            .AnyAsync(record => record.TimeEntries.Any(), cancellationToken);
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);

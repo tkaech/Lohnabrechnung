@@ -895,7 +895,7 @@
                       <TextBlock FontSize="18" FontWeight="SemiBold" Text="Stundendaten" />
                     <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}">
                       <TextBlock FontWeight="SemiBold" Text="CSV-Datei laden" />
-                      <TextBlock Foreground="#FF5F6B7A" Text="CSV-Datei waehlen, Spalten fuer den Stundenimport zuordnen und den Importmonat explizit festlegen. Das Datum kommt nicht aus der CSV, sondern aus dem Importkontext." TextWrapping="Wrap" />
+                      <TextBlock Foreground="#FF5F6B7A" Text="Datei waehlen, Spalten fuer den Stundenimport zuordnen und den Importmonat explizit festlegen. Trenner und Quotes werden fuer diesen Matrix-Import automatisch erkannt. Das Datum kommt nicht aus der Datei, sondern aus dem Importkontext." TextWrapping="Wrap" />
                       <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
                         <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Spacing="4">
                           <TextBlock Classes="section-caption" Text="CSV-Datei" />
@@ -905,18 +905,7 @@
                             <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding LoadTimeImportCsvCommand}" Content="CSV laden" />
                           </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4" Margin="0,8,8,0">
-                          <TextBlock Classes="section-caption" Text="Trenner" />
-                          <ComboBox Width="160" ItemsSource="{Binding PersonImportDelimiterOptions}" SelectedItem="{Binding SelectedTimeImportDelimiter, Mode=TwoWay}" />
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4" Margin="8,8,0,0">
-                          <TextBlock Classes="section-caption" Text="Textqualifier" />
-                          <Grid ColumnDefinitions="Auto,*">
-                            <CheckBox Content="Felder ummantelt" IsChecked="{Binding TimeImportFieldsEnclosed, Mode=TwoWay}" VerticalAlignment="Center" />
-                            <ComboBox Grid.Column="1" Width="240" Margin="12,0,0,0" ItemsSource="{Binding PersonImportTextQualifierOptions}" SelectedItem="{Binding SelectedTimeImportTextQualifier, Mode=TwoWay}" />
-                          </Grid>
-                        </StackPanel>
-                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="4" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Spacing="4" Margin="0,8,0,0">
                           <TextBlock Classes="section-caption" Text="Importmonat" />
                           <controls:MonthPicker SelectedDate="{Binding TimeImportMonth, Mode=TwoWay}" Watermark="MM/YYYY" />
                         </StackPanel>
@@ -998,6 +987,12 @@
                       </Grid>
 
                       <TextBlock Foreground="#FF5F6B7A" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
+                      <Border IsVisible="{Binding HasTimeImportWarnings}" Background="#FFF7F8EB" BorderBrush="#FFD6DCA5" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="10,8">
+                        <TextBlock Foreground="#FF596116" Text="{Binding TimeImportWarningMessage}" TextWrapping="Wrap" />
+                      </Border>
+                      <Border IsVisible="{Binding HasTimeImportBlockedReasons}" Background="#FFF8F2E8" BorderBrush="#FFE3C8A5" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="10,8">
+                        <TextBlock Foreground="#FF7A4C10" Text="{Binding TimeImportBlockedReason}" TextWrapping="Wrap" />
+                      </Border>
                       <Button HorizontalAlignment="Right" Classes="primary-action" Content="Stundendaten importieren" Click="OnImportTimeDataClick" IsEnabled="{Binding CanImportTimeData}" />
                     </StackPanel>
                     </StackPanel>

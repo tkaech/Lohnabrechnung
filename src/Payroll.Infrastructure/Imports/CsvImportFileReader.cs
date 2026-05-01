@@ -19,9 +19,10 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
             throw new InvalidOperationException("CSV-Datei ist leer.");
         }
 
-        var delimiter = NormalizeSingleCharacter(command.Delimiter, nameof(command.Delimiter));
-        var textQualifier = NormalizeSingleCharacter(command.TextQualifier, nameof(command.TextQualifier));
-        var headers = ParseLine(nonEmptyLines[0], delimiter, command.FieldsEnclosed, textQualifier)
+        var configuredDelimiter = NormalizeSingleCharacter(command.Delimiter, nameof(command.Delimiter));
+        _ = NormalizeSingleCharacter(command.TextQualifier, nameof(command.TextQualifier));
+        var delimiter = DetectDelimiter(nonEmptyLines, configuredDelimiter);
+        var headers = ParseLine(nonEmptyLines[0], delimiter)
             .Select(item => item.Trim())
             .ToArray();
 
@@ -33,7 +34,7 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
         var rows = new List<IReadOnlyDictionary<string, string>>();
         for (var index = 1; index < nonEmptyLines.Length; index++)
         {
-            var values = ParseLine(nonEmptyLines[index], delimiter, command.FieldsEnclosed, textQualifier);
+            var values = ParseLine(nonEmptyLines[index], delimiter);
             var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             for (var columnIndex = 0; columnIndex < headers.Length; columnIndex++)
@@ -53,6 +54,48 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
         return new CsvImportDocumentDto(headers, rows);
     }
 
+    private static char DetectDelimiter(IReadOnlyList<string> lines, char configuredDelimiter)
+    {
+        var candidates = new List<char> { '\t', ';', ',', configuredDelimiter }
+            .Distinct()
+            .ToArray();
+
+        var sampleLines = lines.Take(5).ToArray();
+        var scoredCandidates = candidates
+            .Select(candidate => new
+            {
+                Delimiter = candidate,
+                Score = ScoreDelimiter(sampleLines, candidate)
+            })
+            .ToArray();
+
+        var detected = scoredCandidates
+            .Where(item => item.Score.HeaderColumns > 1)
+            .OrderByDescending(item => item.Score.HeaderColumns)
+            .ThenByDescending(item => item.Score.MultiColumnLines)
+            .ThenByDescending(item => item.Score.AverageColumns)
+            .Select(item => item.Delimiter)
+            .FirstOrDefault();
+
+        return detected == default ? configuredDelimiter : detected;
+    }
+
+    private static (int HeaderColumns, int MultiColumnLines, decimal AverageColumns) ScoreDelimiter(
+        IReadOnlyCollection<string> lines,
+        char delimiter)
+    {
+        var counts = lines.Select(line => ParseLine(line, delimiter).Count).ToArray();
+        if (counts.Length == 0)
+        {
+            return (0, 0, 0m);
+        }
+
+        return (
+            counts[0],
+            counts.Count(count => count > 1),
+            Convert.ToDecimal(counts.Average(count => count)));
+    }
+
     private static char NormalizeSingleCharacter(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Trim().Length != 1)
@@ -63,7 +106,7 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
         return value.Trim()[0];
     }
 
-    private static List<string> ParseLine(string line, char delimiter, bool fieldsEnclosed, char textQualifier)
+    private static List<string> ParseLine(string line, char delimiter)
     {
         var fields = new List<string>();
         var current = new StringBuilder();
@@ -73,7 +116,7 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
         {
             var currentChar = line[index];
 
-            if (fieldsEnclosed && activeTextQualifier.HasValue)
+            if (activeTextQualifier.HasValue)
             {
                 if (currentChar == activeTextQualifier.Value)
                 {
@@ -92,10 +135,9 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
                 }
             }
 
-            if (fieldsEnclosed
-                && activeTextQualifier is null
+            if (activeTextQualifier is null
                 && current.Length == 0
-                && IsSupportedTextQualifier(currentChar, textQualifier))
+                && IsSupportedTextQualifier(currentChar))
             {
                 activeTextQualifier = currentChar;
                 continue;
@@ -115,14 +157,28 @@ public sealed class CsvImportFileReader : ICsvImportFileReader
         return fields;
     }
 
-    private static bool IsSupportedTextQualifier(char value, char configuredTextQualifier)
+    private static bool IsSupportedTextQualifier(char value)
     {
-        return value == configuredTextQualifier || value == '"' || value == '\'';
+        return value == '"' || value == '\'';
     }
 
     private static bool IsQualifierClosingPosition(string line, int qualifierIndex, char delimiter)
     {
-        return qualifierIndex == line.Length - 1 || line[qualifierIndex + 1] == delimiter;
+        for (var index = qualifierIndex + 1; index < line.Length; index++)
+        {
+            var currentChar = line[index];
+            if (currentChar == delimiter)
+            {
+                return true;
+            }
+
+            if (!char.IsWhiteSpace(currentChar))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string NormalizeFieldValue(string value)
