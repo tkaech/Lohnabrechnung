@@ -54,7 +54,14 @@ public sealed partial class MainWindow : Window
 
     private async void OnTimeEntryHistorySelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (sender is not ListBox listBox || listBox.SelectedItem is not MonthlyTimeEntryItemViewModel entry)
+        var selectedItem = sender switch
+        {
+            DataGrid dataGrid => dataGrid.SelectedItem,
+            ListBox listBox => listBox.SelectedItem,
+            _ => null
+        };
+
+        if (selectedItem is not MonthlyTimeEntryItemViewModel entry)
         {
             return;
         }
@@ -62,7 +69,11 @@ public sealed partial class MainWindow : Window
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })
         {
             await monthlyRecord.ActivateMonthFromTimeEntryAsync(entry);
-            EnsureTimeEntryListSelection(listBox, entry.TimeEntryId);
+
+            if (sender is ListBox listBox)
+            {
+                EnsureTimeEntryListSelection(listBox, entry.TimeEntryId);
+            }
         }
     }
 
@@ -181,6 +192,26 @@ public sealed partial class MainWindow : Window
         {
             monthlyRecord.CloseAllPickers();
         }
+    }
+
+    private void OnRootPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            || DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        if (e.Delta.Y > 0)
+        {
+            viewModel.IncreaseUiZoom();
+        }
+        else if (e.Delta.Y < 0)
+        {
+            viewModel.DecreaseUiZoom();
+        }
+
+        e.Handled = true;
     }
 
     private void OnDeactivated(object? sender, EventArgs e)

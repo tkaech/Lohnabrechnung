@@ -14,6 +14,7 @@ using Payroll.Application.Reporting;
 using Payroll.Application.SalaryCertificate;
 using Payroll.Application.Settings;
 using Payroll.Desktop.Formatting;
+using Avalonia.Media;
 using Payroll.Desktop.Styles;
 using Payroll.Domain.Employees;
 
@@ -41,6 +42,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private const string BackupTypeConfigurationLabel = "Nur Konfiguration";
     private const string BackupTypeUserDataLabel = "Nur Nutzdaten";
     private const string BackupTypeBothLabel = "Beides";
+    private const string MonthlyRecordIdleActionMessage = "Noch keine Aktion ausgefuehrt.";
     private const string DefaultEnvironmentLabel = "Unbekannt";
     private const string ThousandsSeparatorApostropheLabel = "Apostroph (')";
     private const string ThousandsSeparatorSpaceLabel = "Leerzeichen";
@@ -63,6 +65,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly SqlExplorerViewModel _sqlExplorer;
     private readonly LayoutParameterFilesViewModel _layoutParameterFiles;
     private readonly LayoutParameterHelpViewModel _layoutParameterHelp;
+    private static readonly double[] UiZoomLevels = [0.8d, 0.9d, 1d, 1.1d, 1.25d, 1.5d];
     private MainNavigationItemViewModel? _selectedMainNavigationItem;
     private SettingsNavigationItemViewModel? _selectedSettingsNavigationItem;
     private EmployeeListItemViewModel? _selectedEmployee;
@@ -179,6 +182,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string _appLogoText = ThemeTokens.BrandLogoText;
     private Bitmap? _appLogoImage;
     private string _statusMessage = "Mitarbeitende koennen links ausgewaehlt werden.";
+    private double _uiZoomFactor = 1d;
     private bool _isBusy;
     private bool _isEditing;
     private bool _isCreatingNew;
@@ -277,6 +281,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         MonthCaptureOverviewRows = [];
         ReportingPayrollTotalsRows = [];
         AnnualSalaryMonths = [];
+        SaveEmployeeFeedback = new ButtonFeedbackViewModel();
+        SaveSettingsFeedback = new ButtonFeedbackViewModel();
+        PersonImportFeedback = new ButtonFeedbackViewModel();
+        TimeImportFeedback = new ButtonFeedbackViewModel();
+        CreatePayrollPdfFeedback = new ButtonFeedbackViewModel();
+        PayrollMonthActionFeedback = new ButtonFeedbackViewModel();
+        CreateSalaryCertificateFeedback = new ButtonFeedbackViewModel();
         ActivityFilters = [ActivityFilterAll, ActivityFilterActive, ActivityFilterInactive, ActivityFilterPayrollPossible];
         MonthCaptureFilters = [MonthCaptureFilterAll, MonthCaptureFilterWithoutMonth, MonthCaptureFilterWithMonth];
         ReportingPayrollTotalsMonthOptions =
@@ -370,6 +381,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         MonthlyRecord.PropertyChanged += OnMonthlyRecordPropertyChanged;
         MonthlyRecord.TimeCaptureChanged += OnMonthlyRecordTimeCaptureChanged;
         InitializeImportFieldMappings();
+        UiZoomTransform = new ScaleTransform(1d, 1d);
+        ApplyUiZoom(UiPreferencesStore.Load().ZoomFactor, persist: false, announce: false);
 
         ClearFormForEmptyState();
     }
@@ -378,6 +391,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string WorkspaceLabel { get; }
     public string DatabasePathDisplay { get; }
     public string EnvironmentNameDisplay { get; }
+    public ScaleTransform UiZoomTransform { get; }
     public string StartupArgumentsHelp => StartupArgumentsHelpText;
     public MonthlyRecordViewModel MonthlyRecord { get; }
     public LayoutParameterFilesViewModel LayoutParameterFiles => _layoutParameterFiles;
@@ -480,6 +494,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<MonthlyTimeCaptureOverviewRowDto> MonthCaptureOverviewRows { get; }
     public ObservableCollection<PayrollTotalsLineDto> ReportingPayrollTotalsRows { get; }
     public ObservableCollection<AnnualSalaryMonthDto> AnnualSalaryMonths { get; }
+    public ButtonFeedbackViewModel SaveEmployeeFeedback { get; }
+    public ButtonFeedbackViewModel SaveSettingsFeedback { get; }
+    public ButtonFeedbackViewModel PersonImportFeedback { get; }
+    public ButtonFeedbackViewModel TimeImportFeedback { get; }
+    public ButtonFeedbackViewModel CreatePayrollPdfFeedback { get; }
+    public ButtonFeedbackViewModel PayrollMonthActionFeedback { get; }
+    public ButtonFeedbackViewModel CreateSalaryCertificateFeedback { get; }
     public IReadOnlyList<string> ActivityFilters { get; }
     public IReadOnlyList<string> MonthCaptureFilters { get; }
     public IReadOnlyList<string> ReportingPayrollTotalsMonthOptions { get; }
@@ -1824,6 +1845,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _statusMessage, value);
     }
 
+    public double UiZoomFactor
+    {
+        get => _uiZoomFactor;
+        private set => SetProperty(ref _uiZoomFactor, value);
+    }
+
     public bool IsBusy
     {
         get => _isBusy;
@@ -1895,7 +1922,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             await LoadPayrollRunStatusAsync();
             StatusMessage = $"{Employees.Count} Mitarbeitende geladen.";
-        });
+        }, SaveEmployeeFeedback);
     }
 
     private void BeginCreateEmployee()
@@ -1941,7 +1968,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
 
             StatusMessage = $"Mitarbeitender {PersonnelNumber} geladen.";
-        });
+        }, SaveEmployeeFeedback);
     }
 
     private async Task SaveAsync()
@@ -2001,7 +2028,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             await ReloadEmployeesAsync();
             await RestoreSelectionAfterReloadAsync(saved.EmployeeId, selectFirstIfMissing: true);
             StatusMessage = $"Mitarbeitender {saved.PersonnelNumber} gespeichert.";
-        });
+        }, SaveSettingsFeedback);
     }
 
     private async Task CancelAsync()
@@ -2037,7 +2064,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             SetInteractionState(isEditing: false, isCreatingNew: false);
             StatusMessage = "Bearbeitung abgebrochen.";
-        });
+        }, SaveSettingsFeedback);
     }
 
     private void RequestDelete()
@@ -2534,7 +2561,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             var summary = $"{result.CreatedCount} neu, {result.UpdatedCount} aktualisiert";
             PersonImportStatusMessage = result.ErrorCount > 0
                 ? BuildPersonImportStatusMessage(summary, result)
-                : $"{summary}.";
+                : $"Import abgeschlossen: {summary}.";
             StatusMessage = PersonImportStatusMessage;
 
             if (result.CreatedCount > 0 || result.UpdatedCount > 0)
@@ -2543,7 +2570,15 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
 
             ClearPersonImportPreview();
-        });
+
+            if (result.ErrorCount > 0)
+            {
+                PersonImportFeedback.SetError();
+                return;
+            }
+
+            PersonImportFeedback.SetSuccess();
+        }, PersonImportFeedback, markSuccessOnCompletion: false);
     }
 
     public async Task ImportSelectedTimeDataAsync()
@@ -2575,12 +2610,20 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             TimeImportStatusMessage = result.ErrorCount > 0
                 ? BuildTimeImportStatusMessage(result)
-                : $"{result.ImportedCount} importiert.";
+                : $"Import abgeschlossen: {result.ImportedCount} importiert.";
             StatusMessage = TimeImportStatusMessage;
             await LoadImportedTimeMonthsAsync();
             await LoadMonthCaptureOverviewAsync();
             ClearTimeImportPreview();
-        });
+
+            if (result.ErrorCount > 0)
+            {
+                TimeImportFeedback.SetError();
+                return;
+            }
+
+            TimeImportFeedback.SetSuccess();
+        }, TimeImportFeedback, markSuccessOnCompletion: false);
     }
 
     public async Task ReloadTimeImportCsvAsync()
@@ -2667,11 +2710,19 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             TimeImportStatusMessage = result.ErrorCount > 0
                 ? BuildTimeImportStatusMessage(result)
-                : $"{result.ImportedCount} importiert.";
+                : $"Import abgeschlossen: {result.ImportedCount} importiert.";
             StatusMessage = TimeImportStatusMessage;
             await LoadImportedTimeMonthsAsync();
             await LoadMonthCaptureOverviewAsync();
-        });
+
+            if (result.ErrorCount > 0)
+            {
+                TimeImportFeedback.SetError();
+                return;
+            }
+
+            TimeImportFeedback.SetSuccess();
+        }, TimeImportFeedback, markSuccessOnCompletion: false);
     }
 
     public async Task<bool> IsSelectedTimeImportMonthAlreadyImportedAsync()
@@ -2730,7 +2781,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 paymentDate);
 
             StatusMessage = $"PDF erstellt: {exportPath}";
-        });
+        }, CreatePayrollPdfFeedback);
     }
 
     private async Task FinalizePayrollMonthAsync()
@@ -2755,7 +2806,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             PayrollRunStatusDisplay = "abgeschlossen";
             StatusMessage = $"Monat {selectedMonth:MM/yyyy} abgeschlossen ({result.LineCount} Positionen).";
             await LoadAnnualSalaryCoreIfVisibleAsync();
-        });
+        }, PayrollMonthActionFeedback);
     }
 
     private async Task CancelPayrollMonthAsync()
@@ -2778,7 +2829,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             PayrollRunStatusDisplay = "storniert";
             StatusMessage = $"Monat {selectedMonth:MM/yyyy} storniert.";
             await LoadAnnualSalaryCoreIfVisibleAsync();
-        });
+        }, PayrollMonthActionFeedback);
     }
 
     private async Task LoadAnnualSalaryCoreIfVisibleAsync()
@@ -2910,25 +2961,34 @@ public sealed class MainWindowViewModel : ViewModelBase
         });
     }
 
-    private async Task ExecuteBusyAsync(Func<Task> action)
+    private async Task ExecuteBusyAsync(Func<Task> action, ButtonFeedbackViewModel? feedback = null, bool markSuccessOnCompletion = true)
     {
         if (IsBusy)
         {
             return;
         }
 
+        var completedSuccessfully = false;
+
         try
         {
             IsBusy = true;
             await action();
+            completedSuccessfully = true;
         }
         catch (Exception exception)
         {
             StatusMessage = exception.Message;
+            feedback?.SetError();
         }
         finally
         {
             IsBusy = false;
+        }
+
+        if (completedSuccessfully && feedback is not null && markSuccessOnCompletion)
+        {
+            feedback.SetSuccess();
         }
 
         if (_pendingEmployeeId.HasValue && !_isEditing)
@@ -2942,6 +3002,69 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
         }
     }
+
+    public void IncreaseUiZoom() => ChangeUiZoom(1);
+
+    public void DecreaseUiZoom() => ChangeUiZoom(-1);
+
+    private void ChangeUiZoom(int direction)
+    {
+        var currentIndex = Array.FindIndex(UiZoomLevels, level => Math.Abs(level - UiZoomFactor) < 0.001d);
+        if (currentIndex < 0)
+        {
+            currentIndex = FindClosestUiZoomLevelIndex(UiZoomFactor);
+        }
+
+        var newIndex = Math.Clamp(currentIndex + direction, 0, UiZoomLevels.Length - 1);
+        if (newIndex == currentIndex)
+        {
+            StatusMessage = $"Zoom: {FormatZoomPercentage(UiZoomLevels[newIndex])}%";
+            return;
+        }
+
+        ApplyUiZoom(UiZoomLevels[newIndex], persist: true, announce: true);
+    }
+
+    private void ApplyUiZoom(double zoomFactor, bool persist, bool announce)
+    {
+        var normalizedZoomFactor = UiZoomLevels[FindClosestUiZoomLevelIndex(zoomFactor)];
+        UiZoomFactor = normalizedZoomFactor;
+        UiZoomTransform.ScaleX = normalizedZoomFactor;
+        UiZoomTransform.ScaleY = normalizedZoomFactor;
+
+        if (persist)
+        {
+            UiPreferencesStore.Save(new UiPreferences
+            {
+                ZoomFactor = normalizedZoomFactor
+            });
+        }
+
+        if (announce)
+        {
+            StatusMessage = $"Zoom: {FormatZoomPercentage(normalizedZoomFactor)}%";
+        }
+    }
+
+    private static int FindClosestUiZoomLevelIndex(double zoomFactor)
+    {
+        var closestIndex = 0;
+        var closestDistance = double.MaxValue;
+
+        for (var index = 0; index < UiZoomLevels.Length; index++)
+        {
+            var distance = Math.Abs(UiZoomLevels[index] - zoomFactor);
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestIndex = index;
+            }
+        }
+
+        return closestIndex;
+    }
+
+    private static int FormatZoomPercentage(double zoomFactor) => (int)Math.Round(zoomFactor * 100d, MidpointRounding.AwayFromZero);
 
     private async Task ReloadEmployeesAsync()
     {
@@ -3444,6 +3567,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 StatusMessage = "Kein Ausgabeort fuer Lohnausweis gewaehlt.";
             }
 
+            CreateSalaryCertificateFeedback.SetError();
+
             return;
         }
 
@@ -3459,10 +3584,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
                 await RefreshSalaryCertificateCreatedDisplayAsync(_currentEmployeeId.Value, _loadedAnnualSalaryYear.Value);
                 StatusMessage = $"Lohnausweis erstellt: {exportPath}";
+                CreateSalaryCertificateFeedback.SetSuccess();
             }
             catch (Exception exception)
             {
                 StatusMessage = $"Lohnausweis fehlgeschlagen: {exception.Message}";
+                CreateSalaryCertificateFeedback.SetError();
             }
         });
     }
@@ -3617,6 +3744,13 @@ public sealed class MainWindowViewModel : ViewModelBase
             CreatePayrollPdfCommand.RaiseCanExecuteChanged();
             FinalizePayrollMonthCommand.RaiseCanExecuteChanged();
             CancelPayrollMonthCommand.RaiseCanExecuteChanged();
+        }
+
+        if (e.PropertyName == nameof(MonthlyRecordViewModel.ActionMessage)
+            && !string.IsNullOrWhiteSpace(MonthlyRecord.ActionMessage)
+            && !string.Equals(MonthlyRecord.ActionMessage, MonthlyRecordIdleActionMessage, StringComparison.Ordinal))
+        {
+            StatusMessage = MonthlyRecord.ActionMessage;
         }
     }
 

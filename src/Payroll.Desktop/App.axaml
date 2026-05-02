@@ -5,6 +5,7 @@
     RequestedThemeVariant="Light">
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
     <StyleInclude Source="avares://Payroll.Desktop/Styles/DesignSystem.axaml" />
     <StyleInclude Source="avares://Payroll.Desktop/Styles/PrintDesignSystem.axaml" />
   </Application.Styles>

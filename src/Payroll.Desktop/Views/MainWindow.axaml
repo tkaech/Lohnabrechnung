@@ -2,6 +2,7 @@
     x:Class="Payroll.Desktop.Views.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:behaviors="clr-namespace:Payroll.Desktop.Behaviors"
     xmlns:controls="clr-namespace:Payroll.Desktop.Controls"
     xmlns:styles="clr-namespace:Payroll.Desktop.Styles"
     Title="{Binding Title}"
@@ -10,7 +11,8 @@
     MinWidth="1200"
     MinHeight="760"
     Background="{DynamicResource Theme.Color.AppBackground}">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Theme.Layout.PagePadding}" PointerPressed="OnRootPointerPressed">
+  <LayoutTransformControl LayoutTransform="{Binding UiZoomTransform}">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource Theme.Layout.PagePadding}" PointerPressed="OnRootPointerPressed" PointerWheelChanged="OnRootPointerWheelChanged">
     <Border
         Grid.Row="0"
         Classes="surface-panel"
@@ -138,7 +140,12 @@
                            Text="Die Bereiche werden links ueber eine feste Liste geoeffnet. Rechts bleibt der bestehende Inhalt des gewaehlten Bereichs sichtbar."
                            TextWrapping="Wrap" />
               </StackPanel>
-              <Button Grid.Column="1" Classes="primary-action" Command="{Binding SaveSettingsCommand}" Content="Einstellungen speichern" />
+              <Button Grid.Column="1"
+                      Classes="primary-action"
+                      Classes.action-feedback-success="{Binding SaveSettingsFeedback.IsSuccess}"
+                      Classes.action-feedback-error="{Binding SaveSettingsFeedback.IsError}"
+                      Command="{Binding SaveSettingsCommand}"
+                      Content="Einstellungen speichern" />
             </Grid>
           </Border>
 
@@ -1315,12 +1322,16 @@
                         Margin="0,0,8,0"
                         VerticalAlignment="Bottom"
                         Classes="primary-action"
+                        Classes.action-feedback-success="{Binding PayrollMonthActionFeedback.IsSuccess}"
+                        Classes.action-feedback-error="{Binding PayrollMonthActionFeedback.IsError}"
                         IsEnabled="{Binding CanExecutePayrollMonthAction}"
                         Click="OnFinalizePayrollMonthClick"
                         Content="{Binding PayrollMonthActionLabel}" />
                 <Button Grid.Column="6"
                         VerticalAlignment="Bottom"
                         Classes="primary-action"
+                        Classes.action-feedback-success="{Binding CreatePayrollPdfFeedback.IsSuccess}"
+                        Classes.action-feedback-error="{Binding CreatePayrollPdfFeedback.IsError}"
                         Command="{Binding CreatePayrollPdfCommand}"
                         Content="PDF erstellen" />
                 <StackPanel Grid.Row="1"
@@ -1345,6 +1356,8 @@
                           Command="{Binding MonthlyRecord.ResetWithholdingTaxCommand}"
                           Content="Zuruecksetzen" />
                   <Button VerticalAlignment="Bottom"
+                          Classes.action-feedback-success="{Binding MonthlyRecord.SaveWithholdingTaxFeedback.IsSuccess}"
+                          Classes.action-feedback-error="{Binding MonthlyRecord.SaveWithholdingTaxFeedback.IsError}"
                           Command="{Binding MonthlyRecord.SaveWithholdingTaxCommand}"
                           Content="Quellensteuer speichern" />
                 </StackPanel>
@@ -1377,7 +1390,7 @@
 
               <TabControl Grid.Row="1" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}">
                 <TabItem Header="Zeiten">
-                  <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                  <ScrollViewer MinHeight="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}" Margin="0,10,0,0">
                       <Grid ColumnDefinitions="1.25*,8,1.2*,8,*,8,*,8,*,8,*,8,*,8,*,8,*" RowDefinitions="Auto,Auto" HorizontalAlignment="Stretch">
                         <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,0,10">
@@ -1425,65 +1438,46 @@
 
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Command="{Binding NewTimeEntryCommand}" Content="Neu" />
-                        <Button Command="{Binding SaveTimeEntryCommand}" Content="Zeiteintrag speichern" />
+                        <Button Classes.action-feedback-success="{Binding SaveTimeEntryFeedback.IsSuccess}"
+                                Classes.action-feedback-error="{Binding SaveTimeEntryFeedback.IsError}"
+                                Command="{Binding SaveTimeEntryCommand}"
+                                Content="Zeiteintrag speichern" />
                         <Button Command="{Binding DeleteTimeEntryCommand}" Content="Zeiteintrag loeschen" />
                       </StackPanel>
 
                       <TextBlock Classes="section-caption" Text="Tagesliste" />
                       <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
-                        <StackPanel Spacing="0">
-                          <ItemsControl ItemsSource="{Binding TimeEntryColumns}" Background="#FFF8FAFC">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
-                              </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate>
-                                <Border Width="{Binding Width}"
-                                        BorderBrush="#FFD7E1EA"
-                                        BorderThickness="0,0,1,1"
-                                        Padding="{DynamicResource Theme.Layout.TableCellPadding}"
-                                        DragDrop.AllowDrop="True"
-                                        DragDrop.DragOver="OnTimeEntryColumnHeaderDragOver"
-                                        DragDrop.Drop="OnTimeEntryColumnHeaderDrop"
-                                        PointerPressed="OnTimeEntryColumnHeaderPointerPressed">
-                                  <TextBlock FontWeight="SemiBold" Text="{Binding Header}" />
-                                </Border>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                          <ListBox Classes="table-list"
-                                   ItemsSource="{Binding TimeEntryHistory}"
-                                   SelectedItem="{Binding SelectedTimeEntry, Mode=TwoWay}"
-                                   SelectionChanged="OnTimeEntryHistorySelectionChanged"
-                                   MinHeight="240"
-                                   BorderThickness="0">
-                            <ListBox.ItemTemplate>
-                              <DataTemplate>
-                                <StackPanel Spacing="0">
-                                  <ItemsControl ItemsSource="{Binding Cells}">
-                                    <ItemsControl.ItemsPanel>
-                                      <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" />
-                                      </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                      <DataTemplate>
-                                        <Border Width="{Binding Width}" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
-                                          <TextBlock FontWeight="SemiBold" Text="{Binding Value}" />
-                                        </Border>
-                                      </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                  </ItemsControl>
-                                  <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}" IsVisible="{Binding HasNote}">
-                                    <TextBlock Classes="section-caption" Text="{Binding Note}" TextWrapping="Wrap" />
-                                  </Border>
-                                </StackPanel>
-                              </DataTemplate>
-                            </ListBox.ItemTemplate>
-                          </ListBox>
-                        </StackPanel>
+                        <DataGrid ItemsSource="{Binding TimeEntryHistory}"
+                                  SelectedItem="{Binding SelectedTimeEntry, Mode=TwoWay}"
+                                  SelectionChanged="OnTimeEntryHistorySelectionChanged"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserSortColumns="False"
+                                  MinHeight="240"
+                                  MinColumnWidth="72"
+                                  BorderThickness="0"
+                                  GridLinesVisibility="All"
+                                  behaviors:PersistentDataGridState.IsEnabled="True"
+                                  behaviors:PersistentDataGridState.GridKey="TimeEntriesGrid">
+                          <DataGrid.Columns>
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="WorkDate" Header="Datum" Binding="{Binding WorkDate, StringFormat='{}{0:dd.MM.yyyy}'}" Width="140" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="Month" Header="Monat" Binding="{Binding WorkDate, StringFormat='{}{0:MM.yyyy}'}" Width="110" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="HoursWorked" Header="Arbeit" Binding="{Binding HoursWorked, StringFormat='{}{0:0.##} h'}" Width="120" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="NightHours" Header="Nacht" Binding="{Binding NightHours, StringFormat='{}{0:0.##}'}" Width="110" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="SundayHours" Header="Sonntag" Binding="{Binding SundayHours, StringFormat='{}{0:0.##}'}" Width="120" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="HolidayHours" Header="Feiertag" Binding="{Binding HolidayHours, StringFormat='{}{0:0.##}'}" Width="120" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="VehiclePauschalzone1" Header="Pauschalzone 1" Binding="{Binding VehiclePauschalzone1Chf, StringFormat='{}{0:0.00}'}" Width="140" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="VehiclePauschalzone2" Header="Pauschalzone 2" Binding="{Binding VehiclePauschalzone2Chf, StringFormat='{}{0:0.00}'}" Width="140" />
+                            <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="VehicleRegiezone1" Header="Regiezone 1" Binding="{Binding VehicleRegiezone1Chf, StringFormat='{}{0:0.00}'}" Width="130" />
+                            <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="Note" Header="Bemerkung" Width="260">
+                              <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                  <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
+                                </DataTemplate>
+                              </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                          </DataGrid.Columns>
+                        </DataGrid>
                       </Border>
                     </StackPanel>
                   </ScrollViewer>
@@ -1509,7 +1503,10 @@
 
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Command="{Binding ResetExpenseValuesCommand}" Content="Zuruecksetzen" />
-                        <Button Command="{Binding SaveExpenseEntryCommand}" Content="Spesen speichern" />
+                        <Button Classes.action-feedback-success="{Binding SaveExpenseEntryFeedback.IsSuccess}"
+                                Classes.action-feedback-error="{Binding SaveExpenseEntryFeedback.IsError}"
+                                Command="{Binding SaveExpenseEntryCommand}"
+                                Content="Spesen speichern" />
                       </StackPanel>
 
                       <TextBlock Classes="section-caption" Text="Spesenliste" />
@@ -1690,26 +1687,51 @@
                                 <Expander.Header>
                                   <TextBlock Classes="section-caption" FontWeight="SemiBold" Text="{Binding Title}" />
                                 </Expander.Header>
-                                <ItemsControl ItemsSource="{Binding Items}">
-                                  <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                      <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="0,0,0,1" CornerRadius="0" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
-                                        <StackPanel Spacing="4">
-                                          <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-                                            <Border Background="{Binding ColorHint}" CornerRadius="999" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding HasDisplayTag}">
-                                              <TextBlock FontSize="11" FontWeight="SemiBold" Text="{Binding DisplayTag}" />
-                                            </Border>
-                                            <TextBlock Grid.Column="1" Classes="section-caption" Margin="0,0,8,0" FontWeight="SemiBold" Text="{Binding KindLabel}" VerticalAlignment="Center" />
-                                            <TextBlock Grid.Column="2" Margin="0,0,8,0" FontWeight="SemiBold" Text="{Binding Label}" TextWrapping="Wrap" />
-                                            <TextBlock Grid.Column="3" FontWeight="SemiBold" Text="{Binding ValueDisplay}" TextAlignment="Right" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                                          </Grid>
-                                          <TextBlock Classes="section-caption" FontWeight="Normal" Text="{Binding FormulaDisplay}" TextWrapping="Wrap" IsVisible="{Binding HasFormula}" />
-                                          <TextBlock Classes="section-caption" FontWeight="Normal" Text="{Binding Detail}" TextWrapping="Wrap" IsVisible="{Binding HasDetail}" />
-                                        </StackPanel>
-                                      </Border>
-                                    </DataTemplate>
-                                  </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <DataGrid ItemsSource="{Binding Items}"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserSortColumns="False"
+                                          MinHeight="120"
+                                          MinColumnWidth="90"
+                                          BorderThickness="0"
+                                          GridLinesVisibility="All"
+                                          behaviors:PersistentDataGridState.IsEnabled="True"
+                                          behaviors:PersistentDataGridState.GridKey="PayrollRunLinesGrid">
+                                  <DataGrid.Columns>
+                                    <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="DisplayTag" Header="Tag" Width="110">
+                                      <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                          <Border Background="{Binding ColorHint}" CornerRadius="999" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center" IsVisible="{Binding HasDisplayTag}">
+                                            <TextBlock FontSize="11" FontWeight="SemiBold" Text="{Binding DisplayTag}" />
+                                          </Border>
+                                        </DataTemplate>
+                                      </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="KindLabel" Header="Art" Binding="{Binding KindLabel}" Width="150" />
+                                    <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="Label" Header="Position" Width="260">
+                                      <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                          <TextBlock FontWeight="SemiBold" Text="{Binding Label}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                      </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="ValueDisplay" Header="Wert" Binding="{Binding ValueDisplay}" Width="140" />
+                                    <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="FormulaDisplay" Header="Formel" Width="260">
+                                      <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                          <TextBlock Classes="section-caption" Text="{Binding FormulaDisplay}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                      </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="Detail" Header="Detail" Width="320">
+                                      <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                          <TextBlock Classes="section-caption" Text="{Binding Detail}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                      </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                  </DataGrid.Columns>
+                                </DataGrid>
                               </Expander>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
@@ -1749,6 +1771,8 @@
                     <Button Grid.Column="2"
                             Margin="8,22,0,0"
                             VerticalAlignment="Top"
+                            Classes.action-feedback-success="{Binding CreateSalaryCertificateFeedback.IsSuccess}"
+                            Classes.action-feedback-error="{Binding CreateSalaryCertificateFeedback.IsError}"
                             Command="{Binding CreateSalaryCertificatePdfCommand}"
                             Click="OnCreateSalaryCertificatePdfClick"
                             Content="Lohnausweis erstellen" />
@@ -1763,43 +1787,41 @@
                 </Grid>
 
                 <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
-                  <StackPanel Spacing="0">
-                    <Grid ColumnDefinitions="72,94,122,108,96,132,156,132,96,96,96,122" Background="#FFF8FAFC">
-                      <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Monat" /></Border>
-                      <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
-                      <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Bruttolohn" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="AHV/IV/EO" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="ALV" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Krankentaggeld" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Aus-/Weiterbildung" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Total Sozialabzuege" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="BVG" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="QST" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Spesen" TextAlignment="Right" /></Border>
-                      <Border Grid.Column="11" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nettolohn" TextAlignment="Right" /></Border>
-                    </Grid>
-
-                    <ItemsControl ItemsSource="{Binding AnnualSalaryMonths}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <Grid ColumnDefinitions="72,94,122,108,96,132,156,132,96,96,96,122">
-                            <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding MonthLabel}" /></Border>
-                            <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Classes="payroll-status" Classes.payroll-status-finalized="{Binding IsStatusFinalized}" Classes.payroll-status-cancelled="{Binding IsStatusCancelled}" Classes.payroll-status-open-with-data="{Binding IsStatusOpenWithRecordedData}" Classes.payroll-status-open="{Binding IsStatusOpen}" Text="{Binding StatusDisplay}" /></Border>
-                            <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding GrossSalaryChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AhvIvEoDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding AlvDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding SicknessDailyAllowanceDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding TrainingAndEducationDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="{Binding TotalSocialDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding BvgDeductionChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding WithholdingTaxChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding ExpensesChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                            <Border Grid.Column="11" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="{Binding NetSalaryChf, Converter={StaticResource ChfAmountConverter}}" TextAlignment="Right" /></Border>
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
+                  <DataGrid ItemsSource="{Binding AnnualSalaryMonths}"
+                            AutoGenerateColumns="False"
+                            IsReadOnly="True"
+                            CanUserSortColumns="False"
+                            MinColumnWidth="90"
+                            BorderThickness="0"
+                            GridLinesVisibility="All"
+                            behaviors:PersistentDataGridState.IsEnabled="True"
+                            behaviors:PersistentDataGridState.GridKey="AnnualSalaryGrid">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="MonthLabel" Header="Monat" Binding="{Binding MonthLabel}" Width="100" />
+                      <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="StatusDisplay" Header="Status" Width="150">
+                        <DataGridTemplateColumn.CellTemplate>
+                          <DataTemplate>
+                            <TextBlock Classes="payroll-status"
+                                       Classes.payroll-status-finalized="{Binding IsStatusFinalized}"
+                                       Classes.payroll-status-cancelled="{Binding IsStatusCancelled}"
+                                       Classes.payroll-status-open-with-data="{Binding IsStatusOpenWithRecordedData}"
+                                       Classes.payroll-status-open="{Binding IsStatusOpen}"
+                                       Text="{Binding StatusDisplay}" />
+                          </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                      </DataGridTemplateColumn>
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="GrossSalaryChf" Header="Bruttolohn" Binding="{Binding GrossSalaryChf, Converter={StaticResource ChfAmountConverter}}" Width="130" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AhvIvEoDeductionChf" Header="AHV/IV/EO" Binding="{Binding AhvIvEoDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="120" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AlvDeductionChf" Header="ALV" Binding="{Binding AlvDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="SicknessDailyAllowanceDeductionChf" Header="Krankentaggeld" Binding="{Binding SicknessDailyAllowanceDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="150" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TrainingAndEducationDeductionChf" Header="Aus-/Weiterbildung" Binding="{Binding TrainingAndEducationDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="170" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TotalSocialDeductionChf" Header="Total Sozialabzuege" Binding="{Binding TotalSocialDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="165" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="BvgDeductionChf" Header="BVG" Binding="{Binding BvgDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="WithholdingTaxChf" Header="QST" Binding="{Binding WithholdingTaxChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="ExpensesChf" Header="Spesen" Binding="{Binding ExpensesChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="NetSalaryChf" Header="Nettolohn" Binding="{Binding NetSalaryChf, Converter={StaticResource ChfAmountConverter}}" Width="130" />
+                    </DataGrid.Columns>
+                  </DataGrid>
                 </Border>
 
                 <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}">
@@ -1841,51 +1863,43 @@
                     <TextBlock Classes="section-caption" Text="{Binding MonthCaptureSummary}" TextWrapping="Wrap" />
 
                     <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
-                      <StackPanel Spacing="0">
-                        <Grid ColumnDefinitions="82,120,120,70,70,70,78,78,78,160,66" Background="#FFF8FAFC">
-                          <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="PNr" /></Border>
-                          <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Vorname" /></Border>
-                          <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nachname" /></Border>
-                          <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Status" /></Border>
-                          <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Erfasst" /></Border>
-                          <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Arbeit" /></Border>
-                          <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Nacht" /></Border>
-                          <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Sonntag" /></Border>
-                          <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Feiertag" /></Border>
-                          <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Fahrzeug" /></Border>
-                          <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Einträge" /></Border>
-                        </Grid>
-
-                        <ItemsControl ItemsSource="{Binding MonthCaptureOverviewRows}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                              <Grid ColumnDefinitions="82,120,120,70,70,70,78,78,78,160,66">
-                                <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding PersonnelNumber}" /></Border>
-                                <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding FirstName}" /></Border>
-                                <Border Grid.Column="2" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding LastName}" /></Border>
-                                <Border Grid.Column="3" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding StatusDisplay}" /></Border>
-                                <Border Grid.Column="4" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding CaptureDisplay}" /></Border>
-                                <Border Grid.Column="5" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding HoursWorked, StringFormat='{}{0:0.##} h'}" /></Border>
-                                <Border Grid.Column="6" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding NightHours, StringFormat='{}{0:0.##}'}" /></Border>
-                                <Border Grid.Column="7" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding SundayHours, StringFormat='{}{0:0.##}'}" /></Border>
-                                <Border Grid.Column="8" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding HolidayHours, StringFormat='{}{0:0.##}'}" /></Border>
-                                <Border Grid.Column="9" BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
-                                  <TextBlock>
-                                    <TextBlock.Text>
-                                      <MultiBinding StringFormat="P1 {0:0.##} | P2 {1:0.##} | R1 {2:0.##}">
-                                        <Binding Path="VehiclePauschalzone1" />
-                                        <Binding Path="VehiclePauschalzone2" />
-                                        <Binding Path="VehicleRegiezone1" />
-                                      </MultiBinding>
-                                    </TextBlock.Text>
-                                  </TextBlock>
-                                </Border>
-                                <Border Grid.Column="10" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock Text="{Binding TimeEntryCount}" /></Border>
-                              </Grid>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
+                      <DataGrid ItemsSource="{Binding MonthCaptureOverviewRows}"
+                                AutoGenerateColumns="False"
+                                IsReadOnly="True"
+                                CanUserSortColumns="False"
+                                MinColumnWidth="70"
+                                BorderThickness="0"
+                                GridLinesVisibility="All"
+                                behaviors:PersistentDataGridState.IsEnabled="True"
+                                behaviors:PersistentDataGridState.GridKey="ReportingMonthCaptureGrid">
+                        <DataGrid.Columns>
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="PersonnelNumber" Header="PNr" Binding="{Binding PersonnelNumber}" Width="100" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="FirstName" Header="Vorname" Binding="{Binding FirstName}" Width="140" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="LastName" Header="Nachname" Binding="{Binding LastName}" Width="150" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="StatusDisplay" Header="Status" Binding="{Binding StatusDisplay}" Width="90" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="CaptureDisplay" Header="Erfasst" Binding="{Binding CaptureDisplay}" Width="90" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="HoursWorked" Header="Arbeit" Binding="{Binding HoursWorked, StringFormat='{}{0:0.##} h'}" Width="110" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="NightHours" Header="Nacht" Binding="{Binding NightHours, StringFormat='{}{0:0.##}'}" Width="95" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="SundayHours" Header="Sonntag" Binding="{Binding SundayHours, StringFormat='{}{0:0.##}'}" Width="110" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="HolidayHours" Header="Feiertag" Binding="{Binding HolidayHours, StringFormat='{}{0:0.##}'}" Width="110" />
+                          <DataGridTemplateColumn behaviors:PersistentDataGridState.ColumnKey="VehicleSummary" Header="Fahrzeug" Width="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                              <DataTemplate>
+                                <TextBlock>
+                                  <TextBlock.Text>
+                                    <MultiBinding StringFormat="P1 {0:0.##} | P2 {1:0.##} | R1 {2:0.##}">
+                                      <Binding Path="VehiclePauschalzone1" />
+                                      <Binding Path="VehiclePauschalzone2" />
+                                      <Binding Path="VehicleRegiezone1" />
+                                    </MultiBinding>
+                                  </TextBlock.Text>
+                                </TextBlock>
+                              </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                          </DataGridTemplateColumn>
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TimeEntryCount" Header="Einträge" Binding="{Binding TimeEntryCount}" Width="90" />
+                        </DataGrid.Columns>
+                      </DataGrid>
                     </Border>
                   </StackPanel>
                 </TabItem>
@@ -1915,28 +1929,20 @@
                     <TextBlock Classes="section-caption" Text="{Binding ReportingPayrollTotalsIncludedMonths}" TextWrapping="Wrap" />
 
                     <Border BorderBrush="#FFD7E1EA" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" ClipToBounds="True">
-                      <StackPanel Spacing="0">
-                        <Grid ColumnDefinitions="*,180" Background="#FFF8FAFC">
-                          <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Position" /></Border>
-                          <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}"><TextBlock FontWeight="SemiBold" Text="Total" TextAlignment="Right" /></Border>
-                        </Grid>
-
-                        <ItemsControl ItemsSource="{Binding ReportingPayrollTotalsRows}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                              <Grid ColumnDefinitions="*,180">
-                                <Border BorderBrush="#FFD7E1EA" BorderThickness="0,0,1,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
-                                  <TextBlock Text="{Binding Label}" />
-                                </Border>
-                                <Border Grid.Column="1" BorderBrush="#FFD7E1EA" BorderThickness="0,0,0,1" Padding="{DynamicResource Theme.Layout.TableCellPadding}">
-                                  <TextBlock Text="{Binding AmountChf, Converter={StaticResource ChfAmountConverter}}"
-                                             TextAlignment="Right" />
-                                </Border>
-                              </Grid>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
+                      <DataGrid ItemsSource="{Binding ReportingPayrollTotalsRows}"
+                                AutoGenerateColumns="False"
+                                IsReadOnly="True"
+                                CanUserSortColumns="False"
+                                MinColumnWidth="100"
+                                BorderThickness="0"
+                                GridLinesVisibility="All"
+                                behaviors:PersistentDataGridState.IsEnabled="True"
+                                behaviors:PersistentDataGridState.GridKey="ReportingGrid">
+                        <DataGrid.Columns>
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="Label" Header="Position" Binding="{Binding Label}" Width="2*" />
+                          <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AmountChf" Header="Total" Binding="{Binding AmountChf, Converter={StaticResource ChfAmountConverter}}" Width="180" />
+                        </DataGrid.Columns>
+                      </DataGrid>
                     </Border>
                   </StackPanel>
                 </TabItem>
@@ -2144,6 +2150,10 @@
             </Grid>
           </ScrollViewer>
 
+          <Border Grid.Row="2" Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}">
+            <TextBlock Foreground="#FF304255" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+          </Border>
+
           <Border
               Grid.Row="3"
               Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}"
@@ -2160,16 +2170,18 @@
             </Grid>
           </Border>
 
-          <Border Grid.Row="4" Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}">
-            <TextBlock Foreground="#FF304255" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
-          </Border>
-
           <Grid Grid.Row="5" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}" IsVisible="{Binding ShowEmployeeWorkspace}">
             <Button Grid.Column="0" Command="{Binding NewEmployeeCommand}" Content="Neu" />
             <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding EditEmployeeCommand}" Content="Bearbeiten" IsVisible="{Binding ShowViewActions}" />
             <Button Grid.Column="2" Margin="10,0,0,0" Command="{Binding DeleteCommand}" Content="Loeschen" IsVisible="{Binding ShowEditActions}" />
             <Button Grid.Column="4" Margin="10,0,0,0" Command="{Binding CancelCommand}" Content="Abbrechen" IsVisible="{Binding ShowEditActions}" />
-            <Button Grid.Column="5" Classes="primary-action" Command="{Binding SaveCommand}" Content="Speichern" IsVisible="{Binding ShowEditActions}" />
+            <Button Grid.Column="5"
+                    Classes="primary-action"
+                    Classes.action-feedback-success="{Binding SaveEmployeeFeedback.IsSuccess}"
+                    Classes.action-feedback-error="{Binding SaveEmployeeFeedback.IsError}"
+                    Command="{Binding SaveCommand}"
+                    Content="Speichern"
+                    IsVisible="{Binding ShowEditActions}" />
           </Grid>
 
         </Grid>
@@ -2321,7 +2333,14 @@
                          IsVisible="{Binding ShowSettingsVersionCreateSection}"
                          TextWrapping="Wrap" />
               <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding DismissSettingsVersionDialogCommand}" Content="Schliessen" />
-              <Button Grid.Column="2" Margin="10,0,0,0" Classes="primary-action" Command="{Binding ConfirmSettingsVersionDialogCommand}" Content="Neuen Stand speichern" IsVisible="{Binding ShowSettingsVersionCreateSection}" />
+              <Button Grid.Column="2"
+                      Margin="10,0,0,0"
+                      Classes="primary-action"
+                      Classes.action-feedback-success="{Binding SaveSettingsFeedback.IsSuccess}"
+                      Classes.action-feedback-error="{Binding SaveSettingsFeedback.IsError}"
+                      Command="{Binding ConfirmSettingsVersionDialogCommand}"
+                      Content="Neuen Stand speichern"
+                      IsVisible="{Binding ShowSettingsVersionCreateSection}" />
             </Grid>
           </StackPanel>
         </Border>
@@ -2330,4 +2349,5 @@
 
     <TextBlock Grid.Row="3" Foreground="#FF5F6B7A" Text="{Binding WorkspaceLabel}" />
   </Grid>
+  </LayoutTransformControl>
 </Window>

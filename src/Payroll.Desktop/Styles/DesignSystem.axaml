@@ -39,6 +39,8 @@
     <SolidColorBrush x:Key="Theme.Color.Brand">#FF14324A</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.BrandSoft">#FFD1DCE7</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.Danger">#FFC95F36</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.Success">#FF1F7A3D</SolidColorBrush>
+    <SolidColorBrush x:Key="Theme.Color.Error">#FFC53B3B</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.WarningSurface">#FFFFF1E6</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.WarningText">#FF6B4A1F</SolidColorBrush>
     <SolidColorBrush x:Key="Theme.Color.ChipSurface">#FFE6EEF5</SolidColorBrush>
@@ -400,5 +402,17 @@
     <Setter Property="Background" Value="{DynamicResource Theme.Color.Danger}" />
     <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Danger}" />
+  </Style>
+
+  <Style Selector="Button.action-feedback-success">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.Success}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Success}" />
+  </Style>
+
+  <Style Selector="Button.action-feedback-error">
+    <Setter Property="Background" Value="{DynamicResource Theme.Color.Error}" />
+    <Setter Property="Foreground" Value="{DynamicResource Theme.Color.TextInverse}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Theme.Color.Error}" />
   </Style>
 </Styles>

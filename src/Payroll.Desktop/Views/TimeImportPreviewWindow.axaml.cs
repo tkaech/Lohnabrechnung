@@ -25,6 +25,10 @@ public sealed partial class TimeImportPreviewWindow : Window
         }
 
         await viewModel.ImportSelectedTimeDataAsync();
-        Close(true);
+        if (viewModel.TimeImportFeedback.IsSuccess)
+        {
+            await Task.Delay(500);
+            Close(true);
+        }
     }
 }

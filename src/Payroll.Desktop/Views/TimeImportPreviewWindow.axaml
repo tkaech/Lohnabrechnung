@@ -42,7 +42,14 @@
     <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto">
       <TextBlock Foreground="#FF5F6B7A" VerticalAlignment="Center" Text="{Binding TimeImportStatusMessage}" TextWrapping="Wrap" />
       <Button Grid.Column="1" Margin="12,0,0,0" Content="Abbrechen" Click="OnCancelClick" />
-      <Button Grid.Column="2" Margin="12,0,0,0" Classes="primary-action" Content="Definitiv importieren" Click="OnConfirmImportClick" IsEnabled="{Binding CanImportSelectedTimeData}" />
+      <Button Grid.Column="2"
+              Margin="12,0,0,0"
+              Classes="primary-action"
+              Classes.action-feedback-success="{Binding TimeImportFeedback.IsSuccess}"
+              Classes.action-feedback-error="{Binding TimeImportFeedback.IsError}"
+              Content="Definitiv importieren"
+              Click="OnConfirmImportClick"
+              IsEnabled="{Binding CanImportSelectedTimeData}" />
     </Grid>
   </Grid>
 </Window>

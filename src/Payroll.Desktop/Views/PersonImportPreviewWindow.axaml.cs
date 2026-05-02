@@ -25,6 +25,10 @@ public sealed partial class PersonImportPreviewWindow : Window
         }
 
         await viewModel.ImportSelectedPersonDataAsync();
-        Close(true);
+        if (viewModel.PersonImportFeedback.IsSuccess)
+        {
+            await Task.Delay(500);
+            Close(true);
+        }
     }
 }

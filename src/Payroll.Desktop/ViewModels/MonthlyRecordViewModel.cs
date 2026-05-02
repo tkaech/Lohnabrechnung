@@ -75,6 +75,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PayrollPreviewLines = [];
         PayrollPreviewDerivationGroups = [];
         PayrollPreviewNotes = [];
+        SaveTimeEntryFeedback = new ButtonFeedbackViewModel();
+        SaveExpenseEntryFeedback = new ButtonFeedbackViewModel();
+        SaveWithholdingTaxFeedback = new ButtonFeedbackViewModel();
         LoadMonthlyRecordCommand = new DelegateCommand(LoadAsync, () => CanManageRecord);
         NewTimeEntryCommand = new DelegateCommand(PrepareNewTimeEntry, () => CanManageRecord);
         SaveTimeEntryCommand = new DelegateCommand(SaveTimeEntryAsync, () => CanSaveTimeEntry);
@@ -94,6 +97,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public ObservableCollection<MonthlyPayrollPreviewLineDto> PayrollPreviewLines { get; }
     public ObservableCollection<MonthlyPayrollPreviewDerivationGroupDto> PayrollPreviewDerivationGroups { get; }
     public ObservableCollection<string> PayrollPreviewNotes { get; }
+    public ButtonFeedbackViewModel SaveTimeEntryFeedback { get; }
+    public ButtonFeedbackViewModel SaveExpenseEntryFeedback { get; }
+    public ButtonFeedbackViewModel SaveWithholdingTaxFeedback { get; }
     public DelegateCommand LoadMonthlyRecordCommand { get; }
     public DelegateCommand NewTimeEntryCommand { get; }
     public DelegateCommand SaveTimeEntryCommand { get; }
@@ -715,7 +721,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 ? "Zeiteintrag gespeichert."
                 : "Zeiteintrag aktualisiert.";
             PrepareNewTimeEntry();
-        });
+        }, SaveTimeEntryFeedback);
     }
 
     private async Task DeleteTimeEntryAsync()
@@ -755,7 +761,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
             ApplyDetails(details);
             ActionMessage = "Spesen gespeichert.";
-        });
+        }, SaveExpenseEntryFeedback);
     }
 
     private async Task SaveWithholdingTaxAsync()
@@ -791,7 +797,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
 
             ApplyDetails(details);
             ActionMessage = successMessage;
-        });
+        }, SaveWithholdingTaxFeedback);
     }
 
     private void ApplyDetails(MonthlyRecordDetailsDto details)
@@ -960,7 +966,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         TimeNote = entry.Note;
     }
 
-    private async Task ExecuteBusyAsync(Func<Task> action)
+    private async Task ExecuteBusyAsync(Func<Task> action, ButtonFeedbackViewModel? feedback = null)
     {
         if (IsBusy)
         {
@@ -978,10 +984,16 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
             ActionMessage = $"Fehler: {message}";
             PreviewSummary = message;
             PayrollPreviewSummary = message;
+            feedback?.SetError();
         }
         finally
         {
             IsBusy = false;
+        }
+
+        if (feedback is not null && !ActionMessage.StartsWith("Fehler:", StringComparison.Ordinal))
+        {
+            feedback.SetSuccess();
         }
 
         if (_loadCurrentRecordAfterBusy && _currentEmployeeId.HasValue && SelectedMonth.HasValue)
