@@ -104,6 +104,9 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
     {
         var record = await _dbContext.EmployeeMonthlyRecords
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+                .ThenInclude(advance => advance.Settlements)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .SingleOrDefaultAsync(
                 record => record.EmployeeId == employeeId && record.Year == year && record.Month == month,
@@ -134,6 +137,13 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
                 && contract.ValidFrom <= periodEnd
                 && (!contract.ValidTo.HasValue || contract.ValidTo.Value >= periodStart))
             .ToListAsync(cancellationToken);
+        var salaryAdvances = await _dbContext.SalaryAdvances
+            .AsNoTracking()
+            .Where(advance => advance.EmployeeId == employeeId
+                && ((advance.Year == year && advance.Month == month)
+                    || advance.Settlements.Any(settlement => settlement.Year == year && settlement.Month == month)))
+            .Include(advance => advance.Settlements)
+            .ToListAsync(cancellationToken);
 
         return new PayrollRunMonthlyInputDto(
             record.EmployeeId,
@@ -143,7 +153,8 @@ public sealed class PayrollRunRepository : IPayrollRunRepository
             employee?.TaxStatus,
             employee?.IsSubjectToWithholdingTax == true,
             record,
-            contracts.OrderByDescending(contract => contract.ValidFrom).FirstOrDefault());
+            contracts.OrderByDescending(contract => contract.ValidFrom).FirstOrDefault(),
+            SalaryAdvancePayrollMonthFilter.FilterForMonth(salaryAdvances, employeeId, year, month));
     }
 
     public async Task<PayrollSettings> LoadCurrentPayrollSettingsAsync(CancellationToken cancellationToken)

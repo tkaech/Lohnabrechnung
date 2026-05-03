@@ -20,6 +20,8 @@ public static class PayrollPreviewHelpCatalog
     public const string BvgCode = "BVG";
     public const string TotalCode = "TOTAL";
     public const string ExpensesCode = "EXPENSES";
+    public const string SalaryAdvancePayoutCode = "SALARY_ADVANCE_PAYOUT";
+    public const string SalaryAdvanceSettlementCode = "SALARY_ADVANCE_SETTLEMENT";
     public const string TotalPayoutCode = "TOTAL_PAYOUT";
 
     private static readonly PayrollPreviewHelpOptionDto[] DefaultOptions =
@@ -31,6 +33,8 @@ public static class PayrollPreviewHelpCatalog
         new(AhvGrossCode, "AHV-pflichtiger Bruttolohn", true, string.Empty),
         new(BvgCode, "BVG", true, string.Empty),
         new(TotalCode, "Total", true, string.Empty),
+        new(SalaryAdvancePayoutCode, "Lohnvorschuss Auszahlung", true, string.Empty),
+        new(SalaryAdvanceSettlementCode, "Lohnvorschuss Verrechnung", true, string.Empty),
         new(TotalPayoutCode, "Total Auszahlung", true, string.Empty)
     ];
 

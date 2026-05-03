@@ -297,7 +297,9 @@ public sealed class AppBootstrapper
                    && TableExists(connection, "ImportMappingConfigurations")
                    && TableExists(connection, "ImportExecutionStatuses")
                    && TableExists(connection, "PayrollRuns")
-                   && TableExists(connection, "PayrollRunLines");
+                   && TableExists(connection, "PayrollRunLines")
+                   && TableExists(connection, "SalaryAdvances")
+                   && TableExists(connection, "SalaryAdvanceSettlements");
         }
         finally
         {
@@ -723,6 +725,66 @@ public sealed class AppBootstrapper
                 connection,
                 "IX_SalaryCertificateRecords_EmployeeId_Year_CreatedAtUtc",
                 "CREATE INDEX IF NOT EXISTS \"IX_SalaryCertificateRecords_EmployeeId_Year_CreatedAtUtc\" ON \"SalaryCertificateRecords\" (\"EmployeeId\", \"Year\", \"CreatedAtUtc\");");
+
+            EnsureTable(
+                connection,
+                "SalaryAdvances",
+                """
+                CREATE TABLE IF NOT EXISTS "SalaryAdvances" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_SalaryAdvances" PRIMARY KEY,
+                    "EmployeeMonthlyRecordId" TEXT NOT NULL,
+                    "EmployeeId" TEXT NOT NULL,
+                    "Year" INTEGER NOT NULL,
+                    "Month" INTEGER NOT NULL,
+                    "AmountChf" TEXT NOT NULL,
+                    "Note" TEXT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NULL,
+                    CONSTRAINT "FK_SalaryAdvances_EmployeeMonthlyRecords_EmployeeMonthlyRecordId" FOREIGN KEY ("EmployeeMonthlyRecordId") REFERENCES "EmployeeMonthlyRecords" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_SalaryAdvances_Employees_EmployeeId" FOREIGN KEY ("EmployeeId") REFERENCES "Employees" ("Id") ON DELETE CASCADE
+                );
+                """);
+            EnsureIndex(
+                connection,
+                "IX_SalaryAdvances_EmployeeId_Year_Month",
+                "CREATE INDEX IF NOT EXISTS \"IX_SalaryAdvances_EmployeeId_Year_Month\" ON \"SalaryAdvances\" (\"EmployeeId\", \"Year\", \"Month\");");
+            EnsureIndex(
+                connection,
+                "IX_SalaryAdvances_EmployeeMonthlyRecordId",
+                "CREATE INDEX IF NOT EXISTS \"IX_SalaryAdvances_EmployeeMonthlyRecordId\" ON \"SalaryAdvances\" (\"EmployeeMonthlyRecordId\");");
+
+            EnsureTable(
+                connection,
+                "SalaryAdvanceSettlements",
+                """
+                CREATE TABLE IF NOT EXISTS "SalaryAdvanceSettlements" (
+                    "Id" TEXT NOT NULL CONSTRAINT "PK_SalaryAdvanceSettlements" PRIMARY KEY,
+                    "EmployeeMonthlyRecordId" TEXT NOT NULL,
+                    "SalaryAdvanceId" TEXT NOT NULL,
+                    "EmployeeId" TEXT NOT NULL,
+                    "Year" INTEGER NOT NULL,
+                    "Month" INTEGER NOT NULL,
+                    "AmountChf" TEXT NOT NULL,
+                    "Note" TEXT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL,
+                    "UpdatedAtUtc" TEXT NULL,
+                    CONSTRAINT "FK_SalaryAdvanceSettlements_EmployeeMonthlyRecords_EmployeeMonthlyRecordId" FOREIGN KEY ("EmployeeMonthlyRecordId") REFERENCES "EmployeeMonthlyRecords" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_SalaryAdvanceSettlements_Employees_EmployeeId" FOREIGN KEY ("EmployeeId") REFERENCES "Employees" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_SalaryAdvanceSettlements_SalaryAdvances_SalaryAdvanceId" FOREIGN KEY ("SalaryAdvanceId") REFERENCES "SalaryAdvances" ("Id") ON DELETE CASCADE
+                );
+                """);
+            EnsureIndex(
+                connection,
+                "IX_SalaryAdvanceSettlements_EmployeeId_Year_Month",
+                "CREATE INDEX IF NOT EXISTS \"IX_SalaryAdvanceSettlements_EmployeeId_Year_Month\" ON \"SalaryAdvanceSettlements\" (\"EmployeeId\", \"Year\", \"Month\");");
+            EnsureIndex(
+                connection,
+                "IX_SalaryAdvanceSettlements_EmployeeMonthlyRecordId",
+                "CREATE INDEX IF NOT EXISTS \"IX_SalaryAdvanceSettlements_EmployeeMonthlyRecordId\" ON \"SalaryAdvanceSettlements\" (\"EmployeeMonthlyRecordId\");");
+            EnsureIndex(
+                connection,
+                "IX_SalaryAdvanceSettlements_SalaryAdvanceId",
+                "CREATE INDEX IF NOT EXISTS \"IX_SalaryAdvanceSettlements_SalaryAdvanceId\" ON \"SalaryAdvanceSettlements\" (\"SalaryAdvanceId\");");
         }
         finally
         {

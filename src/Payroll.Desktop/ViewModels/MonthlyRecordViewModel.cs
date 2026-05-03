@@ -48,6 +48,20 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     private string _withholdingTaxRatePercent = "0";
     private string _withholdingTaxCorrectionAmountChf = "0";
     private string? _withholdingTaxCorrectionText;
+    private bool _isSalaryAdvanceEditorVisible;
+    private bool _isSalaryAdvanceEditorPinnedOpen;
+    private bool _hasSalaryAdvanceContext;
+    private string _salaryAdvanceAmountChf = "0";
+    private string _salaryAdvanceSettlementAmountChf = "0";
+    private string? _salaryAdvanceNote;
+    private Guid? _selectedSalaryAdvanceId;
+    private Guid? _currentSalaryAdvanceId;
+    private Guid? _currentSalaryAdvanceSettlementId;
+    private Guid? _currentSalaryAdvanceSettlementAdvanceId;
+    private Guid? _openSalaryAdvanceId;
+    private decimal _openSalaryAdvanceAmountChf;
+    private int _openSalaryAdvanceYear;
+    private int _openSalaryAdvanceMonth;
     private IReadOnlyCollection<MonthlyPayrollPreviewLineDto> _rawPayrollPreviewLines = [];
     private IReadOnlyDictionary<string, PayrollPreviewHelpOptionDto> _payrollPreviewHelpOptions = new Dictionary<string, PayrollPreviewHelpOptionDto>(StringComparer.Ordinal);
     public event EventHandler? TimeCaptureChanged;
@@ -75,9 +89,11 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PayrollPreviewLines = [];
         PayrollPreviewDerivationGroups = [];
         PayrollPreviewNotes = [];
+        SalaryAdvanceCases = [];
         SaveTimeEntryFeedback = new ButtonFeedbackViewModel();
         SaveExpenseEntryFeedback = new ButtonFeedbackViewModel();
         SaveWithholdingTaxFeedback = new ButtonFeedbackViewModel();
+        SaveSalaryAdvanceFeedback = new ButtonFeedbackViewModel();
         LoadMonthlyRecordCommand = new DelegateCommand(LoadAsync, () => CanManageRecord);
         NewTimeEntryCommand = new DelegateCommand(PrepareNewTimeEntry, () => CanManageRecord);
         SaveTimeEntryCommand = new DelegateCommand(SaveTimeEntryAsync, () => CanSaveTimeEntry);
@@ -86,6 +102,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         SaveExpenseEntryCommand = new DelegateCommand(SaveExpenseEntryAsync, () => CanSaveExpenseEntry);
         SaveWithholdingTaxCommand = new DelegateCommand(SaveWithholdingTaxAsync, () => CanSaveWithholdingTax);
         ResetWithholdingTaxCommand = new DelegateCommand(ResetWithholdingTaxAsync, () => CanResetWithholdingTax);
+        ToggleSalaryAdvanceEditorCommand = new DelegateCommand(ToggleSalaryAdvanceEditor, () => CanToggleSalaryAdvanceEditor);
+        SaveSalaryAdvanceCommand = new DelegateCommand(SaveSalaryAdvanceAsync, () => CanSaveSalaryAdvance);
+        DeleteSalaryAdvanceCommand = new DelegateCommand(DeleteSalaryAdvanceAsync, () => CanDeleteSalaryAdvance);
     }
 
     public ObservableCollection<MonthlyTimeEntryItemViewModel> TimeEntries { get; }
@@ -97,9 +116,11 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public ObservableCollection<MonthlyPayrollPreviewLineDto> PayrollPreviewLines { get; }
     public ObservableCollection<MonthlyPayrollPreviewDerivationGroupDto> PayrollPreviewDerivationGroups { get; }
     public ObservableCollection<string> PayrollPreviewNotes { get; }
+    public ObservableCollection<SalaryAdvanceCaseItemViewModel> SalaryAdvanceCases { get; }
     public ButtonFeedbackViewModel SaveTimeEntryFeedback { get; }
     public ButtonFeedbackViewModel SaveExpenseEntryFeedback { get; }
     public ButtonFeedbackViewModel SaveWithholdingTaxFeedback { get; }
+    public ButtonFeedbackViewModel SaveSalaryAdvanceFeedback { get; }
     public DelegateCommand LoadMonthlyRecordCommand { get; }
     public DelegateCommand NewTimeEntryCommand { get; }
     public DelegateCommand SaveTimeEntryCommand { get; }
@@ -108,6 +129,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public DelegateCommand SaveExpenseEntryCommand { get; }
     public DelegateCommand SaveWithholdingTaxCommand { get; }
     public DelegateCommand ResetWithholdingTaxCommand { get; }
+    public DelegateCommand ToggleSalaryAdvanceEditorCommand { get; }
+    public DelegateCommand SaveSalaryAdvanceCommand { get; }
+    public DelegateCommand DeleteSalaryAdvanceCommand { get; }
 
     public bool IsBusy
     {
@@ -122,6 +146,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
                 RaisePropertyChanged(nameof(CanResetWithholdingTax));
+                RaisePropertyChanged(nameof(CanToggleSalaryAdvanceEditor));
+                RaisePropertyChanged(nameof(CanSaveSalaryAdvance));
+                RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
                 RaiseActionStateChanged();
             }
         }
@@ -140,6 +167,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
                 RaisePropertyChanged(nameof(CanResetWithholdingTax));
+                RaisePropertyChanged(nameof(CanToggleSalaryAdvanceEditor));
+                RaisePropertyChanged(nameof(CanSaveSalaryAdvance));
+                RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
                 RaiseActionStateChanged();
             }
         }
@@ -151,6 +181,11 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
     public bool CanSaveExpenseEntry => CanManageRecord && _currentMonthlyRecordId.HasValue;
     public bool CanSaveWithholdingTax => CanManageRecord && _currentMonthlyRecordId.HasValue && IsSubjectToWithholdingTax;
     public bool CanResetWithholdingTax => CanSaveWithholdingTax;
+    public bool CanToggleSalaryAdvanceEditor => CanManageRecord && _currentMonthlyRecordId.HasValue;
+    public bool CanSaveSalaryAdvance => CanManageRecord && _currentMonthlyRecordId.HasValue;
+    public bool CanDeleteSalaryAdvance => CanManageRecord
+        && _currentMonthlyRecordId.HasValue
+        && SelectedSalaryAdvanceCase?.CanDelete == true;
 
     public DateTimeOffset? SelectedMonth
     {
@@ -397,6 +432,77 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         set => SetProperty(ref _withholdingTaxCorrectionText, value);
     }
 
+    public bool IsSalaryAdvanceEditorVisible
+    {
+        get => _isSalaryAdvanceEditorVisible;
+        private set => SetProperty(ref _isSalaryAdvanceEditorVisible, value);
+    }
+
+    public string SalaryAdvanceAmountChf
+    {
+        get => _salaryAdvanceAmountChf;
+        set => SetProperty(ref _salaryAdvanceAmountChf, value);
+    }
+
+    public string SalaryAdvanceSettlementAmountChf
+    {
+        get => _salaryAdvanceSettlementAmountChf;
+        set => SetProperty(ref _salaryAdvanceSettlementAmountChf, value);
+    }
+
+    public string? SalaryAdvanceNote
+    {
+        get => _salaryAdvanceNote;
+        set => SetProperty(ref _salaryAdvanceNote, value);
+    }
+
+    public SalaryAdvanceCaseItemViewModel? SelectedSalaryAdvanceCase
+    {
+        get => SalaryAdvanceCases.FirstOrDefault(item => item.SalaryAdvanceId == _selectedSalaryAdvanceId);
+        set
+        {
+            var selectedId = value?.SalaryAdvanceId;
+            if (!SetProperty(ref _selectedSalaryAdvanceId, selectedId))
+            {
+                return;
+            }
+
+            RaisePropertyChanged(nameof(SelectedSalaryAdvanceCase));
+            RaisePropertyChanged(nameof(HasOpenSalaryAdvance));
+            RaisePropertyChanged(nameof(OpenSalaryAdvanceAmountDisplay));
+            RaisePropertyChanged(nameof(OpenSalaryAdvanceReferenceDisplay));
+            RaisePropertyChanged(nameof(SalaryAdvanceStatusDisplay));
+            RaisePropertyChanged(nameof(SalaryAdvanceStatusHint));
+            RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
+            RaiseActionStateChanged();
+        }
+    }
+
+    public IReadOnlyCollection<SalaryAdvanceCaseItemViewModel> OpenSalaryAdvanceOptions => SalaryAdvanceCases
+        .Where(item => item.IsOpen)
+        .ToArray();
+
+    public bool HasSalaryAdvanceCases => SalaryAdvanceCases.Count > 0;
+    public bool HasOpenSalaryAdvance => SelectedSalaryAdvanceCase?.IsOpen == true || OpenSalaryAdvanceOptions.Count > 0;
+    public bool ShowSalaryAdvanceSettledHint => _hasSalaryAdvanceContext && !HasOpenSalaryAdvance;
+    public bool IsSalaryAdvanceEditorActive => IsSalaryAdvanceEditorVisible;
+    public string OpenSalaryAdvanceAmountDisplay => PayrollAmountFormatter.FormatChf(SelectedSalaryAdvanceCase?.OpenAmountChf ?? _openSalaryAdvanceAmountChf);
+    public string OpenSalaryAdvanceReferenceDisplay => SelectedSalaryAdvanceCase is not null
+        ? SelectedSalaryAdvanceCase.ReferenceDisplay
+        : HasOpenSalaryAdvance
+            ? $"{_openSalaryAdvanceMonth:00}/{_openSalaryAdvanceYear}"
+            : "-";
+    public string SalaryAdvanceStatusDisplay => HasOpenSalaryAdvance
+        ? SelectedSalaryAdvanceCase?.StatusDisplay ?? "pendent"
+        : ShowSalaryAdvanceSettledHint
+            ? "beglichen"
+            : "neu";
+    public string SalaryAdvanceStatusHint => HasOpenSalaryAdvance
+        ? $"aus {OpenSalaryAdvanceReferenceDisplay}"
+        : ShowSalaryAdvanceSettledHint
+            ? "keine offene Verrechnung"
+            : "optional";
+
     public string TimeDate
     {
         get => _timeDate;
@@ -475,6 +581,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
                 RaisePropertyChanged(nameof(CanSaveWithholdingTax));
                 RaisePropertyChanged(nameof(CanResetWithholdingTax));
+                RaisePropertyChanged(nameof(CanToggleSalaryAdvanceEditor));
+                RaisePropertyChanged(nameof(CanSaveSalaryAdvance));
+                RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
                 RaiseActionStateChanged();
             }
         }
@@ -496,6 +605,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
                 RaisePropertyChanged(nameof(CanSaveTimeEntry));
                 RaisePropertyChanged(nameof(CanDeleteTimeEntry));
                 RaisePropertyChanged(nameof(CanSaveExpenseEntry));
+                RaisePropertyChanged(nameof(CanToggleSalaryAdvanceEditor));
+                RaisePropertyChanged(nameof(CanSaveSalaryAdvance));
+                RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
                 RaiseActionStateChanged();
             }
         }
@@ -594,6 +706,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(ShowPayrollPreviewDerivation));
         RaisePropertyChanged(nameof(ShowPayrollPreviewResultOnly));
         RaisePropertyChanged(nameof(ShowPayrollPreviewSplitView));
+        ResetSalaryAdvanceFormState();
         PrepareNewTimeEntry();
         PrepareNewExpenseEntry();
     }
@@ -800,6 +913,110 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         }, SaveWithholdingTaxFeedback);
     }
 
+    private void ToggleSalaryAdvanceEditor()
+    {
+        _isSalaryAdvanceEditorPinnedOpen = !_isSalaryAdvanceEditorVisible;
+        ApplySalaryAdvanceVisibility();
+    }
+
+    private async Task SaveSalaryAdvanceAsync()
+    {
+        await EnsureCurrentRecordLoadedAsync();
+
+        if (!_currentMonthlyRecordId.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var advanceAmount = ParseRequiredDecimal(SalaryAdvanceAmountChf, nameof(SalaryAdvanceAmountChf));
+            var settlementAmount = ParseRequiredDecimal(SalaryAdvanceSettlementAmountChf, nameof(SalaryAdvanceSettlementAmountChf));
+
+            if (advanceAmount < 0m)
+            {
+                throw new InvalidOperationException("Vorschussbetrag darf nicht negativ sein.");
+            }
+
+            if (settlementAmount < 0m)
+            {
+                throw new InvalidOperationException("Verrechnungsbetrag darf nicht negativ sein.");
+            }
+
+            if (advanceAmount == 0m && settlementAmount == 0m)
+            {
+                throw new InvalidOperationException("Vorschuss oder Verrechnungsbetrag erfassen.");
+            }
+
+            MonthlyRecordDetailsDto? details = null;
+
+            if (advanceAmount > 0m)
+            {
+                details = await _monthlyRecordService.SaveSalaryAdvanceAsync(
+                    new SaveMonthlySalaryAdvanceCommand(
+                        _currentMonthlyRecordId.Value,
+                        null,
+                        advanceAmount,
+                        SalaryAdvanceNote));
+            }
+
+            if (settlementAmount > 0m)
+            {
+                var salaryAdvanceId = SelectedSalaryAdvanceCase?.SalaryAdvanceId
+                    ?? _currentSalaryAdvanceSettlementAdvanceId
+                    ?? _openSalaryAdvanceId;
+                if (!salaryAdvanceId.HasValue)
+                {
+                    throw new InvalidOperationException("Kein offener Vorschuss fuer eine Verrechnung vorhanden.");
+                }
+
+                details = await _monthlyRecordService.SaveSalaryAdvanceSettlementAsync(
+                    new SaveMonthlySalaryAdvanceSettlementCommand(
+                        _currentMonthlyRecordId.Value,
+                        salaryAdvanceId.Value,
+                        null,
+                        settlementAmount,
+                        SalaryAdvanceNote));
+            }
+
+            if (details is null)
+            {
+                return;
+            }
+
+            ApplyDetails(details);
+            ActionMessage = advanceAmount > 0m && settlementAmount > 0m
+                ? "Vorschuss und Verrechnung gespeichert."
+                : advanceAmount > 0m
+                    ? "Vorschuss gespeichert."
+                    : "Verrechnung gespeichert.";
+        }, SaveSalaryAdvanceFeedback);
+    }
+
+    private async Task DeleteSalaryAdvanceAsync()
+    {
+        await EnsureCurrentRecordLoadedAsync();
+
+        var salaryAdvanceId = SelectedSalaryAdvanceCase?.CanDelete == true
+            ? SelectedSalaryAdvanceCase.SalaryAdvanceId
+            : _currentSalaryAdvanceId;
+        if (!_currentMonthlyRecordId.HasValue || !salaryAdvanceId.HasValue)
+        {
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var details = await _monthlyRecordService.DeleteSalaryAdvanceAsync(
+                new DeleteMonthlySalaryAdvanceCommand(
+                    _currentMonthlyRecordId.Value,
+                    salaryAdvanceId.Value));
+
+            ApplyDetails(details);
+            ActionMessage = "Vorschuss geloescht.";
+        }, SaveSalaryAdvanceFeedback);
+    }
+
     private void ApplyDetails(MonthlyRecordDetailsDto details)
     {
         _currentMonthlyRecordId = details.Header.MonthlyRecordId;
@@ -810,6 +1027,7 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         WithholdingTaxRatePercent = NumericFormatManager.FormatDecimal(details.Header.WithholdingTaxRatePercent, "0.###");
         WithholdingTaxCorrectionAmountChf = NumericFormatManager.FormatDecimal(details.Header.WithholdingTaxCorrectionAmountChf, "0.00");
         WithholdingTaxCorrectionText = details.Header.WithholdingTaxCorrectionText;
+        ApplySalaryAdvanceDetails(details);
         ContractSummary = details.Header.ContractValidFrom.HasValue
             ? $"Vertragsstand: {details.Header.ContractValidFrom:dd.MM.yyyy} bis {FormatDate(details.Header.ContractValidTo)} | {PayrollAmountFormatter.FormatChf(details.Header.HourlyRateChf ?? 0m)}/h | BVG {PayrollAmountFormatter.FormatChf(details.Header.MonthlyBvgDeductionChf ?? 0m)}"
             : "Vertragsstand: kein passender Vertrag fuer den Monat gefunden.";
@@ -950,7 +1168,51 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
         RaisePropertyChanged(nameof(CanSaveWithholdingTax));
         RaisePropertyChanged(nameof(CanResetWithholdingTax));
+        RaisePropertyChanged(nameof(CanToggleSalaryAdvanceEditor));
+        RaisePropertyChanged(nameof(CanSaveSalaryAdvance));
+        RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
         RaiseActionStateChanged();
+    }
+
+    private void ApplySalaryAdvanceDetails(MonthlyRecordDetailsDto details)
+    {
+        _currentSalaryAdvanceId = details.CurrentSalaryAdvance?.SalaryAdvanceId;
+        _currentSalaryAdvanceSettlementId = details.CurrentSalaryAdvanceSettlement?.SalaryAdvanceSettlementId;
+        _currentSalaryAdvanceSettlementAdvanceId = details.CurrentSalaryAdvanceSettlement?.SalaryAdvanceId;
+        _openSalaryAdvanceId = details.OpenSalaryAdvance?.SalaryAdvanceId;
+        _openSalaryAdvanceAmountChf = details.OpenSalaryAdvance?.OpenAmountChf ?? 0m;
+        _openSalaryAdvanceYear = details.OpenSalaryAdvance?.Year ?? 0;
+        _openSalaryAdvanceMonth = details.OpenSalaryAdvance?.Month ?? 0;
+        var previouslySelectedSalaryAdvanceId = _selectedSalaryAdvanceId;
+        SalaryAdvanceCases.Clear();
+        foreach (var item in BuildSalaryAdvanceCases(details))
+        {
+            SalaryAdvanceCases.Add(item);
+        }
+
+        SelectedSalaryAdvanceCase = SalaryAdvanceCases.FirstOrDefault(item => item.SalaryAdvanceId == previouslySelectedSalaryAdvanceId)
+            ?? SalaryAdvanceCases.FirstOrDefault(item => item.SalaryAdvanceId == details.CurrentSalaryAdvanceSettlement?.SalaryAdvanceId)
+            ?? SalaryAdvanceCases.FirstOrDefault(item => item.SalaryAdvanceId == details.OpenSalaryAdvance?.SalaryAdvanceId)
+            ?? SalaryAdvanceCases.FirstOrDefault(item => item.IsOpen)
+            ?? SalaryAdvanceCases.FirstOrDefault();
+        _hasSalaryAdvanceContext = details.CurrentSalaryAdvance is not null
+            || details.CurrentSalaryAdvanceSettlement is not null
+            || details.OpenSalaryAdvance is not null
+            || SalaryAdvanceCases.Count > 0;
+        SalaryAdvanceAmountChf = "0.00";
+        SalaryAdvanceSettlementAmountChf = "0.00";
+        SalaryAdvanceNote = null;
+        ApplySalaryAdvanceVisibility();
+        RaisePropertyChanged(nameof(OpenSalaryAdvanceOptions));
+        RaisePropertyChanged(nameof(HasSalaryAdvanceCases));
+        RaisePropertyChanged(nameof(SelectedSalaryAdvanceCase));
+        RaisePropertyChanged(nameof(HasOpenSalaryAdvance));
+        RaisePropertyChanged(nameof(ShowSalaryAdvanceSettledHint));
+        RaisePropertyChanged(nameof(IsSalaryAdvanceEditorActive));
+        RaisePropertyChanged(nameof(OpenSalaryAdvanceAmountDisplay));
+        RaisePropertyChanged(nameof(OpenSalaryAdvanceReferenceDisplay));
+        RaisePropertyChanged(nameof(SalaryAdvanceStatusDisplay));
+        RaisePropertyChanged(nameof(SalaryAdvanceStatusHint));
     }
 
     private void PopulateTimeEntryForm(MonthlyTimeEntryItemViewModel entry)
@@ -1049,6 +1311,8 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         PayrollPreviewLines.Clear();
         PayrollPreviewDerivationGroups.Clear();
         PayrollPreviewNotes.Clear();
+        SalaryAdvanceCases.Clear();
+        ResetSalaryAdvanceFormState();
         RaisePropertyChanged(nameof(HasPayrollPreviewLines));
         RaisePropertyChanged(nameof(HasPayrollPreviewDerivationGroups));
         TimeCaptureChanged?.Invoke(this, EventArgs.Empty);
@@ -1058,6 +1322,9 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         RaisePropertyChanged(nameof(CanSaveExpenseEntry));
         RaisePropertyChanged(nameof(CanSaveWithholdingTax));
         RaisePropertyChanged(nameof(CanResetWithholdingTax));
+        RaisePropertyChanged(nameof(CanToggleSalaryAdvanceEditor));
+        RaisePropertyChanged(nameof(CanSaveSalaryAdvance));
+        RaisePropertyChanged(nameof(CanDeleteSalaryAdvance));
         RaiseActionStateChanged();
     }
 
@@ -1071,6 +1338,82 @@ public sealed class MonthlyRecordViewModel : ViewModelBase
         SaveExpenseEntryCommand.RaiseCanExecuteChanged();
         SaveWithholdingTaxCommand.RaiseCanExecuteChanged();
         ResetWithholdingTaxCommand.RaiseCanExecuteChanged();
+        ToggleSalaryAdvanceEditorCommand.RaiseCanExecuteChanged();
+        SaveSalaryAdvanceCommand.RaiseCanExecuteChanged();
+        DeleteSalaryAdvanceCommand.RaiseCanExecuteChanged();
+    }
+
+    private void ResetSalaryAdvanceFormState()
+    {
+        _selectedSalaryAdvanceId = null;
+        _currentSalaryAdvanceId = null;
+        _currentSalaryAdvanceSettlementId = null;
+        _currentSalaryAdvanceSettlementAdvanceId = null;
+        _openSalaryAdvanceId = null;
+        _openSalaryAdvanceAmountChf = 0m;
+        _openSalaryAdvanceYear = 0;
+        _openSalaryAdvanceMonth = 0;
+        _hasSalaryAdvanceContext = false;
+        _isSalaryAdvanceEditorPinnedOpen = false;
+        IsSalaryAdvanceEditorVisible = false;
+        SalaryAdvanceAmountChf = "0.00";
+        SalaryAdvanceSettlementAmountChf = "0.00";
+        SalaryAdvanceNote = null;
+        RaisePropertyChanged(nameof(OpenSalaryAdvanceOptions));
+        RaisePropertyChanged(nameof(HasSalaryAdvanceCases));
+        RaisePropertyChanged(nameof(SelectedSalaryAdvanceCase));
+        RaisePropertyChanged(nameof(HasOpenSalaryAdvance));
+        RaisePropertyChanged(nameof(ShowSalaryAdvanceSettledHint));
+        RaisePropertyChanged(nameof(IsSalaryAdvanceEditorActive));
+        RaisePropertyChanged(nameof(OpenSalaryAdvanceAmountDisplay));
+        RaisePropertyChanged(nameof(OpenSalaryAdvanceReferenceDisplay));
+        RaisePropertyChanged(nameof(SalaryAdvanceStatusDisplay));
+        RaisePropertyChanged(nameof(SalaryAdvanceStatusHint));
+    }
+
+    private void ApplySalaryAdvanceVisibility()
+    {
+        IsSalaryAdvanceEditorVisible = _hasSalaryAdvanceContext || _isSalaryAdvanceEditorPinnedOpen;
+        RaisePropertyChanged(nameof(IsSalaryAdvanceEditorActive));
+    }
+
+    private IEnumerable<SalaryAdvanceCaseItemViewModel> BuildSalaryAdvanceCases(MonthlyRecordDetailsDto details)
+    {
+        var salaryAdvances = details.SalaryAdvances ?? BuildLegacySalaryAdvanceItems(details);
+
+        return salaryAdvances
+            .OrderByDescending(item => item.Year)
+            .ThenByDescending(item => item.Month)
+            .ThenByDescending(item => item.AmountChf)
+            .Select(item => new SalaryAdvanceCaseItemViewModel
+            {
+                SalaryAdvanceId = item.SalaryAdvanceId,
+                Year = item.Year,
+                Month = item.Month,
+                AmountChf = item.AmountChf,
+                SettledAmountChf = item.SettledAmountChf,
+                OpenAmountChf = item.OpenAmountChf,
+                IsSettled = item.IsSettled,
+                IsCurrentMonth = SelectedMonth.HasValue
+                    && item.Year == SelectedMonth.Value.Year
+                    && item.Month == SelectedMonth.Value.Month,
+                ReferenceDisplay = item.ReferenceDisplay ?? $"{item.Month:00}/{item.Year}",
+                Note = item.Note
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyCollection<MonthlySalaryAdvanceDto> BuildLegacySalaryAdvanceItems(MonthlyRecordDetailsDto details)
+    {
+        return new[]
+            {
+                details.CurrentSalaryAdvance,
+                details.OpenSalaryAdvance
+            }
+            .OfType<MonthlySalaryAdvanceDto>()
+            .GroupBy(item => item.SalaryAdvanceId)
+            .Select(group => group.First())
+            .ToArray();
     }
 
     private void RefreshVisiblePayrollPreviewLines()

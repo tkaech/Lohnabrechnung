@@ -85,6 +85,81 @@ public sealed class MonthlyRecordService
         return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
     }
 
+    public async Task<MonthlyRecordDetailsDto> SaveSalaryAdvanceAsync(
+        SaveMonthlySalaryAdvanceCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        _repository.ClearTracking();
+        var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
+        var isNewAdvance = !command.SalaryAdvanceId.HasValue;
+        var advance = monthlyRecord.SaveSalaryAdvance(command.SalaryAdvanceId, command.AmountChf, command.Note);
+
+        if (isNewAdvance)
+        {
+            _repository.MarkAsAdded(advance);
+        }
+
+        await _repository.SaveChangesAsync(cancellationToken);
+        _repository.ClearTracking();
+        return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
+    }
+
+    public async Task<MonthlyRecordDetailsDto> DeleteSalaryAdvanceAsync(
+        DeleteMonthlySalaryAdvanceCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        _repository.ClearTracking();
+        var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
+        var advance = monthlyRecord.SalaryAdvances.SingleOrDefault(item => item.Id == command.SalaryAdvanceId)
+            ?? throw new InvalidOperationException("Salary advance was not found.");
+
+        monthlyRecord.RemoveSalaryAdvance(command.SalaryAdvanceId);
+        _repository.MarkAsDeleted(advance);
+
+        await _repository.SaveChangesAsync(cancellationToken);
+        _repository.ClearTracking();
+        return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
+    }
+
+    public async Task<MonthlyRecordDetailsDto> SaveSalaryAdvanceSettlementAsync(
+        SaveMonthlySalaryAdvanceSettlementCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        _repository.ClearTracking();
+        var monthlyRecord = await LoadAggregateAsync(command.MonthlyRecordId, cancellationToken);
+        var advance = await _repository.GetSalaryAdvanceByIdAsync(command.SalaryAdvanceId, cancellationToken)
+            ?? throw new InvalidOperationException("Salary advance was not found.");
+        if (advance.EmployeeId != monthlyRecord.EmployeeId)
+        {
+            throw new InvalidOperationException("Salary advance does not belong to the selected employee.");
+        }
+
+        var isNewSettlement = !command.SalaryAdvanceSettlementId.HasValue;
+        var settlement = advance.SaveSettlement(
+            command.SalaryAdvanceSettlementId,
+            monthlyRecord.Id,
+            monthlyRecord.Year,
+            monthlyRecord.Month,
+            command.AmountChf,
+            command.Note);
+        monthlyRecord.RegisterSalaryAdvanceSettlement(settlement);
+
+        if (isNewSettlement)
+        {
+            _repository.MarkAsAdded(settlement);
+        }
+
+        await _repository.SaveChangesAsync(cancellationToken);
+        _repository.ClearTracking();
+        return await LoadDetailsAsync(monthlyRecord.Id, cancellationToken);
+    }
+
     public async Task<MonthlyRecordDetailsDto> SaveWithholdingTaxAsync(
         SaveMonthlyWithholdingTaxCommand command,
         CancellationToken cancellationToken = default)

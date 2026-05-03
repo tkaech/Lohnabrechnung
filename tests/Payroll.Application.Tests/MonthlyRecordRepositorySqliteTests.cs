@@ -617,6 +617,130 @@ public sealed class MonthlyRecordRepositorySqliteTests
     }
 
     [Fact]
+    public async Task GetDetailsAsync_IncludesSalaryAdvanceAndSettlementRowsInPreviewHistory()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var marchRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 3, CancellationToken.None);
+        var advance = marchRecord.SaveSalaryAdvance(null, 300m, "Vorschuss");
+
+        var aprilRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        var settlement = advance.SaveSettlement(null, aprilRecord.Id, aprilRecord.Year, aprilRecord.Month, 120m, "Teilrueckzahlung");
+        aprilRecord.RegisterSalaryAdvanceSettlement(settlement);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(aprilRecord.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.Preview.Rows, row => row.EntryType == "Vorschuss" && row.Year == 2026 && row.Month == 3 && row.QuantityOrAmount == "300.00 CHF");
+        Assert.Contains(details.Preview.Rows, row => row.EntryType == "Verrechnung" && row.Year == 2026 && row.Month == 4 && row.QuantityOrAmount == "-120.00 CHF");
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_ReturnsMultipleOpenSalaryAdvancesAndCurrentMonthSettlements()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var januaryRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 1, CancellationToken.None);
+        var firstAdvance = januaryRecord.SaveSalaryAdvance(null, 300m, "Januar");
+
+        var februaryRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 2, CancellationToken.None);
+        var secondAdvance = februaryRecord.SaveSalaryAdvance(null, 200m, "Februar");
+
+        var aprilRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        var firstSettlement = firstAdvance.SaveSettlement(null, aprilRecord.Id, aprilRecord.Year, aprilRecord.Month, 100m, "Teil 1");
+        var secondSettlement = secondAdvance.SaveSettlement(null, aprilRecord.Id, aprilRecord.Year, aprilRecord.Month, 50m, "Teil 2");
+        aprilRecord.RegisterSalaryAdvanceSettlement(firstSettlement);
+        aprilRecord.RegisterSalaryAdvanceSettlement(secondSettlement);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(aprilRecord.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.NotNull(details!.SalaryAdvances);
+        Assert.NotNull(details.SalaryAdvanceSettlements);
+        Assert.Equal(2, details.SalaryAdvances!.Count);
+        Assert.Equal(2, details.SalaryAdvanceSettlements!.Count);
+        Assert.Contains(details.SalaryAdvances, item => item.SalaryAdvanceId == firstAdvance.Id && item.AmountChf == 300m && item.SettledAmountChf == 100m && item.OpenAmountChf == 200m && !item.IsSettled);
+        Assert.Contains(details.SalaryAdvances, item => item.SalaryAdvanceId == secondAdvance.Id && item.AmountChf == 200m && item.SettledAmountChf == 50m && item.OpenAmountChf == 150m && !item.IsSettled);
+        Assert.Contains(details.SalaryAdvanceSettlements, item => item.SalaryAdvanceId == firstAdvance.Id && item.AmountChf == 100m && item.Month == 4);
+        Assert.Contains(details.SalaryAdvanceSettlements, item => item.SalaryAdvanceId == secondAdvance.Id && item.AmountChf == 50m && item.Month == 4);
+    }
+
+    [Fact]
+    public async Task GetDetailsAsync_PreviewIgnoresFutureSalaryAdvanceSettlementsInAdvanceMonth()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new global::Payroll.Domain.Employees.EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var repository = new EmployeeMonthlyRecordRepository(dbContext);
+        var marchRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 3, CancellationToken.None);
+        marchRecord.SaveTimeEntry(null, new DateOnly(2026, 3, 31), 10m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        var advance = marchRecord.SaveSalaryAdvance(null, 300m, "Vorschuss");
+
+        var aprilRecord = await repository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 30), 5m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        var settlement = advance.SaveSettlement(null, aprilRecord.Id, aprilRecord.Year, aprilRecord.Month, 120m, "Teilrueckzahlung");
+        aprilRecord.RegisterSalaryAdvanceSettlement(settlement);
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var details = await repository.GetDetailsAsync(marchRecord.Id, CancellationToken.None);
+
+        Assert.NotNull(details);
+        Assert.Contains(details!.PayrollPreview.Lines, line => line.Label == "Lohnvorschuss Auszahlung" && line.AmountDisplay == "300.00 CHF");
+        Assert.DoesNotContain(details.PayrollPreview.Lines, line => line.Label == "Lohnvorschuss Verrechnung");
+    }
+
+    [Fact]
     public async Task ListTimeCaptureOverviewAsync_ReturnsEmployeesWithAndWithoutMonthCapture()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");

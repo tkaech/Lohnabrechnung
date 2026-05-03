@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Payroll.Application.AnnualSalary;
+using Payroll.Application.MonthlyRecords;
 using Payroll.Application.Payroll;
 using Payroll.Application.Settings;
 using Payroll.Domain.Employees;
@@ -244,6 +245,260 @@ public sealed class PayrollRunRepositorySqliteTests
     }
 
     [Fact]
+    public async Task FinalizeMonthAsync_PersistsSalaryAdvancePayoutAndLaterSettlement_AsStableSnapshots()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        var monthlyRecordService = new MonthlyRecordService(monthlyRecordRepository);
+
+        var marchDetails = await monthlyRecordService.GetOrCreateAsync(new MonthlyRecordQuery(employee.Id, 2026, 3));
+        await monthlyRecordService.SaveTimeEntryAsync(new SaveMonthlyTimeEntryCommand(
+            marchDetails.Header.MonthlyRecordId,
+            null,
+            new DateOnly(2026, 3, 31),
+            10m,
+            0m,
+            0m,
+            0m,
+            0m,
+            0m,
+            0m,
+            null));
+        await monthlyRecordService.SaveSalaryAdvanceAsync(new SaveMonthlySalaryAdvanceCommand(
+            marchDetails.Header.MonthlyRecordId,
+            null,
+            250m,
+            "Vorschuss Maerz"));
+
+        var advanceId = await dbContext.SalaryAdvances
+            .Select(item => item.Id)
+            .SingleAsync();
+
+        var payrollRunService = new PayrollRunService(new PayrollRunRepository(dbContext));
+        var marchResult = await payrollRunService.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
+
+        var aprilDetails = await monthlyRecordService.GetOrCreateAsync(new MonthlyRecordQuery(employee.Id, 2026, 4));
+        await monthlyRecordService.SaveTimeEntryAsync(new SaveMonthlyTimeEntryCommand(
+            aprilDetails.Header.MonthlyRecordId,
+            null,
+            new DateOnly(2026, 4, 30),
+            5m,
+            0m,
+            0m,
+            0m,
+            0m,
+            0m,
+            0m,
+            null));
+        await monthlyRecordService.SaveSalaryAdvanceSettlementAsync(new SaveMonthlySalaryAdvanceSettlementCommand(
+            aprilDetails.Header.MonthlyRecordId,
+            advanceId,
+            null,
+            100m,
+            "April Verrechnung"));
+
+        var aprilResult = await payrollRunService.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 4, new DateOnly(2026, 5, 5)));
+
+        dbContext.ChangeTracker.Clear();
+        var marchRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == marchResult.PayrollRunId);
+        var aprilRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == aprilResult.PayrollRunId);
+
+        Assert.Contains(marchRun.Lines, line => line.LineType == PayrollLineType.SalaryAdvancePayout && line.AmountChf == 250m);
+        Assert.DoesNotContain(marchRun.Lines, line => line.LineType == PayrollLineType.SalaryAdvanceSettlement);
+        Assert.Contains(aprilRun.Lines, line => line.LineType == PayrollLineType.SalaryAdvanceSettlement && line.AmountChf == -100m);
+        Assert.DoesNotContain(aprilRun.Lines, line => line.LineType == PayrollLineType.SalaryAdvancePayout);
+    }
+
+    [Fact]
+    public async Task FinalizeMonthAsync_IgnoresFutureSalaryAdvanceSettlementsInAdvanceMonth()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        var marchRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 3, CancellationToken.None);
+        marchRecord.SaveTimeEntry(null, new DateOnly(2026, 3, 31), 10m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        var advance = marchRecord.SaveSalaryAdvance(null, 250m, "Vorschuss");
+
+        var aprilRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 30), 5m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        var settlement = advance.SaveSettlement(null, aprilRecord.Id, aprilRecord.Year, aprilRecord.Month, 100m, "April Verrechnung");
+        aprilRecord.RegisterSalaryAdvanceSettlement(settlement);
+        await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
+
+        var service = new PayrollRunService(new PayrollRunRepository(dbContext));
+        var result = await service.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
+
+        var storedRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == result.PayrollRunId);
+
+        Assert.Contains(storedRun.Lines, line => line.LineType == PayrollLineType.SalaryAdvancePayout && line.AmountChf == 250m);
+        Assert.DoesNotContain(storedRun.Lines, line => line.LineType == PayrollLineType.SalaryAdvanceSettlement);
+    }
+
+    [Fact]
+    public async Task FinalizeMonthAsync_PersistsSeparateSalaryAdvanceAndSettlementLines()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+        dbContext.EmploymentContracts.Add(new EmploymentContract(employee.Id, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m));
+        dbContext.PayrollSettings.Add(new PayrollSettings(
+            workTimeSupplementSettings: WorkTimeSupplementSettings.Empty,
+            ahvIvEoRate: 0m,
+            alvRate: 0m,
+            sicknessAccidentInsuranceRate: 0m,
+            trainingAndHolidayRate: 0m,
+            vacationCompensationRate: 0m,
+            vacationCompensationRateAge50Plus: 0m,
+            vehiclePauschalzone1RateChf: 0m,
+            vehiclePauschalzone2RateChf: 0m,
+            vehicleRegiezone1RateChf: 0m));
+        await dbContext.SaveChangesAsync();
+
+        var monthlyRecordRepository = new EmployeeMonthlyRecordRepository(dbContext);
+        var marchRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 3, CancellationToken.None);
+        marchRecord.SaveTimeEntry(null, new DateOnly(2026, 3, 31), 10m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        var firstAdvance = marchRecord.SaveSalaryAdvance(null, 250m, "Laptop");
+        var secondAdvance = marchRecord.SaveSalaryAdvance(null, 150m, "Werkzeug");
+
+        var aprilRecord = await monthlyRecordRepository.GetOrCreateAsync(employee.Id, 2026, 4, CancellationToken.None);
+        aprilRecord.SaveTimeEntry(null, new DateOnly(2026, 4, 30), 8m, 0m, 0m, 0m, 0m, 0m, 0m, null);
+        aprilRecord.RegisterSalaryAdvanceSettlement(firstAdvance.SaveSettlement(null, aprilRecord.Id, 2026, 4, 100m, "April Laptop"));
+        aprilRecord.RegisterSalaryAdvanceSettlement(secondAdvance.SaveSettlement(null, aprilRecord.Id, 2026, 4, 60m, "April Werkzeug"));
+        await monthlyRecordRepository.SaveChangesAsync(CancellationToken.None);
+
+        var payrollRunService = new PayrollRunService(new PayrollRunRepository(dbContext));
+        var marchResult = await payrollRunService.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 3, new DateOnly(2026, 4, 5)));
+        var aprilResult = await payrollRunService.FinalizeMonthAsync(new FinalizePayrollMonthCommand(employee.Id, 2026, 4, new DateOnly(2026, 5, 5)));
+
+        dbContext.ChangeTracker.Clear();
+        var marchRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == marchResult.PayrollRunId);
+        var aprilRun = await dbContext.PayrollRuns
+            .Include(run => run.Lines)
+            .SingleAsync(run => run.Id == aprilResult.PayrollRunId);
+
+        var marchPayoutLines = marchRun.Lines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvancePayout)
+            .ToArray();
+        Assert.Equal(2, marchPayoutLines.Length);
+        Assert.Contains(marchPayoutLines, line => line.AmountChf == 250m && line.Description.Contains("Laptop", StringComparison.Ordinal));
+        Assert.Contains(marchPayoutLines, line => line.AmountChf == 150m && line.Description.Contains("Werkzeug", StringComparison.Ordinal));
+
+        var aprilSettlementLines = aprilRun.Lines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvanceSettlement)
+            .ToArray();
+        Assert.Equal(2, aprilSettlementLines.Length);
+        Assert.Contains(aprilSettlementLines, line => line.AmountChf == -100m && line.Description.Contains("April Laptop", StringComparison.Ordinal));
+        Assert.Contains(aprilSettlementLines, line => line.AmountChf == -60m && line.Description.Contains("April Werkzeug", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AnnualSalary_IncludesSalaryAdvanceAdjustmentsInNetSalary()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var employee = CreateEmployee();
+        dbContext.Employees.Add(employee);
+
+        var marchRun = new PayrollRun("2026-03", new DateOnly(2026, 3, 31));
+        marchRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(employee.Id, PayrollLineType.BaseHours, "BASE", "Basislohn", 10m, 10m));
+        marchRun.AddLine(PayrollRunLine.CreateDirectChfLine(employee.Id, PayrollLineType.SalaryAdvancePayout, "SALARY_ADVANCE_PAYOUT", "Lohnvorschuss Auszahlung", 200m));
+        marchRun.FinalizeRun();
+
+        var aprilRun = new PayrollRun("2026-04", new DateOnly(2026, 4, 30));
+        aprilRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(employee.Id, PayrollLineType.BaseHours, "BASE", "Basislohn", 10m, 10m));
+        aprilRun.AddLine(PayrollRunLine.CreateManualChfLine(employee.Id, PayrollLineType.SalaryAdvanceSettlement, "SALARY_ADVANCE_SETTLEMENT", "Lohnvorschuss Verrechnung", -50m));
+        aprilRun.FinalizeRun();
+
+        dbContext.PayrollRuns.AddRange(marchRun, aprilRun);
+        await dbContext.SaveChangesAsync();
+
+        var overview = await new AnnualSalaryRepository(dbContext).GetOverviewAsync(
+            new AnnualSalaryOverviewQuery(employee.Id, 2026),
+            CancellationToken.None);
+
+        var march = overview.Months.Single(month => month.Month == 3);
+        var april = overview.Months.Single(month => month.Month == 4);
+
+        Assert.Equal(300m, march.NetSalaryChf);
+        Assert.Equal(50m, april.NetSalaryChf);
+        Assert.Equal(350m, overview.Totals.NetSalaryChf);
+    }
+
+    [Fact]
     public async Task AnnualSalary_ReadsOnlyFinalizedPayrollRunLines()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
@@ -297,6 +552,69 @@ public sealed class PayrollRunRepositorySqliteTests
         Assert.False(march.IsStatusOpenWithRecordedData);
         Assert.Equal("offen", april.StatusDisplay);
         Assert.Equal(100m, overview.Totals.GrossSalaryChf);
+    }
+
+    [Fact]
+    public async Task AnnualSalary_ReadsFinalizedSnapshotForSelectedEmployeeOnly()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<PayrollDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var dbContext = new PayrollDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var selectedEmployee = CreateEmployee();
+        var otherEmployee = new Employee(
+            "9002",
+            "Nora",
+            "Muster",
+            new DateOnly(1991, 2, 2),
+            new DateOnly(2021, 2, 1),
+            null,
+            true,
+            new EmployeeAddress("Bahnhofstrasse", "2", null, "6300", "Zug", "Schweiz"),
+            "Schweiz",
+            "CH",
+            "B",
+            "Ordentlich",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            EmployeeWageType.Hourly);
+        dbContext.Employees.AddRange(selectedEmployee, otherEmployee);
+
+        var selectedMarchRun = new PayrollRun("2026-03", new DateOnly(2026, 3, 31));
+        selectedMarchRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(selectedEmployee.Id, PayrollLineType.BaseHours, "BASE", "Basislohn", 10m, 10m));
+        selectedMarchRun.AddLine(PayrollRunLine.CreateDirectChfLine(selectedEmployee.Id, PayrollLineType.SalaryAdvancePayout, "SALARY_ADVANCE_PAYOUT", "Lohnvorschuss Auszahlung", 200m));
+        selectedMarchRun.FinalizeRun();
+
+        var otherMarchRun = new PayrollRun("2026-03", new DateOnly(2026, 3, 31));
+        otherMarchRun.AddLine(PayrollRunLine.CreateCalculatedHourlyLine(otherEmployee.Id, PayrollLineType.BaseHours, "BASE", "Basislohn", 20m, 20m));
+        otherMarchRun.FinalizeRun();
+
+        dbContext.PayrollRuns.AddRange(selectedMarchRun, otherMarchRun);
+        await dbContext.SaveChangesAsync();
+
+        var overview = await new AnnualSalaryRepository(dbContext).GetOverviewAsync(
+            new AnnualSalaryOverviewQuery(selectedEmployee.Id, 2026),
+            CancellationToken.None);
+
+        var march = overview.Months.Single(month => month.Month == 3);
+
+        Assert.True(march.IsStatusFinalized);
+        Assert.Equal(100m, march.GrossSalaryChf);
+        Assert.Equal(300m, march.NetSalaryChf);
+        Assert.Equal(100m, overview.Totals.GrossSalaryChf);
+        Assert.Equal(300m, overview.Totals.NetSalaryChf);
     }
 
     [Fact]

@@ -26,7 +26,8 @@ public sealed record MonthlyTimeCaptureOverviewRowDto(
     decimal VehiclePauschalzone2,
     decimal VehicleRegiezone1,
     int TimeEntryCount,
-    decimal ExpensesTotalChf = 0m)
+    decimal ExpensesTotalChf = 0m,
+    decimal SalaryAdvanceNetAdjustmentChf = 0m)
 {
     public string StatusDisplay => IsActive ? "Aktiv" : "Inaktiv";
     public string CaptureDisplay => HasMonthCapture ? "Ja" : "Nein";
@@ -38,7 +39,8 @@ public sealed record MonthlyTimeCaptureOverviewRowDto(
         || VehiclePauschalzone1 > 0m
         || VehiclePauschalzone2 > 0m
         || VehicleRegiezone1 > 0m
-        || ExpensesTotalChf > 0m;
+        || ExpensesTotalChf > 0m
+        || SalaryAdvanceNetAdjustmentChf != 0m;
 }
 
 public sealed record MonthlyRecordHeaderDto(
@@ -86,6 +88,26 @@ public sealed record HistoricalMonthlyExpenseEntryDto(
     int Year,
     int Month,
     decimal ExpensesTotalChf);
+
+public sealed record MonthlySalaryAdvanceDto(
+    Guid SalaryAdvanceId,
+    int Year,
+    int Month,
+    decimal AmountChf,
+    string? Note,
+    decimal OpenAmountChf,
+    decimal SettledAmountChf = 0m,
+    bool IsSettled = false,
+    string? ReferenceDisplay = null);
+
+public sealed record MonthlySalaryAdvanceSettlementDto(
+    Guid SalaryAdvanceSettlementId,
+    Guid SalaryAdvanceId,
+    int Year,
+    int Month,
+    decimal AmountChf,
+    string? Note,
+    string? ReferenceDisplay = null);
 
 public sealed record MonthlyPreviewRowDto(
     int Year,
@@ -150,8 +172,13 @@ public sealed record MonthlyRecordDetailsDto(
     IReadOnlyCollection<MonthlyTimeEntryDto> TimeEntryHistory,
     MonthlyExpenseEntryDto? ExpenseEntry,
     IReadOnlyCollection<HistoricalMonthlyExpenseEntryDto> ExpenseEntryHistory,
+    MonthlySalaryAdvanceDto? CurrentSalaryAdvance,
+    MonthlySalaryAdvanceSettlementDto? CurrentSalaryAdvanceSettlement,
+    MonthlySalaryAdvanceDto? OpenSalaryAdvance,
     MonthlyRecordPreviewDto Preview,
-    MonthlyPayrollPreviewDto PayrollPreview);
+    MonthlyPayrollPreviewDto PayrollPreview,
+    IReadOnlyCollection<MonthlySalaryAdvanceDto>? SalaryAdvances = null,
+    IReadOnlyCollection<MonthlySalaryAdvanceSettlementDto>? SalaryAdvanceSettlements = null);
 
 public sealed record SaveMonthlyTimeEntryCommand(
     Guid MonthlyRecordId,
@@ -169,6 +196,23 @@ public sealed record SaveMonthlyTimeEntryCommand(
 public sealed record SaveMonthlyExpenseEntryCommand(
     Guid MonthlyRecordId,
     decimal ExpensesTotalChf);
+
+public sealed record SaveMonthlySalaryAdvanceCommand(
+    Guid MonthlyRecordId,
+    Guid? SalaryAdvanceId,
+    decimal AmountChf,
+    string? Note);
+
+public sealed record DeleteMonthlySalaryAdvanceCommand(
+    Guid MonthlyRecordId,
+    Guid SalaryAdvanceId);
+
+public sealed record SaveMonthlySalaryAdvanceSettlementCommand(
+    Guid MonthlyRecordId,
+    Guid SalaryAdvanceId,
+    Guid? SalaryAdvanceSettlementId,
+    decimal AmountChf,
+    string? Note);
 
 public sealed record SaveMonthlyWithholdingTaxCommand(
     Guid MonthlyRecordId,

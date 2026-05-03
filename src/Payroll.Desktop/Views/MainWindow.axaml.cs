@@ -214,6 +214,19 @@ public sealed partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnEmployeeSearchTextBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not Key.Enter and not Key.Return
+            || DataContext is not MainWindowViewModel viewModel
+            || !viewModel.SearchCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        viewModel.SearchCommand.Execute(null);
+        e.Handled = true;
+    }
+
     private void OnDeactivated(object? sender, EventArgs e)
     {
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })

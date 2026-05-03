@@ -253,6 +253,95 @@ public sealed class PayrollRunLineDerivationServiceTests
     }
 
     [Fact]
+    public void DeriveForEmployee_AddsSalaryAdvanceSettlementWithoutChangingDeductionBasis()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m);
+        var advance = new global::Payroll.Domain.MonthlyRecords.SalaryAdvance(Guid.NewGuid(), employeeId, 2026, 3, 250m, "Vorschuss");
+        advance.SaveSettlement(null, Guid.NewGuid(), 2026, 4, 50m, "Teilrueckzahlung");
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 4, 30),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            [advance],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false));
+
+        Assert.Contains(result.Lines, line => line.LineType == PayrollLineType.SalaryAdvanceSettlement && line.AmountChf == -50m);
+        var ahvLine = Assert.Single(result.Lines, line => line.Code == "AHV_IV_EO");
+        Assert.Equal(-5.86392m, ahvLine.AmountChf);
+    }
+
+    [Fact]
+    public void DeriveForEmployee_CreatesSeparateSalaryAdvancePayoutLinesForCurrentMonth()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m);
+        var firstAdvance = new global::Payroll.Domain.MonthlyRecords.SalaryAdvance(Guid.NewGuid(), employeeId, 2026, 4, 120m, "Laptop");
+        var secondAdvance = new global::Payroll.Domain.MonthlyRecords.SalaryAdvance(Guid.NewGuid(), employeeId, 2026, 4, 80m, "Werkzeug");
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 4, 30),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            [firstAdvance, secondAdvance],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false));
+
+        var payoutLines = result.Lines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvancePayout)
+            .ToArray();
+
+        Assert.Equal(2, payoutLines.Length);
+        Assert.Contains(payoutLines, line => line.AmountChf == 120m && line.Description.Contains("04/2026", StringComparison.Ordinal));
+        Assert.Contains(payoutLines, line => line.AmountChf == 80m && line.Description.Contains("Werkzeug", StringComparison.Ordinal));
+        var ahvLine = Assert.Single(result.Lines, line => line.Code == "AHV_IV_EO");
+        Assert.Equal(-5.86392m, ahvLine.AmountChf);
+    }
+
+    [Fact]
+    public void DeriveForEmployee_CreatesSeparateSalaryAdvanceSettlementLinesForCurrentMonth()
+    {
+        var employeeId = Guid.NewGuid();
+        var contract = new EmploymentContract(employeeId, new DateOnly(2026, 1, 1), null, 10m, 0m, 0m);
+        var firstAdvance = new global::Payroll.Domain.MonthlyRecords.SalaryAdvance(Guid.NewGuid(), employeeId, 2026, 3, 250m, "Laptop");
+        firstAdvance.SaveSettlement(null, Guid.NewGuid(), 2026, 4, 50m, "April 1");
+        var secondAdvance = new global::Payroll.Domain.MonthlyRecords.SalaryAdvance(Guid.NewGuid(), employeeId, 2026, 3, 180m, "Werkzeug");
+        secondAdvance.SaveSettlement(null, Guid.NewGuid(), 2026, 4, 70m, "April 2");
+        var service = new PayrollRunLineDerivationService();
+
+        var result = service.DeriveForEmployee(
+            new DateOnly(2026, 4, 30),
+            null,
+            contract,
+            CreatePayrollSettings(),
+            new PayrollWorkSummary(employeeId, 10m, 0m, 0m, 0m),
+            [],
+            [],
+            [firstAdvance, secondAdvance],
+            new PayrollDerivationContext(EmployeeWageType.Hourly, "Buero", false));
+
+        var settlementLines = result.Lines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvanceSettlement)
+            .ToArray();
+
+        Assert.Equal(2, settlementLines.Length);
+        Assert.Contains(settlementLines, line => line.AmountChf == -50m && line.Description.Contains("April 1", StringComparison.Ordinal));
+        Assert.Contains(settlementLines, line => line.AmountChf == -70m && line.Description.Contains("April 2", StringComparison.Ordinal));
+        var ahvLine = Assert.Single(result.Lines, line => line.Code == "AHV_IV_EO");
+        Assert.Equal(-5.86392m, ahvLine.AmountChf);
+    }
+
+    [Fact]
     public void DeriveForEmployee_MonthlyWageTypeUsesSeparatePath()
     {
         var employeeId = Guid.NewGuid();

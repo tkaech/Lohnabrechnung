@@ -64,7 +64,7 @@ public sealed class PayrollSettingsServiceTests
         Assert.Equal(1.10m, saved.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, saved.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, saved.VehicleRegiezone1RateChf);
-        Assert.Equal(8, saved.PayrollPreviewHelpOptions.Count);
+        Assert.Equal(10, saved.PayrollPreviewHelpOptions.Count);
         Assert.Single(saved.Departments);
         Assert.Single(saved.EmploymentCategories);
         Assert.Single(saved.EmploymentLocations);

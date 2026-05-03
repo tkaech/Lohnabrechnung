@@ -7,6 +7,8 @@ namespace Payroll.Domain.MonthlyRecords;
 public sealed class EmployeeMonthlyRecord : AuditableEntity
 {
     private readonly List<TimeEntry> _timeEntries = [];
+    private readonly List<SalaryAdvance> _salaryAdvances = [];
+    private readonly List<SalaryAdvanceSettlement> _salaryAdvanceSettlements = [];
 
     private EmployeeMonthlyRecord()
     {
@@ -41,6 +43,8 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
     public decimal WithholdingTaxCorrectionAmountChf { get; private set; }
     public string? WithholdingTaxCorrectionText { get; private set; }
     public IReadOnlyCollection<TimeEntry> TimeEntries => _timeEntries.AsReadOnly();
+    public IReadOnlyCollection<SalaryAdvance> SalaryAdvances => _salaryAdvances.AsReadOnly();
+    public IReadOnlyCollection<SalaryAdvanceSettlement> SalaryAdvanceSettlements => _salaryAdvanceSettlements.AsReadOnly();
     public ExpenseEntry? ExpenseEntry { get; private set; }
     public DateOnly PeriodStart => new(Year, Month, 1);
     public DateOnly PeriodEnd => new(Year, Month, DateTime.DaysInMonth(Year, Month));
@@ -153,6 +157,59 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
         return ExpenseEntry;
     }
 
+    public SalaryAdvance SaveSalaryAdvance(Guid? salaryAdvanceId, decimal amountChf, string? note)
+    {
+        var existingAdvance = ResolveSalaryAdvance(salaryAdvanceId);
+        if (existingAdvance is null)
+        {
+            var createdAdvance = new SalaryAdvance(Id, EmployeeId, Year, Month, amountChf, note);
+            _salaryAdvances.Add(createdAdvance);
+            return createdAdvance;
+        }
+
+        existingAdvance.Update(amountChf, note);
+        return existingAdvance;
+    }
+
+    public void RemoveSalaryAdvance(Guid salaryAdvanceId)
+    {
+        var advance = ResolveSalaryAdvance(salaryAdvanceId)
+            ?? throw new InvalidOperationException("Salary advance was not found.");
+
+        if (advance.Year != Year || advance.Month != Month)
+        {
+            throw new InvalidOperationException("Only salary advances from the current monthly record can be removed.");
+        }
+
+        if (advance.Settlements.Count > 0)
+        {
+            throw new InvalidOperationException("Salary advance cannot be removed once settlements exist.");
+        }
+
+        _salaryAdvances.Remove(advance);
+        Touch();
+    }
+
+    public void RegisterSalaryAdvanceSettlement(SalaryAdvanceSettlement settlement)
+    {
+        ArgumentNullException.ThrowIfNull(settlement);
+
+        if (settlement.EmployeeMonthlyRecordId != Id)
+        {
+            throw new InvalidOperationException("Settlement does not belong to this monthly record.");
+        }
+
+        if (settlement.EmployeeId != EmployeeId || settlement.Year != Year || settlement.Month != Month)
+        {
+            throw new InvalidOperationException("Settlement metadata does not match the target monthly record.");
+        }
+
+        if (_salaryAdvanceSettlements.All(item => item.Id != settlement.Id))
+        {
+            _salaryAdvanceSettlements.Add(settlement);
+        }
+    }
+
     public void SaveWithholdingTaxInputs(decimal ratePercent, decimal correctionAmountChf, string? correctionText)
     {
         if (ratePercent < 0m || ratePercent > 100m)
@@ -180,6 +237,17 @@ public sealed class EmployeeMonthlyRecord : AuditableEntity
             1 => _timeEntries[0],
             _ => throw new InvalidOperationException("Only one time entry per employee and month is allowed.")
         };
+    }
+
+    private SalaryAdvance? ResolveSalaryAdvance(Guid? salaryAdvanceId)
+    {
+        if (!salaryAdvanceId.HasValue)
+        {
+            return null;
+        }
+
+        return _salaryAdvances.SingleOrDefault(item => item.Id == salaryAdvanceId.Value)
+            ?? throw new InvalidOperationException("Salary advance was not found.");
     }
 
     private void EnsureNoOtherTimeEntryExists(Guid currentTimeEntryId)

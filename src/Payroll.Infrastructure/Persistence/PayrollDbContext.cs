@@ -31,6 +31,8 @@ public sealed class PayrollDbContext : DbContext
     public DbSet<EmploymentLocationOption> EmploymentLocationOptions => Set<EmploymentLocationOption>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
+    public DbSet<SalaryAdvance> SalaryAdvances => Set<SalaryAdvance>();
+    public DbSet<SalaryAdvanceSettlement> SalaryAdvanceSettlements => Set<SalaryAdvanceSettlement>();
     public DbSet<ImportMappingConfiguration> ImportMappingConfigurations => Set<ImportMappingConfiguration>();
     public DbSet<ImportExecutionStatus> ImportExecutionStatuses => Set<ImportExecutionStatus>();
     public DbSet<SalaryCertificateRecord> SalaryCertificateRecords => Set<SalaryCertificateRecord>();
@@ -314,6 +316,16 @@ public sealed class PayrollDbContext : DbContext
                 .HasForeignKey(entry => entry.EmployeeMonthlyRecordId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            builder.HasMany(record => record.SalaryAdvances)
+                .WithOne()
+                .HasForeignKey(advance => advance.EmployeeMonthlyRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(record => record.SalaryAdvanceSettlements)
+                .WithOne()
+                .HasForeignKey(settlement => settlement.EmployeeMonthlyRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.HasOne(record => record.ExpenseEntry)
                 .WithOne()
                 .HasForeignKey<ExpenseEntry>(entry => entry.EmployeeMonthlyRecordId)
@@ -423,6 +435,51 @@ public sealed class PayrollDbContext : DbContext
             builder.Property(entry => entry.ExpenseTypeCode).HasMaxLength(50).IsRequired();
             builder.Property(entry => entry.Description).HasMaxLength(500).IsRequired();
             builder.HasIndex(entry => entry.EmployeeMonthlyRecordId).IsUnique();
+        });
+
+        modelBuilder.Entity<SalaryAdvance>(builder =>
+        {
+            builder.ToTable("SalaryAdvances");
+            builder.HasKey(advance => advance.Id);
+            builder.Property(advance => advance.EmployeeMonthlyRecordId).IsRequired();
+            builder.Property(advance => advance.EmployeeId).IsRequired();
+            builder.Property(advance => advance.Year).IsRequired();
+            builder.Property(advance => advance.Month).IsRequired();
+            builder.Property(advance => advance.AmountChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(advance => advance.Note).HasMaxLength(500);
+            builder.HasIndex(advance => advance.EmployeeMonthlyRecordId);
+            builder.HasIndex(advance => new { advance.EmployeeId, advance.Year, advance.Month });
+
+            builder.HasOne<Employee>()
+                .WithMany()
+                .HasForeignKey(advance => advance.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(advance => advance.Settlements)
+                .WithOne()
+                .HasForeignKey(settlement => settlement.SalaryAdvanceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalaryAdvanceSettlement>(builder =>
+        {
+            builder.ToTable("SalaryAdvanceSettlements");
+            builder.HasKey(settlement => settlement.Id);
+            builder.Property(settlement => settlement.EmployeeMonthlyRecordId).IsRequired();
+            builder.Property(settlement => settlement.SalaryAdvanceId).IsRequired();
+            builder.Property(settlement => settlement.EmployeeId).IsRequired();
+            builder.Property(settlement => settlement.Year).IsRequired();
+            builder.Property(settlement => settlement.Month).IsRequired();
+            builder.Property(settlement => settlement.AmountChf).HasColumnType("TEXT").IsRequired();
+            builder.Property(settlement => settlement.Note).HasMaxLength(500);
+            builder.HasIndex(settlement => settlement.EmployeeMonthlyRecordId);
+            builder.HasIndex(settlement => settlement.SalaryAdvanceId);
+            builder.HasIndex(settlement => new { settlement.EmployeeId, settlement.Year, settlement.Month });
+
+            builder.HasOne<Employee>()
+                .WithMany()
+                .HasForeignKey(settlement => settlement.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

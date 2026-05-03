@@ -1164,6 +1164,14 @@ public sealed class ImportServiceTests
             return Task.FromResult<EmployeeMonthlyRecord?>(record);
         }
 
+        public Task<SalaryAdvance?> GetSalaryAdvanceByIdAsync(Guid salaryAdvanceId, CancellationToken cancellationToken)
+        {
+            var advance = _records.Values
+                .SelectMany(record => record.SalaryAdvances)
+                .SingleOrDefault(item => item.Id == salaryAdvanceId);
+            return Task.FromResult(advance);
+        }
+
         public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
             return Task.FromResult<MonthlyRecordDetailsDto?>(null);
@@ -1204,6 +1212,10 @@ public sealed class ImportServiceTests
         }
 
         public void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class
+        {
+        }
+
+        public void MarkAsDeleted<TEntity>(TEntity entity) where TEntity : class
         {
         }
     }

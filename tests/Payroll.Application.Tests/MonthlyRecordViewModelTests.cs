@@ -384,6 +384,80 @@ public sealed class MonthlyRecordViewModelTests
         Assert.Single(viewModel.PayrollPreviewNotes, note => note == "Monat noch nicht erfasst");
     }
 
+    [Fact]
+    public async Task DeleteSalaryAdvance_RemovesCurrentMonthAdvanceFromPreview()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Rita Rueckgaengig");
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+
+        await viewModel.SetEmployeeAsync(employeeId, "Rita Rueckgaengig");
+        viewModel.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+        await WaitUntilAsync(() => viewModel.TimePayrollMonth == "04/2026" && viewModel.CanSaveTimeEntry);
+
+        viewModel.TimeDate = "2026-04-03";
+        viewModel.HoursWorked = "8";
+        viewModel.SaveTimeEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
+
+        viewModel.ToggleSalaryAdvanceEditorCommand.Execute(null);
+        viewModel.SalaryAdvanceAmountChf = "250";
+        viewModel.SalaryAdvanceSettlementAmountChf = "0";
+        viewModel.SalaryAdvanceNote = "Vertippt";
+        viewModel.SaveSalaryAdvanceCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ActionMessage == "Vorschuss gespeichert.");
+
+        Assert.True(viewModel.CanDeleteSalaryAdvance);
+        Assert.Contains(viewModel.PayrollPreviewLines, line => line.Label == "Lohnvorschuss Auszahlung");
+
+        viewModel.DeleteSalaryAdvanceCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ActionMessage == "Vorschuss geloescht.");
+
+        Assert.DoesNotContain(viewModel.PayrollPreviewLines, line => line.Label == "Lohnvorschuss Auszahlung");
+        Assert.False(viewModel.CanDeleteSalaryAdvance);
+    }
+
+    [Fact]
+    public async Task SaveSalaryAdvanceSettlement_UsesSelectedOpenSalaryAdvance()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository();
+        repository.RegisterEmployee(employeeId, "Sina Saldo");
+        var marchRecord = await repository.GetOrCreateAsync(employeeId, 2026, 3, CancellationToken.None);
+        var firstAdvance = marchRecord.SaveSalaryAdvance(null, 200m, "Laptop");
+        var secondAdvance = marchRecord.SaveSalaryAdvance(null, 120m, "Werkzeug");
+        await repository.SaveChangesAsync(CancellationToken.None);
+
+        var viewModel = new MonthlyRecordViewModel(new MonthlyRecordService(repository));
+        await viewModel.SetEmployeeAsync(employeeId, "Sina Saldo");
+        viewModel.SelectedMonth = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
+        await WaitUntilAsync(() => viewModel.TimePayrollMonth == "04/2026" && viewModel.CanSaveTimeEntry);
+
+        viewModel.TimeDate = "2026-04-03";
+        viewModel.HoursWorked = "8";
+        viewModel.SaveTimeEntryCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.TimeEntries.Count == 1);
+
+        viewModel.ToggleSalaryAdvanceEditorCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.SalaryAdvanceCases.Count == 2);
+        viewModel.SelectedSalaryAdvanceCase = viewModel.SalaryAdvanceCases.Single(item => item.SalaryAdvanceId == secondAdvance.Id);
+        viewModel.SalaryAdvanceSettlementAmountChf = "30";
+        viewModel.SalaryAdvanceNote = "Teilzahlung";
+        viewModel.SaveSalaryAdvanceCommand.Execute(null);
+        await WaitUntilAsync(() => viewModel.ActionMessage == "Verrechnung gespeichert.");
+
+        var updatedFirstAdvance = await repository.GetSalaryAdvanceByIdAsync(firstAdvance.Id, CancellationToken.None);
+        var updatedSecondAdvance = await repository.GetSalaryAdvanceByIdAsync(secondAdvance.Id, CancellationToken.None);
+
+        Assert.NotNull(updatedFirstAdvance);
+        Assert.NotNull(updatedSecondAdvance);
+        Assert.Equal(200m, updatedFirstAdvance!.OpenAmountChf);
+        Assert.Equal(90m, updatedSecondAdvance!.OpenAmountChf);
+        Assert.Equal(secondAdvance.Id, viewModel.SelectedSalaryAdvanceCase?.SalaryAdvanceId);
+        Assert.Equal("90.00 CHF", viewModel.OpenSalaryAdvanceAmountDisplay);
+    }
+
     private static async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 3000)
     {
         var startedAt = DateTime.UtcNow;
@@ -429,6 +503,14 @@ public sealed class MonthlyRecordViewModelTests
             return Task.FromResult<EmployeeMonthlyRecord?>(record);
         }
 
+        public Task<SalaryAdvance?> GetSalaryAdvanceByIdAsync(Guid salaryAdvanceId, CancellationToken cancellationToken)
+        {
+            var advance = _records.Values
+                .SelectMany(record => record.SalaryAdvances)
+                .SingleOrDefault(item => item.Id == salaryAdvanceId);
+            return Task.FromResult(advance);
+        }
+
         public async Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
             var delay = DelayNextDetailsRead;
@@ -447,6 +529,39 @@ public sealed class MonthlyRecordViewModelTests
             var employeeName = _employeeNames.TryGetValue(record.EmployeeId.ToString("N"), out var name)
                 ? name
                 : "Unbekannt";
+
+            var salaryAdvanceItems = _records.Values
+                .Where(item => item.EmployeeId == record.EmployeeId)
+                .SelectMany(item => item.SalaryAdvances)
+                .Where(item => item.OpenAmountChf > 0m || (item.Year == record.Year && item.Month == record.Month))
+                .OrderByDescending(item => item.Year)
+                .ThenByDescending(item => item.Month)
+                .ThenByDescending(item => item.CreatedAtUtc)
+                .Select(item => new MonthlySalaryAdvanceDto(
+                    item.Id,
+                    item.Year,
+                    item.Month,
+                    item.AmountChf,
+                    item.Note,
+                    item.OpenAmountChf,
+                    item.SettledAmountChf,
+                    item.IsSettled,
+                    $"{item.Month:00}/{item.Year}"))
+                .ToArray();
+            var settlementItems = _records.Values
+                .Where(item => item.EmployeeId == record.EmployeeId)
+                .SelectMany(item => item.SalaryAdvances.SelectMany(advance => advance.Settlements.Select(settlement => new { advance, settlement })))
+                .Where(item => item.settlement.Year == record.Year && item.settlement.Month == record.Month)
+                .OrderByDescending(item => item.settlement.CreatedAtUtc)
+                .Select(item => new MonthlySalaryAdvanceSettlementDto(
+                    item.settlement.Id,
+                    item.advance.Id,
+                    item.settlement.Year,
+                    item.settlement.Month,
+                    item.settlement.AmountChf,
+                    item.settlement.Note,
+                    $"{item.advance.Month:00}/{item.advance.Year}"))
+                .ToArray();
 
             var details = new MonthlyRecordDetailsDto(
                 new MonthlyRecordHeaderDto(
@@ -497,10 +612,22 @@ public sealed class MonthlyRecordViewModelTests
                         item.Month,
                         item.ExpenseEntry.ExpensesTotalChf))
                     .ToArray(),
+                record.SalaryAdvances
+                    .OrderByDescending(item => item.CreatedAtUtc)
+                    .Select(item => new MonthlySalaryAdvanceDto(item.Id, item.Year, item.Month, item.AmountChf, item.Note, item.OpenAmountChf, item.SettledAmountChf, item.IsSettled, $"{item.Month:00}/{item.Year}"))
+                    .FirstOrDefault(),
+                settlementItems.FirstOrDefault(),
+                salaryAdvanceItems
+                    .Where(item => item.OpenAmountChf > 0m)
+                    .OrderBy(item => item.Year)
+                    .ThenBy(item => item.Month)
+                    .FirstOrDefault(),
                 new MonthlyRecordPreviewDto(
                     BuildPreviewRows(_records.Values.Where(item => item.EmployeeId == record.EmployeeId)),
                     Array.Empty<string>()),
-                BuildPayrollPreview(record));
+                BuildPayrollPreview(record),
+                salaryAdvanceItems,
+                settlementItems);
 
             return details;
         }
@@ -543,6 +670,10 @@ public sealed class MonthlyRecordViewModelTests
         {
         }
 
+        public void MarkAsDeleted<TEntity>(TEntity entity) where TEntity : class
+        {
+        }
+
         private static MonthlyPayrollPreviewDto BuildPayrollPreview(EmployeeMonthlyRecord record)
         {
             if (record.TimeEntries.Count == 0)
@@ -552,20 +683,34 @@ public sealed class MonthlyRecordViewModelTests
 
             var baseAmount = record.TimeEntries.Sum(item => item.HoursWorked) * 30m;
             var expenses = record.ExpenseEntry?.ExpensesTotalChf ?? 0m;
+            var salaryAdvancePayout = record.SalaryAdvances
+                .Where(item => item.Year == record.Year && item.Month == record.Month)
+                .Sum(item => item.AmountChf);
 
             return new MonthlyPayrollPreviewDto(
-                [
+                new[]
+                {
                     new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h", "30.00 CHF", $"{baseAmount:0.00} CHF", null, false, "BASE", "BAS", "#FFDCEBFF"),
                     new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.AhvGrossCode, "AHV-pflichtiger Bruttolohn", "-", "-", $"{baseAmount:0.00} CHF", null, true, "AHV_GROSS", "BRU", "#FFEFF4F8"),
                     new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.ExpensesCode, "Spesen gemaess Nachweis", "-", "-", $"{expenses:0.00} CHF", null, false, "EXPENSES", "SPS", "#FFF3E8FF"),
-                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses):0.00} CHF", null, true, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
-                ],
+                }
+                .Concat(salaryAdvancePayout > 0m
+                    ? new[]
+                    {
+                        new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.SalaryAdvancePayoutCode, "Lohnvorschuss Auszahlung", "-", "-", $"{salaryAdvancePayout:0.00} CHF", null, false, "SALARY_ADVANCE_PAYOUT", "VOR", "#FFE5EEF9")
+                    }
+                    : Array.Empty<MonthlyPayrollPreviewLineDto>())
+                .Concat(new[]
+                {
+                    new MonthlyPayrollPreviewLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", "-", "gerundet auf 0.05", $"{(baseAmount + expenses + salaryAdvancePayout):0.00} CHF", null, true, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
+                })
+                .ToArray(),
                 [
                     new MonthlyPayrollPreviewDerivationGroupDto(
                         "Rechenschritte",
                         [
                             new MonthlyPayrollPreviewDerivationItemDto("STEP_BASE", "Schritt", "Grundlohn", $"{baseAmount:0.00} CHF", $"{record.TimeEntries.Sum(item => item.HoursWorked):0.##} h x 30.00 CHF", null, "BASE", "BAS", "#FFDCEBFF"),
-                            new MonthlyPayrollPreviewDerivationItemDto("STEP_PAYOUT", "Schritt", "Total Auszahlung", $"{(baseAmount + expenses):0.00} CHF", $"{baseAmount:0.00} CHF + {expenses:0.00} CHF", null, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
+                            new MonthlyPayrollPreviewDerivationItemDto("STEP_PAYOUT", "Schritt", "Total Auszahlung", $"{(baseAmount + expenses + salaryAdvancePayout):0.00} CHF", $"{baseAmount:0.00} CHF + {expenses:0.00} CHF + {salaryAdvancePayout:0.00} CHF", null, "TOTAL_PAYOUT", "AUS", "#FFE4F7EC")
                         ])
                 ],
                 ["Test-Lohnvorschau"]);

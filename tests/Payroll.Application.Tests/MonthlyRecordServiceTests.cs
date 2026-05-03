@@ -68,6 +68,32 @@ public sealed class MonthlyRecordServiceTests
         Assert.Equal(80m, updated.ExpenseEntry!.ExpensesTotalChf);
     }
 
+    [Fact]
+    public async Task DeleteSalaryAdvanceAsync_RemovesCurrentMonthAdvance()
+    {
+        var employeeId = Guid.NewGuid();
+        var repository = new InMemoryMonthlyRecordRepository(employeeId, "Anna Aktiv");
+        var service = new MonthlyRecordService(repository);
+        var details = await service.GetOrCreateAsync(new MonthlyRecordQuery(employeeId, 2026, 4));
+
+        var saved = await service.SaveSalaryAdvanceAsync(
+            new SaveMonthlySalaryAdvanceCommand(
+                details.Header.MonthlyRecordId,
+                null,
+                250m,
+                "Vorschuss"));
+
+        Assert.NotNull(saved.CurrentSalaryAdvance);
+
+        var deleted = await service.DeleteSalaryAdvanceAsync(
+            new DeleteMonthlySalaryAdvanceCommand(
+                details.Header.MonthlyRecordId,
+                saved.CurrentSalaryAdvance!.SalaryAdvanceId));
+
+        Assert.Null(deleted.CurrentSalaryAdvance);
+        Assert.Empty(repository.MonthlyRecords.Single().SalaryAdvances);
+    }
+
     private sealed class InMemoryMonthlyRecordRepository : IEmployeeMonthlyRecordRepository
     {
         private readonly Dictionary<Guid, EmployeeMonthlyRecord> _monthlyRecordsById = [];
@@ -101,6 +127,14 @@ public sealed class MonthlyRecordServiceTests
         {
             _monthlyRecordsById.TryGetValue(monthlyRecordId, out var record);
             return Task.FromResult(record);
+        }
+
+        public Task<SalaryAdvance?> GetSalaryAdvanceByIdAsync(Guid salaryAdvanceId, CancellationToken cancellationToken)
+        {
+            var advance = _monthlyRecordsById.Values
+                .SelectMany(record => record.SalaryAdvances)
+                .SingleOrDefault(item => item.Id == salaryAdvanceId);
+            return Task.FromResult(advance);
         }
 
         public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
@@ -169,6 +203,29 @@ public sealed class MonthlyRecordServiceTests
                         record.Year,
                         record.Month,
                         record.ExpenseEntry.ExpensesTotalChf)],
+                record.SalaryAdvances
+                    .OrderByDescending(item => item.CreatedAtUtc)
+                    .Select(item => new MonthlySalaryAdvanceDto(
+                        item.Id,
+                        item.Year,
+                        item.Month,
+                        item.AmountChf,
+                        item.Note,
+                        item.OpenAmountChf))
+                    .FirstOrDefault(),
+                null,
+                record.SalaryAdvances
+                    .Where(item => item.OpenAmountChf > 0m)
+                    .OrderBy(item => item.Year)
+                    .ThenBy(item => item.Month)
+                    .Select(item => new MonthlySalaryAdvanceDto(
+                        item.Id,
+                        item.Year,
+                        item.Month,
+                        item.AmountChf,
+                        item.Note,
+                        item.OpenAmountChf))
+                    .FirstOrDefault(),
                 new MonthlyRecordPreviewDto(
                     Array.Empty<MonthlyPreviewRowDto>(),
                     ["Testvorschau"]),
@@ -227,6 +284,10 @@ public sealed class MonthlyRecordServiceTests
         }
 
         public void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class
+        {
+        }
+
+        public void MarkAsDeleted<TEntity>(TEntity entity) where TEntity : class
         {
         }
     }

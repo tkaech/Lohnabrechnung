@@ -26,7 +26,8 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
 
         var payrollRuns = await _dbContext.PayrollRuns
             .AsNoTracking()
-            .Where(run => (run.Status == PayrollRunStatus.Finalized || run.Status == PayrollRunStatus.Cancelled)
+            .Where(run => run.Lines.Any(line => line.EmployeeId == query.EmployeeId)
+                && (run.Status == PayrollRunStatus.Finalized || run.Status == PayrollRunStatus.Cancelled)
                 && run.PeriodKey.CompareTo($"{query.Year:D4}-01") >= 0
                 && run.PeriodKey.CompareTo($"{query.Year:D4}-12") <= 0)
             .Include(run => run.Lines)
@@ -37,6 +38,8 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
             .Where(record => record.EmployeeId == query.EmployeeId
                 && record.Year == query.Year)
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .ToListAsync(cancellationToken);
 
@@ -121,9 +124,19 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
         var expensesChf = lines
             .Where(line => line.LineType == PayrollLineType.Expense)
             .Sum(line => line.AmountChf);
-        var netSalaryChf = lines
-            .Where(line => line.LineType != PayrollLineType.Expense)
+        var salaryAdvancePayoutChf = lines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvancePayout)
             .Sum(line => line.AmountChf);
+        var salaryAdvanceSettlementChf = lines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvanceSettlement)
+            .Sum(line => line.AmountChf);
+        var netSalaryChf = lines
+            .Where(line => line.LineType is not PayrollLineType.Expense
+                and not PayrollLineType.SalaryAdvancePayout
+                and not PayrollLineType.SalaryAdvanceSettlement)
+            .Sum(line => line.AmountChf)
+            + salaryAdvancePayoutChf
+            + salaryAdvanceSettlementChf;
 
         return new AnnualSalaryMonthDto(
             month,
@@ -171,6 +184,8 @@ public sealed class AnnualSalaryRepository : IAnnualSalaryRepository
     {
         return monthlyRecord is not null
             && (monthlyRecord.TimeEntries.Count > 0
+                || monthlyRecord.SalaryAdvances.Count > 0
+                || monthlyRecord.SalaryAdvanceSettlements.Count > 0
                 || monthlyRecord.ExpenseEntry is not null
                 || monthlyRecord.WithholdingTaxRatePercent != 0m
                 || monthlyRecord.WithholdingTaxCorrectionAmountChf != 0m

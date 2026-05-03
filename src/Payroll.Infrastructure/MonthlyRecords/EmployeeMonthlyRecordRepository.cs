@@ -6,6 +6,7 @@ using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Payroll;
 using Payroll.Domain.Settings;
 using Payroll.Infrastructure.Persistence;
+using Payroll.Infrastructure.Payroll;
 using Payroll.Infrastructure.Settings;
 using System.Globalization;
 using System.Text.Json;
@@ -32,6 +33,9 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             cancellationToken);
         var existingRecord = await _dbContext.EmployeeMonthlyRecords
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+                .ThenInclude(advance => advance.Settlements)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .SingleOrDefaultAsync(
                 record => record.EmployeeId == employeeId && record.Year == year && record.Month == month,
@@ -55,6 +59,9 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     {
         var monthlyRecord = await _dbContext.EmployeeMonthlyRecords
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+                .ThenInclude(advance => advance.Settlements)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .SingleOrDefaultAsync(record => record.Id == monthlyRecordId, cancellationToken);
 
@@ -69,11 +76,21 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return monthlyRecord;
     }
 
+    public Task<SalaryAdvance?> GetSalaryAdvanceByIdAsync(Guid salaryAdvanceId, CancellationToken cancellationToken)
+    {
+        return _dbContext.SalaryAdvances
+            .Include(advance => advance.Settlements)
+            .SingleOrDefaultAsync(advance => advance.Id == salaryAdvanceId, cancellationToken);
+    }
+
     public async Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
     {
         var monthlyRecord = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+                .ThenInclude(advance => advance.Settlements)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .SingleOrDefaultAsync(record => record.Id == monthlyRecordId, cancellationToken);
 
@@ -108,9 +125,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             currentPayrollSettings,
             await TryLoadPayrollSettingsForMonthAsync(monthlyRecord.PeriodStart, cancellationToken),
             hasFinalizedPayrollRun);
+        var salaryAdvances = await LoadEmployeeSalaryAdvancesAsync(monthlyRecord.EmployeeId, cancellationToken);
 
         var previewNotes = BuildPreviewNotes(monthlyRecord, contract is not null);
-        var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, cancellationToken);
+        var previewRows = await BuildPreviewRowsAsync(monthlyRecord.EmployeeId, salaryAdvances, cancellationToken);
         var payrollPreview = BuildPayrollPreview(
             monthlyRecord,
             employee.BirthDate,
@@ -119,11 +137,14 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             contract,
             department,
             payrollSettings,
-            currentPayrollSettings);
+            currentPayrollSettings,
+            salaryAdvances);
         var employeeMonthlyRecords = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Where(record => record.EmployeeId == monthlyRecord.EmployeeId)
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .ToListAsync(cancellationToken);
 
@@ -200,14 +221,65 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 record.ExpenseEntry.ExpensesTotalChf))
             .ToArray();
 
+        var salaryAdvanceItems = salaryAdvances
+            .Where(advance => (advance.Year == monthlyRecord.Year && advance.Month == monthlyRecord.Month)
+                || advance.OpenAmountChf > 0m)
+            .OrderBy(advance => advance.Year)
+            .ThenBy(advance => advance.Month)
+            .ThenBy(advance => advance.CreatedAtUtc)
+            .Select(advance => new MonthlySalaryAdvanceDto(
+                advance.Id,
+                advance.Year,
+                advance.Month,
+                advance.AmountChf,
+                advance.Note,
+                advance.OpenAmountChf,
+                advance.SettledAmountChf,
+                advance.IsSettled,
+                $"{advance.Month:00}/{advance.Year}"))
+            .ToArray();
+
+        var salaryAdvanceSettlementItems = salaryAdvances
+            .SelectMany(advance => advance.Settlements.Select(settlement => new { advance, settlement }))
+            .Where(item => item.settlement.Year == monthlyRecord.Year && item.settlement.Month == monthlyRecord.Month)
+            .OrderByDescending(item => item.settlement.CreatedAtUtc)
+            .Select(item => new MonthlySalaryAdvanceSettlementDto(
+                item.settlement.Id,
+                item.advance.Id,
+                item.settlement.Year,
+                item.settlement.Month,
+                item.settlement.AmountChf,
+                item.settlement.Note,
+                $"{item.advance.Month:00}/{item.advance.Year}"))
+            .ToArray();
+
+        var currentSalaryAdvance = salaryAdvances
+            .Where(advance => advance.Year == monthlyRecord.Year && advance.Month == monthlyRecord.Month)
+            .OrderByDescending(advance => advance.CreatedAtUtc)
+            .Select(advance => salaryAdvanceItems.First(item => item.SalaryAdvanceId == advance.Id))
+            .FirstOrDefault();
+
+        var currentSalaryAdvanceSettlement = salaryAdvanceSettlementItems.FirstOrDefault();
+
+        var openSalaryAdvance = salaryAdvanceItems
+            .Where(advance => advance.OpenAmountChf > 0m)
+            .OrderBy(advance => advance.Year)
+            .ThenBy(advance => advance.Month)
+            .FirstOrDefault();
+
         return new MonthlyRecordDetailsDto(
             header,
             timeEntries,
             timeEntryHistory,
             expenseEntry,
             expenseEntryHistory,
+            currentSalaryAdvance,
+            currentSalaryAdvanceSettlement,
+            openSalaryAdvance,
             new MonthlyRecordPreviewDto(previewRows, previewNotes),
-            payrollPreview);
+            payrollPreview,
+            salaryAdvanceItems,
+            salaryAdvanceSettlementItems);
     }
 
     public async Task<IReadOnlyCollection<MonthlyTimeCaptureOverviewRowDto>> ListTimeCaptureOverviewAsync(int year, int month, CancellationToken cancellationToken)
@@ -224,14 +296,31 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .Include(record => record.TimeEntries)
             .Include(record => record.ExpenseEntry)
             .ToListAsync(cancellationToken);
+        var salaryAdvances = await _dbContext.SalaryAdvances
+            .AsNoTracking()
+            .Where(advance => advance.Year == year && advance.Month == month)
+            .ToListAsync(cancellationToken);
+        var salaryAdvanceSettlements = await _dbContext.SalaryAdvanceSettlements
+            .AsNoTracking()
+            .Where(settlement => settlement.Year == year && settlement.Month == month)
+            .ToListAsync(cancellationToken);
 
         var recordsByEmployeeId = monthlyRecords.ToDictionary(record => record.EmployeeId);
+        var advanceAmountsByEmployeeId = salaryAdvances
+            .GroupBy(item => item.EmployeeId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.AmountChf));
+        var settlementAmountsByEmployeeId = salaryAdvanceSettlements
+            .GroupBy(item => item.EmployeeId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.AmountChf));
 
         return employees
             .Select(employee =>
             {
                 recordsByEmployeeId.TryGetValue(employee.Id, out var monthlyRecord);
                 var timeEntries = monthlyRecord?.TimeEntries ?? [];
+                var netSalaryAdvanceAdjustmentChf =
+                    (advanceAmountsByEmployeeId.TryGetValue(employee.Id, out var advanceAmount) ? advanceAmount : 0m)
+                    - (settlementAmountsByEmployeeId.TryGetValue(employee.Id, out var settlementAmount) ? settlementAmount : 0m);
 
                 return new MonthlyTimeCaptureOverviewRowDto(
                     employee.Id,
@@ -248,7 +337,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                     timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf),
                     timeEntries.Sum(entry => entry.VehicleRegiezone1Chf),
                     timeEntries.Count,
-                    monthlyRecord?.ExpenseEntry?.ExpensesTotalChf ?? 0m);
+                    monthlyRecord?.ExpenseEntry?.ExpensesTotalChf ?? 0m,
+                    netSalaryAdvanceAdjustmentChf);
             })
             .ToArray();
     }
@@ -291,6 +381,11 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         _dbContext.Entry(entity).State = EntityState.Added;
     }
 
+    public void MarkAsDeleted<TEntity>(TEntity entity) where TEntity : class
+    {
+        _dbContext.Entry(entity).State = EntityState.Deleted;
+    }
+
     private async Task<Domain.Employees.EmploymentContract?> LoadRelevantContractAsync(
         Guid employeeId,
         DateOnly periodStart,
@@ -329,6 +424,19 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    private async Task<IReadOnlyCollection<SalaryAdvance>> LoadEmployeeSalaryAdvancesAsync(
+        Guid employeeId,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.SalaryAdvances
+            .AsNoTracking()
+            .Where(advance => advance.EmployeeId == employeeId)
+            .Include(advance => advance.Settlements)
+            .OrderBy(advance => advance.Year)
+            .ThenBy(advance => advance.Month)
+            .ToArrayAsync(cancellationToken);
+    }
+
     private static IReadOnlyCollection<string> BuildPreviewNotes(EmployeeMonthlyRecord monthlyRecord, bool hasContract)
     {
         var notes = new List<string>();
@@ -365,6 +473,30 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return notes;
     }
 
+    private static SalaryAdvanceActivityForMonth GetSalaryAdvanceActivityForMonth(
+        EmployeeMonthlyRecord monthlyRecord,
+        IReadOnlyCollection<SalaryAdvance> salaryAdvances)
+    {
+        var relevantAdvances = SalaryAdvancePayrollMonthFilter.FilterForMonth(
+            salaryAdvances,
+            monthlyRecord.EmployeeId,
+            monthlyRecord.Year,
+            monthlyRecord.Month);
+
+        return new SalaryAdvanceActivityForMonth(
+            relevantAdvances,
+            relevantAdvances
+                .Where(advance => advance.Year == monthlyRecord.Year && advance.Month == monthlyRecord.Month)
+                .ToArray(),
+            relevantAdvances
+                .Where(advance => advance.Year == monthlyRecord.Year && advance.Month == monthlyRecord.Month)
+                .Sum(advance => advance.AmountChf),
+            relevantAdvances
+                .SelectMany(advance => advance.Settlements)
+                .Where(settlement => settlement.Year == monthlyRecord.Year && settlement.Month == monthlyRecord.Month)
+                .Sum(settlement => settlement.AmountChf));
+    }
+
     private MonthlyPayrollPreviewDto BuildPayrollPreview(
         EmployeeMonthlyRecord monthlyRecord,
         DateOnly? employeeBirthDate,
@@ -373,10 +505,15 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         Domain.Employees.EmploymentContract? contract,
         DepartmentOption? department,
         PayrollSettings payrollSettings,
-        PayrollSettings currentPayrollSettings)
+        PayrollSettings currentPayrollSettings,
+        IReadOnlyCollection<SalaryAdvance> salaryAdvances)
     {
         var timeEntries = monthlyRecord.TimeEntries.OrderBy(entry => entry.WorkDate).ToArray();
-        if (timeEntries.Length == 0 && contract?.WageType != Domain.Employees.EmployeeWageType.Monthly)
+        var currentMonthSalaryAdvances = GetSalaryAdvanceActivityForMonth(monthlyRecord, salaryAdvances);
+        if (timeEntries.Length == 0
+            && currentMonthSalaryAdvances.PayoutAmountChf == 0m
+            && currentMonthSalaryAdvances.SettlementAmountChf == 0m
+            && contract?.WageType != Domain.Employees.EmployeeWageType.Monthly)
         {
             return new MonthlyPayrollPreviewDto([], [], ["Monat noch nicht erfasst"]);
         }
@@ -405,6 +542,7 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 workSummary,
                 expenses,
                 timeEntries,
+                currentMonthSalaryAdvances.RelevantAdvances,
                 new PayrollDerivationContext(
                     contract.WageType,
                     department?.Name,
@@ -444,11 +582,21 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                 or PayrollLineType.VacationCompensation
                 or PayrollLineType.VehicleCompensation)
             .Sum(line => line.AmountChf);
+        var salaryAdvancePayoutLines = derivationLines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvancePayout)
+            .ToArray();
+        var salaryAdvanceSettlementLines = derivationLines
+            .Where(line => line.LineType == PayrollLineType.SalaryAdvanceSettlement)
+            .ToArray();
+        var salaryAdvancePayoutAmountChf = salaryAdvancePayoutLines.Sum(line => line.AmountChf);
+        var salaryAdvanceSettlementAmountChf = salaryAdvanceSettlementLines.Sum(line => line.AmountChf);
         var totalChf = derivationLines
-            .Where(line => line.LineType != PayrollLineType.Expense)
+            .Where(line => line.LineType is not PayrollLineType.Expense
+                and not PayrollLineType.SalaryAdvancePayout
+                and not PayrollLineType.SalaryAdvanceSettlement)
             .Sum(line => line.AmountChf);
         var expensesChf = monthlyRecord.ExpenseEntry?.ExpensesTotalChf ?? 0m;
-        var totalPayoutChf = RoundToFiveRappen(totalChf + expensesChf);
+        var totalPayoutChf = RoundToFiveRappen(totalChf + expensesChf + salaryAdvancePayoutAmountChf + salaryAdvanceSettlementAmountChf);
 
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.BaseSalaryCode,
@@ -661,6 +809,36 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "SPS",
             GetPreviewColorHint("EXPENSES")));
 
+        if (salaryAdvancePayoutLines.Length > 0)
+        {
+            lines.Add(new MonthlyPayrollPreviewLineDto(
+                PayrollPreviewHelpCatalog.SalaryAdvancePayoutCode,
+                "Lohnvorschuss Auszahlung",
+                "-",
+                "-",
+                FormatAmount(salaryAdvancePayoutAmountChf, numberCulture, currencyCode),
+                BuildSalaryAdvancePreviewDetail(currentMonthSalaryAdvances.PayoutAdvances, false),
+                false,
+                "SALARY_ADVANCE_PAYOUT",
+                "VOR",
+                GetPreviewColorHint("SALARY_ADVANCE_PAYOUT")));
+        }
+
+        if (salaryAdvanceSettlementLines.Length > 0)
+        {
+            lines.Add(new MonthlyPayrollPreviewLineDto(
+                PayrollPreviewHelpCatalog.SalaryAdvanceSettlementCode,
+                "Lohnvorschuss Verrechnung",
+                "-",
+                "-",
+                FormatAmount(salaryAdvanceSettlementAmountChf, numberCulture, currencyCode),
+                BuildSalaryAdvancePreviewDetail(currentMonthSalaryAdvances.RelevantAdvances, true),
+                false,
+                "SALARY_ADVANCE_SETTLEMENT",
+                "VER",
+                GetPreviewColorHint("SALARY_ADVANCE_SETTLEMENT")));
+        }
+
         lines.Add(new MonthlyPayrollPreviewLineDto(
             PayrollPreviewHelpCatalog.TotalPayoutCode,
             "Total Auszahlung",
@@ -712,6 +890,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             ahvGrossChf,
             totalChf,
             expensesChf,
+            salaryAdvancePayoutAmountChf,
+            salaryAdvanceSettlementAmountChf,
             totalPayoutChf,
             numberCulture,
             currencyCode);
@@ -719,12 +899,17 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return new MonthlyPayrollPreviewDto(filteredLines, derivationGroups, notes);
     }
 
-    private async Task<IReadOnlyCollection<MonthlyPreviewRowDto>> BuildPreviewRowsAsync(Guid employeeId, CancellationToken cancellationToken)
+    private async Task<IReadOnlyCollection<MonthlyPreviewRowDto>> BuildPreviewRowsAsync(
+        Guid employeeId,
+        IReadOnlyCollection<SalaryAdvance> salaryAdvances,
+        CancellationToken cancellationToken)
     {
         var monthlyRecords = await _dbContext.EmployeeMonthlyRecords
             .AsNoTracking()
             .Where(record => record.EmployeeId == employeeId)
             .Include(record => record.TimeEntries)
+            .Include(record => record.SalaryAdvances)
+            .Include(record => record.SalaryAdvanceSettlements)
             .Include(record => record.ExpenseEntry)
             .OrderByDescending(record => record.Year)
             .ThenByDescending(record => record.Month)
@@ -762,6 +947,27 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
                     PayrollAmountFormatter.FormatChf(record.ExpenseEntry.ExpensesTotalChf),
                     $"Diverse Spesen {PayrollAmountFormatter.FormatChf(record.ExpenseEntry.ExpensesTotalChf)}")]
                 )
+                .Concat(salaryAdvances
+                    .Where(advance => advance.Year == record.Year && advance.Month == record.Month)
+                    .Select(advance => new MonthlyPreviewRowDto(
+                        record.Year,
+                        record.Month,
+                        null,
+                        "Vorschuss",
+                        PayrollAmountFormatter.FormatChf(advance.AmountChf),
+                        string.IsNullOrWhiteSpace(advance.Note)
+                            ? $"Lohnvorschuss {PayrollAmountFormatter.FormatChf(advance.AmountChf)}"
+                            : advance.Note!)))
+                .Concat(salaryAdvances
+                    .SelectMany(advance => advance.Settlements.Select(settlement => new { advance, settlement }))
+                    .Where(item => item.settlement.Year == record.Year && item.settlement.Month == record.Month)
+                    .Select(item => new MonthlyPreviewRowDto(
+                        record.Year,
+                        record.Month,
+                        null,
+                        "Verrechnung",
+                        PayrollAmountFormatter.FormatChf(-item.settlement.AmountChf),
+                        BuildSalaryAdvanceSettlementHistoryDetail(item.advance, item.settlement))))
                 .OrderBy(entry => entry.EntryDate)
                 .ThenBy(entry => entry.EntryType)
                 .ToArray();
@@ -835,6 +1041,35 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         return detailParts.Count == 0
             ? "Keine Fahrzeugwerte"
             : string.Join(" | ", detailParts);
+    }
+
+    private static string BuildSalaryAdvanceSettlementHistoryDetail(
+        SalaryAdvance advance,
+        SalaryAdvanceSettlement settlement)
+    {
+        var sourceMonth = $"{advance.Month:00}/{advance.Year}";
+        return string.IsNullOrWhiteSpace(settlement.Note)
+            ? $"Verrechnung fuer Vorschuss aus {sourceMonth}"
+            : $"Verrechnung fuer Vorschuss aus {sourceMonth} | {settlement.Note}";
+    }
+
+    private static string? BuildSalaryAdvancePreviewDetail(
+        IReadOnlyCollection<SalaryAdvance> relevantAdvances,
+        bool settlementsOnly)
+    {
+        var details = settlementsOnly
+            ? relevantAdvances
+                .SelectMany(advance => advance.Settlements.Select(settlement => new { advance, settlement }))
+                .Select(item => BuildSalaryAdvanceSettlementHistoryDetail(item.advance, item.settlement))
+                .ToArray()
+            : relevantAdvances
+                .Where(advance => advance.AmountChf > 0m)
+                .Select(advance => string.IsNullOrWhiteSpace(advance.Note)
+                    ? $"Vorschuss {PayrollAmountFormatter.FormatChf(advance.AmountChf)}"
+                    : $"{PayrollAmountFormatter.FormatChf(advance.AmountChf)} | {advance.Note}")
+                .ToArray();
+
+        return details.Length == 0 ? null : string.Join(" | ", details);
     }
 
     private static MonthlyPayrollPreviewLineDto BuildVehiclePreviewLine(
@@ -934,6 +1169,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
         decimal ahvGrossChf,
         decimal totalChf,
         decimal expensesChf,
+        decimal salaryAdvancePayoutAmountChf,
+        decimal salaryAdvanceSettlementAmountChf,
         decimal totalPayoutChf,
         CultureInfo numberCulture,
         string currencyCode)
@@ -979,7 +1216,9 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("INPUT_VEHICLE_P1", "Eingabe", "Pauschalzone 1 Menge", FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone1Chf), numberCulture), null, "Monatssumme aus den erfassten Zeitzeilen.", "VEHICLE_P1"),
             CreateDerivationItem("INPUT_VEHICLE_P2", "Eingabe", "Pauschalzone 2 Menge", FormatQuantity(timeEntries.Sum(entry => entry.VehiclePauschalzone2Chf), numberCulture), null, "Monatssumme aus den erfassten Zeitzeilen.", "VEHICLE_P2"),
             CreateDerivationItem("INPUT_VEHICLE_R1", "Eingabe", "Regiezone 1 Menge", FormatQuantity(timeEntries.Sum(entry => entry.VehicleRegiezone1Chf), numberCulture), null, "Monatssumme aus den erfassten Zeitzeilen.", "VEHICLE_R1"),
-            CreateDerivationItem("INPUT_EXPENSES", "Eingabe", "Spesenblock", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock.", "EXPENSES")
+            CreateDerivationItem("INPUT_EXPENSES", "Eingabe", "Spesenblock", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock.", "EXPENSES"),
+            CreateDerivationItem("INPUT_ADVANCE_PAYOUT", "Eingabe", "Lohnvorschuss Auszahlung", FormatMoney(salaryAdvancePayoutAmountChf, numberCulture, currencyCode), null, "Manuell erfasster Vorschuss im aktuellen Abrechnungsmonat.", "SALARY_ADVANCE_PAYOUT"),
+            CreateDerivationItem("INPUT_ADVANCE_SETTLEMENT", "Eingabe", "Lohnvorschuss Verrechnung", FormatMoney(-salaryAdvanceSettlementAmountChf, numberCulture, currencyCode), null, "Manuell erfasste Verrechnung eines frueheren Vorschusses im aktuellen Abrechnungsmonat.", "SALARY_ADVANCE_SETTLEMENT")
         };
 
         var rules = new List<MonthlyPayrollPreviewDerivationItemDto>
@@ -1057,7 +1296,9 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             CreateDerivationItem("STEP_WITHHOLDING_TAX", "Schritt", withholdingTaxLine?.Description ?? "Quellensteuer", withholdingTaxLine is null ? FormatMoney(0m, numberCulture, currencyCode) : FormatMoney(withholdingTaxLine.AmountChf, numberCulture, currencyCode), $"{FormatRawPercentageRate(monthlyRecord.WithholdingTaxRatePercent, numberCulture)} x {FormatMoney(ahvGrossChf, numberCulture, currencyCode)}", "Berechnet vom AHV-pflichtigen Bruttolohn.", "WITHHOLDING_TAX"),
             CreateDerivationItem("STEP_TOTAL", "Schritt", "Total", FormatMoney(totalChf, numberCulture, currencyCode), "Lohnrelevante Positionen minus Abzuege, ohne Spesen", "Netto vor separatem Spesenblock.", "TOTAL"),
             CreateDerivationItem("STEP_EXPENSES", "Schritt", "Spesen gemaess Nachweis", FormatMoney(expensesChf, numberCulture, currencyCode), null, "Direkt aus dem monatlichen Spesenblock uebernommen.", "EXPENSES"),
-            CreateDerivationItem("STEP_PAYOUT", "Schritt", "Total Auszahlung", FormatMoney(totalPayoutChf, numberCulture, currencyCode), $"{FormatMoney(totalChf, numberCulture, currencyCode)} + {FormatMoney(expensesChf, numberCulture, currencyCode)}", "Summe aus Total und Spesen, auf 0.05 gerundet.", "TOTAL_PAYOUT")
+            CreateDerivationItem("STEP_ADVANCE_PAYOUT", "Schritt", "Lohnvorschuss Auszahlung", FormatMoney(salaryAdvancePayoutAmountChf, numberCulture, currencyCode), null, "Erhoeht nur die Auszahlung, nicht Bruttolohn oder Abzugsbasis.", "SALARY_ADVANCE_PAYOUT"),
+            CreateDerivationItem("STEP_ADVANCE_SETTLEMENT", "Schritt", "Lohnvorschuss Verrechnung", FormatMoney(-salaryAdvanceSettlementAmountChf, numberCulture, currencyCode), null, "Reduziert nur die Auszahlung, nicht Bruttolohn oder Abzugsbasis.", "SALARY_ADVANCE_SETTLEMENT"),
+            CreateDerivationItem("STEP_PAYOUT", "Schritt", "Total Auszahlung", FormatMoney(totalPayoutChf, numberCulture, currencyCode), $"{FormatMoney(totalChf, numberCulture, currencyCode)} + {FormatMoney(expensesChf, numberCulture, currencyCode)} + {FormatMoney(salaryAdvancePayoutAmountChf, numberCulture, currencyCode)} + {FormatMoney(-salaryAdvanceSettlementAmountChf, numberCulture, currencyCode)}", "Summe aus Total, Spesen und Vorschussbewegungen, auf 0.05 gerundet.", "TOTAL_PAYOUT")
         };
 
         if (bvgLine is not null)
@@ -1560,6 +1801,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "BVG" => "BVG",
             "TOTAL" => "TOT",
             "EXPENSES" => "SPS",
+            "SALARY_ADVANCE_PAYOUT" => "VOR",
+            "SALARY_ADVANCE_SETTLEMENT" => "VER",
             "TOTAL_PAYOUT" => "AUS",
             _ => "!"
         };
@@ -1578,6 +1821,8 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
             "AHV_IV_EO" or "ALV" or "KTG_UVG" or "AUSBILDUNG_FERIEN" or "BVG" => "#FFFCE7E7",
             "TOTAL" => "#FFEAF0F8",
             "EXPENSES" => "#FFF3E8FF",
+            "SALARY_ADVANCE_PAYOUT" => "#FFE5EEF9",
+            "SALARY_ADVANCE_SETTLEMENT" => "#FFF8ECEC",
             "TOTAL_PAYOUT" => "#FFE4F7EC",
             _ => "#FFF8E7E7"
         };
@@ -1615,4 +1860,10 @@ public sealed class EmployeeMonthlyRecordRepository : IEmployeeMonthlyRecordRepo
     {
         return Math.Round(amountChf * 20m, 0, MidpointRounding.AwayFromZero) / 20m;
     }
+
+    private sealed record SalaryAdvanceActivityForMonth(
+        IReadOnlyCollection<SalaryAdvance> RelevantAdvances,
+        IReadOnlyCollection<SalaryAdvance> PayoutAdvances,
+        decimal PayoutAmountChf,
+        decimal SettlementAmountChf);
 }

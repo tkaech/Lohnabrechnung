@@ -127,6 +127,42 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
             b.ToTable("EmployeeMonthlyRecords");
         });
 
+        modelBuilder.Entity("Payroll.Domain.MonthlyRecords.SalaryAdvance", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+            b.Property<decimal>("AmountChf").HasColumnType("TEXT");
+            b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("TEXT");
+            b.Property<Guid>("EmployeeId").HasColumnType("TEXT");
+            b.Property<Guid>("EmployeeMonthlyRecordId").HasColumnType("TEXT");
+            b.Property<int>("Month").HasColumnType("INTEGER");
+            b.Property<string>("Note").HasMaxLength(500).HasColumnType("TEXT");
+            b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");
+            b.Property<int>("Year").HasColumnType("INTEGER");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId", "Year", "Month");
+            b.HasIndex("EmployeeMonthlyRecordId");
+            b.ToTable("SalaryAdvances");
+        });
+
+        modelBuilder.Entity("Payroll.Domain.MonthlyRecords.SalaryAdvanceSettlement", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+            b.Property<decimal>("AmountChf").HasColumnType("TEXT");
+            b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("TEXT");
+            b.Property<Guid>("EmployeeId").HasColumnType("TEXT");
+            b.Property<Guid>("EmployeeMonthlyRecordId").HasColumnType("TEXT");
+            b.Property<int>("Month").HasColumnType("INTEGER");
+            b.Property<string>("Note").HasMaxLength(500).HasColumnType("TEXT");
+            b.Property<Guid>("SalaryAdvanceId").HasColumnType("TEXT");
+            b.Property<DateTimeOffset?>("UpdatedAtUtc").HasColumnType("TEXT");
+            b.Property<int>("Year").HasColumnType("INTEGER");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId", "Year", "Month");
+            b.HasIndex("EmployeeMonthlyRecordId");
+            b.HasIndex("SalaryAdvanceId");
+            b.ToTable("SalaryAdvanceSettlements");
+        });
+
         modelBuilder.Entity("Payroll.Domain.Settings.DepartmentOption", b =>
         {
             b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
@@ -305,6 +341,42 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
                 .IsRequired();
         });
 
+        modelBuilder.Entity("Payroll.Domain.MonthlyRecords.SalaryAdvance", b =>
+        {
+            b.HasOne("Payroll.Domain.Employees.Employee", null)
+                .WithMany()
+                .HasForeignKey("EmployeeId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.HasOne("Payroll.Domain.MonthlyRecords.EmployeeMonthlyRecord", null)
+                .WithMany("SalaryAdvances")
+                .HasForeignKey("EmployeeMonthlyRecordId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity("Payroll.Domain.MonthlyRecords.SalaryAdvanceSettlement", b =>
+        {
+            b.HasOne("Payroll.Domain.Employees.Employee", null)
+                .WithMany()
+                .HasForeignKey("EmployeeId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.HasOne("Payroll.Domain.MonthlyRecords.EmployeeMonthlyRecord", null)
+                .WithMany("SalaryAdvanceSettlements")
+                .HasForeignKey("EmployeeMonthlyRecordId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+
+            b.HasOne("Payroll.Domain.MonthlyRecords.SalaryAdvance", null)
+                .WithMany("Settlements")
+                .HasForeignKey("SalaryAdvanceId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired();
+        });
+
         modelBuilder.Entity("Payroll.Domain.Payroll.PayrollRunLine", b =>
         {
             b.HasOne("Payroll.Domain.Employees.Employee", null)
@@ -332,7 +404,14 @@ partial class PayrollDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("Payroll.Domain.MonthlyRecords.EmployeeMonthlyRecord", b =>
         {
             b.Navigation("ExpenseEntry");
+            b.Navigation("SalaryAdvances");
+            b.Navigation("SalaryAdvanceSettlements");
             b.Navigation("TimeEntries");
+        });
+
+        modelBuilder.Entity("Payroll.Domain.MonthlyRecords.SalaryAdvance", b =>
+        {
+            b.Navigation("Settlements");
         });
 
         modelBuilder.Entity("Payroll.Domain.Payroll.PayrollRun", b =>

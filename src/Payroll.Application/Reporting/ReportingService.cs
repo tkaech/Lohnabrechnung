@@ -148,8 +148,12 @@ public sealed class ReportingService
                 or PayrollLineType.SpecialSupplement
                 or PayrollLineType.VacationCompensation
                 or PayrollLineType.VehicleCompensation);
-        var totalChf = SumAmounts(allLines, line => line.LineType != PayrollLineType.Expense);
+        var totalChf = SumAmounts(allLines, line => line.LineType is not PayrollLineType.Expense
+            and not PayrollLineType.SalaryAdvancePayout
+            and not PayrollLineType.SalaryAdvanceSettlement);
         var totalPayoutChf = runs.Sum(run => RoundToFiveRappen(run.Lines.Sum(line => line.AmountChf)));
+        var salaryAdvancePayoutChf = SumAmounts(allLines, line => line.LineType == PayrollLineType.SalaryAdvancePayout);
+        var salaryAdvanceSettlementChf = SumAmounts(allLines, line => line.LineType == PayrollLineType.SalaryAdvanceSettlement);
 
         var lines = new List<PayrollTotalsLineDto>();
         AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.BaseSalaryCode, "Basislohn",
@@ -185,6 +189,8 @@ public sealed class ReportingService
         lines.Add(new PayrollTotalsLineDto(PayrollPreviewHelpCatalog.TotalCode, "Total", totalChf, true));
         AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.ExpensesCode, "Spesen gemaess Nachweis",
             SumAmounts(allLines, line => line.LineType == PayrollLineType.Expense));
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.SalaryAdvancePayoutCode, "Lohnvorschuss Auszahlung", salaryAdvancePayoutChf);
+        AddLineIfNonZero(lines, PayrollPreviewHelpCatalog.SalaryAdvanceSettlementCode, "Lohnvorschuss Verrechnung", salaryAdvanceSettlementChf);
         lines.Add(new PayrollTotalsLineDto(PayrollPreviewHelpCatalog.TotalPayoutCode, "Total Auszahlung", totalPayoutChf, true));
 
         return new PayrollTotalsReportDto(
@@ -402,6 +408,8 @@ public sealed class ReportingService
             PayrollPreviewHelpCatalog.BvgCode => 150,
             PayrollPreviewHelpCatalog.TotalCode => 160,
             PayrollPreviewHelpCatalog.ExpensesCode => 170,
+            PayrollPreviewHelpCatalog.SalaryAdvancePayoutCode => 175,
+            PayrollPreviewHelpCatalog.SalaryAdvanceSettlementCode => 176,
             PayrollPreviewHelpCatalog.TotalPayoutCode => 180,
             _ => 999
         };

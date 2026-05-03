@@ -70,7 +70,7 @@ public sealed class PayrollSettingsRepositorySqliteTests
         Assert.Equal(1.10m, loaded.VehiclePauschalzone1RateChf);
         Assert.Equal(2.20m, loaded.VehiclePauschalzone2RateChf);
         Assert.Equal(3.30m, loaded.VehicleRegiezone1RateChf);
-        Assert.Equal(8, loaded.PayrollPreviewHelpOptions.Count);
+        Assert.Equal(10, loaded.PayrollPreviewHelpOptions.Count);
         Assert.All(loaded.PayrollPreviewHelpOptions, option => Assert.True(option.IsEnabled));
         Assert.Equal(2, loaded.Departments.Count);
         Assert.Equal(2, loaded.EmploymentCategories.Count);

@@ -13,5 +13,7 @@ public enum PayrollLineType
     VehicleCompensation,
     BvgDeduction,
     SocialContribution,
-    Tax
+    Tax,
+    SalaryAdvancePayout,
+    SalaryAdvanceSettlement
 }

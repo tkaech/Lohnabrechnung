@@ -51,4 +51,5 @@ public sealed record PayrollRunMonthlyInputDto(
     string? TaxStatus,
     bool IsSubjectToWithholdingTax,
     EmployeeMonthlyRecord MonthlyRecord,
-    EmploymentContract? Contract);
+    EmploymentContract? Contract,
+    IReadOnlyCollection<SalaryAdvance> SalaryAdvances);

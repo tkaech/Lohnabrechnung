@@ -58,6 +58,7 @@ public sealed class PayrollRunService
             PayrollWorkSummary.FromTimeEntries(monthlyRecord.EmployeeId, monthlyRecord.TimeEntries),
             expenses,
             monthlyRecord.TimeEntries.ToArray(),
+            input.SalaryAdvances,
             new PayrollDerivationContext(
                 contract.WageType,
                 input.DepartmentName,

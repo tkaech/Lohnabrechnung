@@ -36,17 +36,23 @@
       </Grid>
     </Border>
 
-    <Border Grid.Row="1" Classes="surface-panel" Padding="{DynamicResource Theme.Layout.PanelPadding}" Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}">
-      <Grid ColumnDefinitions="Auto,*">
+    <Border Grid.Row="1"
+            Classes="surface-panel"
+            Height="{DynamicResource Theme.Layout.TopNavigationHeight}"
+            Padding="{DynamicResource Theme.Layout.TopNavigationPadding}"
+            Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}">
+      <Grid ColumnDefinitions="Auto,*"
+            VerticalAlignment="Stretch">
         <ListBox Grid.Column="0"
                  Classes="main-navigation-list"
                  BorderThickness="0"
                  Background="Transparent"
+                 VerticalAlignment="Stretch"
                  ItemsSource="{Binding MainNavigationItems}"
                  SelectedItem="{Binding SelectedMainNavigationItem, Mode=TwoWay}">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>
-              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Theme.Layout.SectionSpacing}" />
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource Theme.Layout.TopNavigationItemGap}" />
           </ItemsPanelTemplate>
         </ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
@@ -54,38 +60,47 @@
               <Button Content="{Binding Label}"
                       Command="{Binding ActivateCommand}"
                       IsEnabled="{Binding IsEnabled}"
-                      Classes.nav-active="{Binding IsSelected}"
-                      Classes.nav-placeholder="{Binding IsNotSelected}" />
+                      Classes="top-navigation-item"
+                      Classes.top-navigation-item-active="{Binding IsSelected}"
+                      VerticalAlignment="Stretch" />
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
-        <Grid Grid.Column="1" ColumnDefinitions="210,92,34,34" HorizontalAlignment="Right" Margin="8,0,0,0" IsVisible="{Binding ShowEmployeeSelectionArea}">
+        <Grid Grid.Column="1"
+              ColumnDefinitions="210,92,34,34"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Center"
+              Margin="12,0,0,0"
+              IsVisible="{Binding ShowEmployeeSelectionArea}">
           <TextBox
+              Classes="top-navigation-search-box"
+              VerticalAlignment="Center"
               IsEnabled="{Binding CanSearchEmployees}"
               Watermark="Suche Mitarbeitende"
-              Text="{Binding SearchText, Mode=TwoWay}" />
+              Text="{Binding SearchText, Mode=TwoWay}"
+              KeyDown="OnEmployeeSearchTextBoxKeyDown" />
           <ComboBox
               Grid.Column="1"
               Margin="4,0,0,0"
+              Classes="top-navigation-filter"
+              VerticalAlignment="Center"
               IsEnabled="{Binding CanSearchEmployees}"
               ItemsSource="{Binding ActivityFilters}"
               SelectedItem="{Binding SelectedActivityFilter, Mode=TwoWay}" />
           <Button
               Grid.Column="2"
-              Width="34"
-              MinWidth="34"
-              Height="34"
               Margin="4,0,0,0"
+              Classes="top-navigation-icon"
+              VerticalAlignment="Center"
               Command="{Binding SearchCommand}"
               ToolTip.Tip="Suchen">
             <PathIcon Width="16" Height="16" Data="M9.5,3A6.5,6.5 0,0 0 9.5,16A6.47,6.47 0,0 0 13.62,14.59L18.71,19.71L20.12,18.3L15.03,13.21A6.47,6.47 0,0 0 16,9.5A6.5,6.5 0,0 0 9.5,3M9.5,5A4.5,4.5 0,0 1 14,9.5A4.5,4.5 0,0 1 9.5,14A4.5,4.5 0,0 1 5,9.5A4.5,4.5 0,0 1 9.5,5Z" />
           </Button>
           <Button
               Grid.Column="3"
-              Width="34"
-              MinWidth="34"
-              Height="34"
               Margin="4,0,0,0"
+              Classes="top-navigation-icon"
+              VerticalAlignment="Center"
               Command="{Binding RefreshCommand}"
               ToolTip.Tip="Aktualisieren">
             <PathIcon Width="16" Height="16" Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0,0 0 4,12A8,8 0,0 0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.82,16.33 14.61,18 12,18A6,6 0,0 1 6,12A6,6 0,0 1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" />
@@ -95,15 +110,11 @@
     </Border>
 
     <Grid Grid.Row="2" ColumnDefinitions="360,*" MinHeight="0">
-      <controls:AppSectionCard Grid.Column="0" Header="Mitarbeitende" Margin="0,0,8,0" IsVisible="{Binding ShowEmployeeSelectionArea}">
-        <Grid RowDefinitions="Auto,*" MinHeight="0">
-          <TextBlock Grid.Row="0" Foreground="#FF5F6B7A" Text="{Binding EmployeeCountSummary}" />
-
+      <controls:AppSectionCard Grid.Column="0" Header="{Binding Employees.Count, StringFormat='Mitarbeitende ({0})'}" Margin="0,0,8,0" IsVisible="{Binding ShowEmployeeSelectionArea}">
+        <Grid MinHeight="0">
           <ListBox
               Classes="employee-selection-list"
-              Grid.Row="1"
               MinHeight="0"
-              Margin="{DynamicResource Theme.Layout.SectionSpacing.TopMargin}"
               BorderThickness="0"
               Background="Transparent"
               IsEnabled="{Binding CanSelectEmployees}"
@@ -111,18 +122,19 @@
               SelectedItem="{Binding SelectedEmployee, Mode=TwoWay}">
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <Border Padding="8" Margin="0,0,0,6" Background="#FFF8FAFC" CornerRadius="6">
-                  <StackPanel Spacing="2">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <StackPanel Spacing="1">
-                        <TextBlock FontWeight="SemiBold" Text="{Binding FullName}" />
-                        <TextBlock Classes="section-caption" Text="{Binding PersonnelNumber}" />
-                      </StackPanel>
-                      <Border Grid.Column="1" Margin="6,0,0,0" Background="#FFE6EEF5" CornerRadius="999" Padding="6,1">
-                        <TextBlock Classes="section-caption" Text="{Binding StatusSummary}" />
-                      </Border>
-                    </Grid>
-                  </StackPanel>
+                <Border Classes="employee-list-card">
+                  <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Spacing="1" VerticalAlignment="Center">
+                      <TextBlock Classes="employee-name" Text="{Binding FullName}" />
+                      <TextBlock Classes="employee-id" Text="{Binding PersonnelNumber}" />
+                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            Classes="employee-status-badge">
+                      <TextBlock Classes="employee-status-text" Text="{Binding StatusSummary}" />
+                    </Border>
+                  </Grid>
                 </Border>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -1289,7 +1301,7 @@
         <Grid RowDefinitions="Auto,*,Auto,Auto,Auto,Auto" MinHeight="0">
           <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}" IsVisible="{Binding ShowPrimaryWorkspaceHeader}">
             <Grid>
-              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="220,220,*,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+              <Grid IsVisible="{Binding ShowPayrollRunsWorkspace}" ColumnDefinitions="220,220,*,Auto,Auto,Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto">
                 <StackPanel Spacing="4">
                   <TextBlock Classes="section-caption" Text="Abrechnungsmonat" />
                   <controls:MonthPicker SelectedDate="{Binding MonthlyRecord.SelectedMonthPickerDate, Mode=TwoWay}" Watermark="MM/YYYY" />
@@ -1314,10 +1326,19 @@
                               MinWidth="132"
                               Margin="0,0,8,0"
                               VerticalAlignment="Bottom"
+                              Classes.active-button="{Binding MonthlyRecord.IsPayrollPreviewDerivationVisible}"
                               IsChecked="{Binding MonthlyRecord.IsPayrollPreviewDerivationVisible, Mode=TwoWay}"
                               IsEnabled="{Binding MonthlyRecord.HasPayrollPreviewDerivationGroups}"
                               Content="Herleitung anzeigen" />
                 <Button Grid.Column="5"
+                        MinWidth="110"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Bottom"
+                        Classes.active-button="{Binding MonthlyRecord.IsSalaryAdvanceEditorActive}"
+                        IsEnabled="{Binding MonthlyRecord.CanToggleSalaryAdvanceEditor}"
+                        Command="{Binding MonthlyRecord.ToggleSalaryAdvanceEditorCommand}"
+                        Content="Vorschuss" />
+                <Button Grid.Column="6"
                         MinWidth="148"
                         Margin="0,0,8,0"
                         VerticalAlignment="Bottom"
@@ -1327,7 +1348,7 @@
                         IsEnabled="{Binding CanExecutePayrollMonthAction}"
                         Click="OnFinalizePayrollMonthClick"
                         Content="{Binding PayrollMonthActionLabel}" />
-                <Button Grid.Column="6"
+                <Button Grid.Column="7"
                         VerticalAlignment="Bottom"
                         Classes="primary-action"
                         Classes.action-feedback-success="{Binding CreatePayrollPdfFeedback.IsSuccess}"
@@ -1335,7 +1356,7 @@
                         Command="{Binding CreatePayrollPdfCommand}"
                         Content="PDF erstellen" />
                 <StackPanel Grid.Row="1"
-                            Grid.ColumnSpan="7"
+                            Grid.ColumnSpan="8"
                             Margin="0,12,0,0"
                             Orientation="Horizontal"
                             Spacing="8"
@@ -1361,16 +1382,126 @@
                           Command="{Binding MonthlyRecord.SaveWithholdingTaxCommand}"
                           Content="Quellensteuer speichern" />
                 </StackPanel>
+                <Border Grid.Row="2"
+                        Grid.ColumnSpan="8"
+                        Margin="0,10,0,0"
+                        Padding="10,8"
+                        Classes="subtle-panel"
+                        IsVisible="{Binding MonthlyRecord.IsSalaryAdvanceEditorVisible}">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="150,150,240,240,110,110,Auto,Auto"
+                          VerticalAlignment="Center">
+                      <StackPanel Spacing="3">
+                        <TextBlock Classes="section-caption" Text="Vorschussbetrag" />
+                        <TextBox Text="{Binding MonthlyRecord.SalaryAdvanceAmountChf, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="3" Margin="8,0,0,0">
+                        <TextBlock Classes="section-caption" Text="Verrechnung" />
+                        <TextBox Text="{Binding MonthlyRecord.SalaryAdvanceSettlementAmountChf, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" Spacing="3" Margin="8,0,0,0">
+                        <TextBlock Classes="section-caption" Text="Ziel-Vorschuss" />
+                        <ComboBox ItemsSource="{Binding MonthlyRecord.OpenSalaryAdvanceOptions}"
+                                  SelectedItem="{Binding MonthlyRecord.SelectedSalaryAdvanceCase, Mode=TwoWay}">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding SelectionDisplay}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </StackPanel>
+                      <StackPanel Grid.Column="3" Spacing="3" Margin="8,0,0,0">
+                        <TextBlock Classes="section-caption" Text="Bemerkung" />
+                        <TextBox Text="{Binding MonthlyRecord.SalaryAdvanceNote, Mode=TwoWay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="4" Spacing="3" Margin="8,0,0,0">
+                        <TextBlock Classes="section-caption" Text="Offen" />
+                        <TextBlock Classes="salary-advance-value"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding MonthlyRecord.OpenSalaryAdvanceAmountDisplay}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="5" Spacing="3" Margin="8,0,0,0">
+                        <TextBlock Classes="section-caption" Text="Status" />
+                        <Border Classes="salary-advance-status-badge"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center">
+                          <TextBlock Classes="employee-status-text"
+                                     Text="{Binding MonthlyRecord.SalaryAdvanceStatusDisplay}" />
+                        </Border>
+                      </StackPanel>
+                      <Button Grid.Column="6"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Bottom"
+                              Classes.action-feedback-success="{Binding MonthlyRecord.SaveSalaryAdvanceFeedback.IsSuccess}"
+                              Classes.action-feedback-error="{Binding MonthlyRecord.SaveSalaryAdvanceFeedback.IsError}"
+                              Command="{Binding MonthlyRecord.SaveSalaryAdvanceCommand}"
+                              Content="Vorschuss speichern" />
+                      <Button Grid.Column="7"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Bottom"
+                              IsEnabled="{Binding MonthlyRecord.CanDeleteSalaryAdvance}"
+                              Command="{Binding MonthlyRecord.DeleteSalaryAdvanceCommand}"
+                              Content="Vorschuss loeschen" />
+                    </Grid>
+
+                    <StackPanel Spacing="4"
+                                IsVisible="{Binding MonthlyRecord.HasSalaryAdvanceCases}">
+                      <Grid ColumnDefinitions="120,100,100,100,90,*"
+                            Margin="0,2,0,0">
+                        <TextBlock Classes="section-caption" Text="Referenz" />
+                        <TextBlock Grid.Column="1" Classes="section-caption" Text="Betrag" />
+                        <TextBlock Grid.Column="2" Classes="section-caption" Text="Verrechnet" />
+                        <TextBlock Grid.Column="3" Classes="section-caption" Text="Offen" />
+                        <TextBlock Grid.Column="4" Classes="section-caption" Text="Status" />
+                        <TextBlock Grid.Column="5" Classes="section-caption" Text="Bemerkung" />
+                      </Grid>
+                      <ItemsControl ItemsSource="{Binding MonthlyRecord.SalaryAdvanceCases}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Classes="subtle-panel"
+                                    Padding="8,6">
+                              <Grid ColumnDefinitions="120,100,100,100,90,*"
+                                    VerticalAlignment="Center">
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{Binding ReferenceDisplay}" />
+                                <TextBlock Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding AmountDisplay}" />
+                                <TextBlock Grid.Column="2"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding SettledAmountDisplay}" />
+                                <TextBlock Grid.Column="3"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding OpenAmountDisplay}" />
+                                <Border Grid.Column="4"
+                                        Classes="salary-advance-status-badge"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center">
+                                  <TextBlock Classes="employee-status-text"
+                                             Text="{Binding StatusDisplay}" />
+                                </Border>
+                                <TextBlock Grid.Column="5"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding NoteDisplay}"
+                                           TextWrapping="Wrap" />
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
               </Grid>
               <StackPanel Spacing="4" IsVisible="{Binding ShowReportingWorkspace}">
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Reporting" />
+                <TextBlock Classes="page-title" Text="Reporting" />
               </StackPanel>
               <StackPanel Spacing="4" IsVisible="{Binding ShowAnnualSalaryWorkspace}">
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding AnnualSalaryTitle}" />
-                <TextBlock Foreground="#FF5F6B7A" Text="{Binding AnnualSalarySummary}" TextWrapping="Wrap" />
+                <TextBlock Classes="page-title" Text="{Binding AnnualSalaryTitle}" />
+                <TextBlock Classes="body-muted" Text="{Binding AnnualSalarySummary}" TextWrapping="Wrap" />
               </StackPanel>
               <StackPanel Spacing="4" IsVisible="{Binding ShowEmployeeWorkspace}">
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding FormTitle}" />
+                <TextBlock Classes="page-title" Text="{Binding FormTitle}" />
               </StackPanel>
             </Grid>
           </Border>
@@ -1379,8 +1510,8 @@
             <Grid RowDefinitions="Auto,*" MinHeight="0" DataContext="{Binding MonthlyRecord}">
               <Border Background="#FFF8FAFC" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}">
                 <StackPanel Spacing="4">
-                  <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding ContextTitle}" />
-                  <TextBlock Foreground="#FF5F6B7A" Text="{Binding ContextDescription}" TextWrapping="Wrap" />
+                  <TextBlock Classes="section-title" Text="{Binding ContextTitle}" />
+                  <TextBlock Classes="body-muted" Text="{Binding ContextDescription}" TextWrapping="Wrap" />
                   <TextBlock Classes="section-caption" Text="{Binding StatusSummary}" />
                   <TextBlock Classes="section-caption" Text="{Binding ContractSummary}" TextWrapping="Wrap" />
                   <TextBlock Classes="section-caption" Text="{Binding TotalsSummary}" TextWrapping="Wrap" />
@@ -1561,8 +1692,8 @@
             <Border Background="{DynamicResource Theme.Color.Surface}" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="{DynamicResource Theme.Layout.PanelPadding}">
               <StackPanel Spacing="{DynamicResource Theme.Layout.SectionSpacing}" DataContext="{Binding MonthlyRecord}">
               <Grid ColumnDefinitions="*" RowDefinitions="Auto,Auto">
-                <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding PayrollPreviewTitle}" />
-                <TextBlock Grid.Row="1" Foreground="#FF5F6B7A" Text="{Binding PayrollPreviewSummary}" TextWrapping="Wrap" />
+                <TextBlock Classes="section-title" Text="{Binding PayrollPreviewTitle}" />
+                <TextBlock Grid.Row="1" Classes="body-muted" Text="{Binding PayrollPreviewSummary}" TextWrapping="Wrap" />
               </Grid>
 
                 <Border Background="#FFFFFFFF" BorderBrush="#FFE2E8F0" BorderThickness="1" CornerRadius="{DynamicResource Theme.Layout.PanelCornerRadius}" Padding="0" IsVisible="{Binding ShowPayrollPreviewResultOnly}">
@@ -1810,16 +1941,16 @@
                           </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                       </DataGridTemplateColumn>
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="GrossSalaryChf" Header="Bruttolohn" Binding="{Binding GrossSalaryChf, Converter={StaticResource ChfAmountConverter}}" Width="130" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AhvIvEoDeductionChf" Header="AHV/IV/EO" Binding="{Binding AhvIvEoDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="120" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AlvDeductionChf" Header="ALV" Binding="{Binding AlvDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="SicknessDailyAllowanceDeductionChf" Header="Krankentaggeld" Binding="{Binding SicknessDailyAllowanceDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="150" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TrainingAndEducationDeductionChf" Header="Aus-/Weiterbildung" Binding="{Binding TrainingAndEducationDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="170" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TotalSocialDeductionChf" Header="Total Sozialabzuege" Binding="{Binding TotalSocialDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="165" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="BvgDeductionChf" Header="BVG" Binding="{Binding BvgDeductionChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="WithholdingTaxChf" Header="QST" Binding="{Binding WithholdingTaxChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="ExpensesChf" Header="Spesen" Binding="{Binding ExpensesChf, Converter={StaticResource ChfAmountConverter}}" Width="110" />
-                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="NetSalaryChf" Header="Nettolohn" Binding="{Binding NetSalaryChf, Converter={StaticResource ChfAmountConverter}}" Width="130" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="GrossSalaryChf" Header="Bruttolohn" Binding="{Binding GrossSalaryDisplay}" Width="130" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AhvIvEoDeductionChf" Header="AHV/IV/EO" Binding="{Binding AhvIvEoDeductionDisplay}" Width="120" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="AlvDeductionChf" Header="ALV" Binding="{Binding AlvDeductionDisplay}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="SicknessDailyAllowanceDeductionChf" Header="Krankentaggeld" Binding="{Binding SicknessDailyAllowanceDeductionDisplay}" Width="150" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TrainingAndEducationDeductionChf" Header="Aus-/Weiterbildung" Binding="{Binding TrainingAndEducationDeductionDisplay}" Width="170" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="TotalSocialDeductionChf" Header="Total Sozialabzuege" Binding="{Binding TotalSocialDeductionDisplay}" Width="165" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="BvgDeductionChf" Header="BVG" Binding="{Binding BvgDeductionDisplay}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="WithholdingTaxChf" Header="QST" Binding="{Binding WithholdingTaxDisplay}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="ExpensesChf" Header="Spesen" Binding="{Binding ExpensesDisplay}" Width="110" />
+                      <DataGridTextColumn behaviors:PersistentDataGridState.ColumnKey="NetSalaryChf" Header="Nettolohn" Binding="{Binding NetSalaryDisplay}" Width="130" />
                     </DataGrid.Columns>
                   </DataGrid>
                 </Border>

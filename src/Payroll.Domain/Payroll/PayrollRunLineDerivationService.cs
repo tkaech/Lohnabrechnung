@@ -1,6 +1,7 @@
 using Payroll.Domain.Common;
 using Payroll.Domain.Employees;
 using Payroll.Domain.Expenses;
+using Payroll.Domain.MonthlyRecords;
 using Payroll.Domain.Settings;
 using Payroll.Domain.TimeTracking;
 
@@ -16,13 +17,62 @@ public sealed class PayrollRunLineDerivationService
         PayrollWorkSummary workSummary,
         IReadOnlyCollection<ExpenseEntry> expenses,
         IReadOnlyCollection<TimeEntry> timeEntries,
+        IReadOnlyCollection<SalaryAdvance> salaryAdvances,
         PayrollDerivationContext? derivationContext = null)
+    {
+        ArgumentNullException.ThrowIfNull(salaryAdvances);
+
+        return DeriveCore(
+            payrollReferenceDate,
+            employeeBirthDate,
+            contract,
+            payrollSettings,
+            workSummary,
+            expenses,
+            timeEntries,
+            salaryAdvances,
+            derivationContext);
+    }
+
+    public PayrollRunLineDerivationResult DeriveForEmployee(
+        DateOnly payrollReferenceDate,
+        DateOnly? employeeBirthDate,
+        EmploymentContract contract,
+        PayrollSettings payrollSettings,
+        PayrollWorkSummary workSummary,
+        IReadOnlyCollection<ExpenseEntry> expenses,
+        IReadOnlyCollection<TimeEntry> timeEntries,
+        PayrollDerivationContext? derivationContext = null)
+    {
+        return DeriveCore(
+            payrollReferenceDate,
+            employeeBirthDate,
+            contract,
+            payrollSettings,
+            workSummary,
+            expenses,
+            timeEntries,
+            [],
+            derivationContext);
+    }
+
+    private PayrollRunLineDerivationResult DeriveCore(
+        DateOnly payrollReferenceDate,
+        DateOnly? employeeBirthDate,
+        EmploymentContract contract,
+        PayrollSettings payrollSettings,
+        PayrollWorkSummary workSummary,
+        IReadOnlyCollection<ExpenseEntry> expenses,
+        IReadOnlyCollection<TimeEntry> timeEntries,
+        IReadOnlyCollection<SalaryAdvance> salaryAdvances,
+        PayrollDerivationContext? derivationContext)
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(payrollSettings);
         ArgumentNullException.ThrowIfNull(workSummary);
         ArgumentNullException.ThrowIfNull(expenses);
         ArgumentNullException.ThrowIfNull(timeEntries);
+        ArgumentNullException.ThrowIfNull(salaryAdvances);
 
         if (contract.EmployeeId != workSummary.EmployeeId)
         {
@@ -31,6 +81,7 @@ public sealed class PayrollRunLineDerivationService
 
         ValidateEmployeeIds(expenses, contract.EmployeeId, nameof(expenses));
         ValidateEmployeeIds(timeEntries, contract.EmployeeId, nameof(timeEntries));
+        ValidateSalaryAdvances(salaryAdvances, contract.EmployeeId, payrollReferenceDate);
 
         var lines = new List<PayrollRunLine>();
         var issues = new List<PayrollDerivationIssue>();
@@ -247,6 +298,38 @@ public sealed class PayrollRunLineDerivationService
                 contract.MonthlyBvgDeductionChf));
         }
 
+        var currentMonthSalaryAdvances = salaryAdvances
+            .Where(advance => advance.Year == payrollReferenceDate.Year && advance.Month == payrollReferenceDate.Month)
+            .ToArray();
+        foreach (var salaryAdvance in currentMonthSalaryAdvances)
+        {
+            lines.Add(PayrollRunLine.CreateManualChfLine(
+                contract.EmployeeId,
+                PayrollLineType.SalaryAdvancePayout,
+                "SALARY_ADVANCE_PAYOUT",
+                BuildSalaryAdvancePayoutDescription(salaryAdvance),
+                salaryAdvance.AmountChf));
+        }
+
+        var currentMonthSalaryAdvanceSettlements = salaryAdvances
+            .SelectMany(advance => advance.Settlements)
+            .Where(settlement => settlement.Year == payrollReferenceDate.Year && settlement.Month == payrollReferenceDate.Month)
+            .Join(
+                salaryAdvances,
+                settlement => settlement.SalaryAdvanceId,
+                advance => advance.Id,
+                (settlement, advance) => new { Settlement = settlement, Advance = advance })
+            .ToArray();
+        foreach (var item in currentMonthSalaryAdvanceSettlements)
+        {
+            lines.Add(PayrollRunLine.CreateManualChfLine(
+                contract.EmployeeId,
+                PayrollLineType.SalaryAdvanceSettlement,
+                "SALARY_ADVANCE_SETTLEMENT",
+                BuildSalaryAdvanceSettlementDescription(item.Advance, item.Settlement),
+                -item.Settlement.AmountChf));
+        }
+
         return new PayrollRunLineDerivationResult(lines, issues);
     }
 
@@ -280,6 +363,24 @@ public sealed class PayrollRunLineDerivationService
             description,
             hours,
             contract.HourlyRateChf * supplementRate.Value));
+    }
+
+    private static string BuildSalaryAdvancePayoutDescription(SalaryAdvance advance)
+    {
+        return BuildSalaryAdvanceDescription("Lohnvorschuss Auszahlung", advance.Year, advance.Month, advance.Note);
+    }
+
+    private static string BuildSalaryAdvanceSettlementDescription(SalaryAdvance advance, SalaryAdvanceSettlement settlement)
+    {
+        return BuildSalaryAdvanceDescription("Lohnvorschuss Verrechnung", advance.Year, advance.Month, settlement.Note ?? advance.Note);
+    }
+
+    private static string BuildSalaryAdvanceDescription(string prefix, int year, int month, string? note)
+    {
+        var reference = $"{month:00}/{year}";
+        return string.IsNullOrWhiteSpace(note)
+            ? $"{prefix} {reference}"
+            : $"{prefix} {reference} - {note.Trim()}";
     }
 
     private static void AddConfiguredVehicleLine(
@@ -365,6 +466,34 @@ public sealed class PayrollRunLineDerivationService
             if (currentEmployeeId != employeeId)
             {
                 throw new ArgumentException("All entries must belong to the same employee.", paramName);
+            }
+        }
+    }
+
+    private static void ValidateSalaryAdvances(
+        IEnumerable<SalaryAdvance> salaryAdvances,
+        Guid employeeId,
+        DateOnly payrollReferenceDate)
+    {
+        foreach (var advance in salaryAdvances)
+        {
+            if (advance.EmployeeId != employeeId)
+            {
+                throw new ArgumentException("All salary advances must belong to the same employee.", nameof(salaryAdvances));
+            }
+
+            foreach (var settlement in advance.Settlements)
+            {
+                if (settlement.EmployeeId != employeeId)
+                {
+                    throw new ArgumentException("All salary advance settlements must belong to the same employee.", nameof(salaryAdvances));
+                }
+
+                if (settlement.Year > payrollReferenceDate.Year
+                    || settlement.Year == payrollReferenceDate.Year && settlement.Month > payrollReferenceDate.Month)
+                {
+                    throw new ArgumentException("Future salary advance settlements cannot affect the selected payroll month.", nameof(salaryAdvances));
+                }
             }
         }
     }

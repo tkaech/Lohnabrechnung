@@ -1,3 +1,5 @@
+using Payroll.Application.Formatting;
+
 namespace Payroll.Application.AnnualSalary;
 
 public enum AnnualSalaryMonthStatus
@@ -61,6 +63,16 @@ public sealed record AnnualSalaryMonthDto(
     public bool IsStatusOpen => Status == AnnualSalaryMonthStatus.Open;
     public decimal AhvIvEoAlvDeductionChf => AhvIvEoDeductionChf + AlvDeductionChf;
     public decimal NbuDeductionChf => SicknessDailyAllowanceDeductionChf;
+    public string GrossSalaryDisplay => PayrollAmountFormatter.FormatChf(GrossSalaryChf);
+    public string AhvIvEoDeductionDisplay => PayrollAmountFormatter.FormatChf(AhvIvEoDeductionChf);
+    public string AlvDeductionDisplay => PayrollAmountFormatter.FormatChf(AlvDeductionChf);
+    public string SicknessDailyAllowanceDeductionDisplay => PayrollAmountFormatter.FormatChf(SicknessDailyAllowanceDeductionChf);
+    public string TrainingAndEducationDeductionDisplay => PayrollAmountFormatter.FormatChf(TrainingAndEducationDeductionChf);
+    public string TotalSocialDeductionDisplay => PayrollAmountFormatter.FormatChf(TotalSocialDeductionChf);
+    public string BvgDeductionDisplay => PayrollAmountFormatter.FormatChf(BvgDeductionChf);
+    public string WithholdingTaxDisplay => PayrollAmountFormatter.FormatChf(WithholdingTaxChf);
+    public string ExpensesDisplay => PayrollAmountFormatter.FormatChf(ExpensesChf);
+    public string NetSalaryDisplay => PayrollAmountFormatter.FormatChf(NetSalaryChf);
 }
 
 public sealed record AnnualSalaryTotalsDto(

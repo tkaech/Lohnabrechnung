@@ -414,6 +414,9 @@ public sealed class MainWindowViewModelTests
         viewModel.MainNavigationItems.Single(item => item.Section == MainSection.AnnualSalary).ActivateCommand.Execute(null);
         await WaitUntilAsync(() => viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
 
+        Assert.Single(viewModel.AnnualSalaryMonths);
+        Assert.Equal("1'000.00 CHF", viewModel.AnnualSalaryMonths[0].GrossSalaryDisplay);
+        Assert.Equal("825.00 CHF", viewModel.AnnualSalaryMonths[0].NetSalaryDisplay);
         Assert.True(viewModel.CanCreateSalaryCertificatePdf);
         Assert.True(viewModel.CreateSalaryCertificatePdfCommand.CanExecute(null));
 
@@ -2488,6 +2491,14 @@ public sealed class MainWindowViewModelTests
             return Task.FromResult<EmployeeMonthlyRecord?>(null);
         }
 
+        public Task<SalaryAdvance?> GetSalaryAdvanceByIdAsync(Guid salaryAdvanceId, CancellationToken cancellationToken)
+        {
+            var advance = _records.Values
+                .SelectMany(record => record.SalaryAdvances)
+                .SingleOrDefault(item => item.Id == salaryAdvanceId);
+            return Task.FromResult(advance);
+        }
+
         public Task<MonthlyRecordDetailsDto?> GetDetailsAsync(Guid monthlyRecordId, CancellationToken cancellationToken)
         {
             return Task.FromResult<MonthlyRecordDetailsDto?>(null);
@@ -2530,6 +2541,10 @@ public sealed class MainWindowViewModelTests
         }
 
         public void MarkAsAdded<TEntity>(TEntity entity) where TEntity : class
+        {
+        }
+
+        public void MarkAsDeleted<TEntity>(TEntity entity) where TEntity : class
         {
         }
     }
