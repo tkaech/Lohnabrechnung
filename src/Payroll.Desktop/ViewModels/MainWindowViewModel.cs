@@ -4809,6 +4809,44 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectMainNavigationSection(MainSection.Help);
     }
 
+    public async Task NavigateToEmployeeContextAsync(Guid employeeId, MainSection section, int? month = null)
+    {
+        if (employeeId == Guid.Empty || IsBusy)
+        {
+            return;
+        }
+
+        var employeeListItem = Employees.FirstOrDefault(item => item.EmployeeId == employeeId);
+        if (employeeListItem is not null)
+        {
+            SetSelectedEmployeeWithoutReload(employeeListItem);
+        }
+
+        if (month.HasValue)
+        {
+            var referenceMonth = MonthlyRecord.SelectedMonth ?? new DateTimeOffset(DateTime.Today.Year, DateTime.Today.Month, 1, 0, 0, 0, TimeSpan.Zero);
+            MonthlyRecord.SelectedMonth = new DateTimeOffset(referenceMonth.Year, month.Value, 1, 0, 0, 0, referenceMonth.Offset);
+        }
+
+        if (section == MainSection.AnnualSalary)
+        {
+            var referenceYear = MonthlyRecord.SelectedMonth?.Year ?? DateTime.Today.Year;
+            AnnualSalaryYear = referenceYear.ToString(CultureInfo.InvariantCulture);
+        }
+
+        SelectMainNavigationSection(section);
+        await LoadEmployeeIntoViewAsync(employeeId);
+
+        if (section == MainSection.PayrollRuns && ShouldApplyPayrollPossibleFilter())
+        {
+            await RefreshAsync();
+        }
+        else if (section == MainSection.AnnualSalary)
+        {
+            await LoadAnnualSalaryCoreAsync();
+        }
+    }
+
     private void SelectMainNavigationSection(MainSection section)
     {
         var targetItem = MainNavigationItems.FirstOrDefault(item => item.Section == section);

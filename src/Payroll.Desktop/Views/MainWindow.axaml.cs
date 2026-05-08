@@ -227,6 +227,42 @@ public sealed partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private async void OnEmployeeContextMenuItemClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: EmployeeListItemViewModel employee, Tag: string tag }
+            || DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var parts = tag.Split(':', 2, StringSplitOptions.TrimEntries);
+        var section = parts[0] switch
+        {
+            "Employees" => MainSection.Employees,
+            "TimeAndExpenses" => MainSection.TimeAndExpenses,
+            "PayrollRuns" => MainSection.PayrollRuns,
+            "AnnualSalary" => MainSection.AnnualSalary,
+            _ => (MainSection?)null
+        };
+
+        if (!section.HasValue)
+        {
+            return;
+        }
+
+        int? month = null;
+        if (parts.Length == 2
+            && !string.Equals(parts[1], "current", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(parts[1], out var parsedMonth)
+            && parsedMonth is >= 1 and <= 12)
+        {
+            month = parsedMonth;
+        }
+
+        await viewModel.NavigateToEmployeeContextAsync(employee.EmployeeId, section.Value, month);
+        e.Handled = true;
+    }
+
     private void OnDeactivated(object? sender, EventArgs e)
     {
         if (DataContext is MainWindowViewModel { MonthlyRecord: { } monthlyRecord })

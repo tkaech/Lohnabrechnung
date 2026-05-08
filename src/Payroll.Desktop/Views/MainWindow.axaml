@@ -123,6 +123,98 @@
             <ListBox.ItemTemplate>
               <DataTemplate>
                 <Border Classes="employee-list-card">
+                  <Border.ContextMenu>
+                    <ContextMenu DataContext="{Binding}">
+                      <MenuItem Header="Mitarbeitende oeffnen"
+                                Tag="Employees"
+                                Click="OnEmployeeContextMenuItemClick" />
+                      <MenuItem Header="Zeit- und Spesenerfassung">
+                        <MenuItem Header="aktueller Monat"
+                                  Tag="TimeAndExpenses:current"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Januar"
+                                  Tag="TimeAndExpenses:1"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Februar"
+                                  Tag="TimeAndExpenses:2"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Maerz"
+                                  Tag="TimeAndExpenses:3"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="April"
+                                  Tag="TimeAndExpenses:4"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Mai"
+                                  Tag="TimeAndExpenses:5"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Juni"
+                                  Tag="TimeAndExpenses:6"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Juli"
+                                  Tag="TimeAndExpenses:7"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="August"
+                                  Tag="TimeAndExpenses:8"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="September"
+                                  Tag="TimeAndExpenses:9"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Oktober"
+                                  Tag="TimeAndExpenses:10"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="November"
+                                  Tag="TimeAndExpenses:11"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Dezember"
+                                  Tag="TimeAndExpenses:12"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                      </MenuItem>
+                      <MenuItem Header="Lohnlauf">
+                        <MenuItem Header="aktueller Monat"
+                                  Tag="PayrollRuns:current"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Januar"
+                                  Tag="PayrollRuns:1"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Februar"
+                                  Tag="PayrollRuns:2"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Maerz"
+                                  Tag="PayrollRuns:3"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="April"
+                                  Tag="PayrollRuns:4"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Mai"
+                                  Tag="PayrollRuns:5"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Juni"
+                                  Tag="PayrollRuns:6"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Juli"
+                                  Tag="PayrollRuns:7"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="August"
+                                  Tag="PayrollRuns:8"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="September"
+                                  Tag="PayrollRuns:9"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Oktober"
+                                  Tag="PayrollRuns:10"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="November"
+                                  Tag="PayrollRuns:11"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                        <MenuItem Header="Dezember"
+                                  Tag="PayrollRuns:12"
+                                  Click="OnEmployeeContextMenuItemClick" />
+                      </MenuItem>
+                      <MenuItem Header="Jahreslohn"
+                                Tag="AnnualSalary:current"
+                                Click="OnEmployeeContextMenuItemClick" />
+                    </ContextMenu>
+                  </Border.ContextMenu>
                   <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                     <StackPanel Spacing="1" VerticalAlignment="Center">
                       <TextBlock Classes="employee-name" Text="{Binding FullName}" />

@@ -75,6 +75,65 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task NavigateToEmployeeContextAsync_OpensMonthBasedWorkspacesForChosenEmployee()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var repository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var viewModel = CreateViewModel(repository);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        await viewModel.NavigateToEmployeeContextAsync(secondEmployee.EmployeeId, MainSection.TimeAndExpenses, 5);
+        await WaitUntilAsync(() =>
+            viewModel.SelectedEmployee?.EmployeeId == secondEmployee.EmployeeId
+            && viewModel.ShowTimeAndExpensesWorkspace
+            && viewModel.MonthlyRecord.TimePayrollMonth == "05/2026");
+
+        Assert.Equal(secondEmployee.EmployeeId, viewModel.SelectedEmployee?.EmployeeId);
+        Assert.True(viewModel.ShowTimeAndExpensesWorkspace);
+        Assert.Equal("05/2026", viewModel.MonthlyRecord.TimePayrollMonth);
+
+        await viewModel.NavigateToEmployeeContextAsync(secondEmployee.EmployeeId, MainSection.PayrollRuns, 6);
+        await WaitUntilAsync(() =>
+            viewModel.ShowPayrollRunsWorkspace
+            && viewModel.MonthlyRecord.TimePayrollMonth == "06/2026");
+
+        Assert.True(viewModel.ShowPayrollRunsWorkspace);
+        Assert.Equal("06/2026", viewModel.MonthlyRecord.TimePayrollMonth);
+    }
+
+    [Fact]
+    public async Task NavigateToEmployeeContextAsync_OpensEmployeeAndAnnualSalaryWorkspaces()
+    {
+        var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
+        var secondEmployee = TestEmployeeRepository.CreateDetails("1001", "Bruno", "Bereit", "Zuerich");
+        var repository = new TestEmployeeRepository(firstEmployee, secondEmployee);
+        var annualSalaryService = new AnnualSalaryService(new StubAnnualSalaryRepository(hasFinalizedMonth: true));
+        var viewModel = CreateViewModel(repository, annualSalaryService: annualSalaryService);
+
+        await viewModel.InitializeAsync();
+        await WaitUntilAsync(() => viewModel.PersonnelNumber == "1000");
+
+        await viewModel.NavigateToEmployeeContextAsync(secondEmployee.EmployeeId, MainSection.Employees);
+        await WaitUntilAsync(() =>
+            viewModel.ShowEmployeeWorkspace
+            && viewModel.SelectedEmployee?.EmployeeId == secondEmployee.EmployeeId);
+
+        Assert.True(viewModel.ShowEmployeeWorkspace);
+        Assert.Equal(secondEmployee.EmployeeId, viewModel.SelectedEmployee?.EmployeeId);
+
+        await viewModel.NavigateToEmployeeContextAsync(secondEmployee.EmployeeId, MainSection.AnnualSalary);
+        await WaitUntilAsync(() =>
+            viewModel.ShowAnnualSalaryWorkspace
+            && viewModel.StatusMessage == "Jahreslohn 2026 geladen.");
+
+        Assert.True(viewModel.ShowAnnualSalaryWorkspace);
+        Assert.Equal("2026", viewModel.AnnualSalaryYear);
+    }
+
+    [Fact]
     public async Task CancelCommand_AfterCreatingNewEmployee_RestoresPreviousSelection()
     {
         var firstEmployee = TestEmployeeRepository.CreateDetails("1000", "Anna", "Aktiv", "Bern");
